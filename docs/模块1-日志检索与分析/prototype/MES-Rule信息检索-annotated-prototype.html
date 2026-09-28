@@ -1,0 +1,2835 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>MES Rule 信息检索</title>
+<style>
+  /* ============================================================
+     框架样式（固定，勿改）
+     ============================================================ */
+  * { box-sizing: border-box; }
+  :root{
+    --accent:#e5484d;
+    --front:#2563eb;
+    --back:#d97706;
+    --ink:#1a1d21;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --bg:#f4f5f7;
+    --note-bg:#fdf6d8;
+    --note-line:#e8dcae;
+    --note-ink:#4a3f1e;
+    /* 布局钩子：内容区最大宽度。页面可在「页面功能自身样式」区块里按需覆盖
+       （宽表格、多列表单必须放宽），默认值不变以保持既有页面视觉。 */
+    --stage-max:760px;
+  }
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--ink);
+    background:radial-gradient(1200px 600px at 50% -10%,#fff 0%,transparent 60%),var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* 原型内容区 */
+  .stage{
+    max-width:var(--stage-max);
+    margin:48px auto;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:48px;
+    box-shadow:0 1px 2px rgba(16,24,40,.04),0 12px 32px -8px rgba(16,24,40,.10);
+  }
+
+  /* 热区框选：与 .anno / #lines 一样用视口坐标系（position:fixed），
+     这样无论页面滚到哪里，红框都不会漂移 */
+  .hotspot{
+    position:fixed;
+    border:3px solid transparent;
+    border-radius:8px;
+    transition:border-color .14s,box-shadow .14s,opacity .14s;
+    pointer-events:none;
+    opacity:0;
+    z-index:2147483000;   /* 压过所有业务弹窗 */
+  }
+  .hotspot.active{
+    border-color:var(--accent);
+    box-shadow:0 0 0 4px rgba(229,72,77,.12),0 0 24px -4px rgba(229,72,77,.40);
+    opacity:1;
+  }
+
+  /* 引线层 */
+  #lines{
+    position:fixed; inset:0;
+    pointer-events:none;
+    z-index:2147483001;
+    overflow:visible;
+  }
+
+  /* 标注框：文档黄底 */
+  .anno{
+    position:fixed;
+    z-index:2147483002;
+    width:250px;
+    background:var(--note-bg);
+    border:1px solid var(--note-line);
+    border-radius:12px; overflow:hidden;
+    box-shadow:
+      0 1px 2px rgba(120,100,30,.10),
+      0 16px 40px -12px rgba(120,100,30,.35);
+    opacity:0; transform:translateY(6px) scale(.98);
+    transition:opacity .16s ease,transform .16s ease;
+    pointer-events:none;
+  }
+  .anno.show{opacity:1; transform:translateY(0) scale(1);}
+  .anno .head{
+    display:flex; align-items:center; gap:8px;
+    padding:12px 16px;
+    background:linear-gradient(180deg,#fef9e2,#fbf1c9);
+    border-bottom:1px solid var(--note-line);
+  }
+  .anno .dot{
+    width:8px;height:8px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 0 4px rgba(229,72,77,.16);flex:0 0 auto;
+  }
+  .anno h4{margin:0;font-size:13px;font-weight:700;color:#5a4a12;}
+  .anno .body{padding:10px 14px 14px;}
+  .anno .item{
+    display:flex;gap:8px;font-size:12.5px;line-height:1.55;padding:4px 0;
+    color:var(--note-ink);
+  }
+  .anno .item+.item{border-top:1px dashed rgba(180,160,90,.35);}
+  .anno .tag{
+    flex:0 0 auto;height:18px;padding:0 6px;border-radius:5px;
+    font-size:10.5px;font-weight:700;line-height:18px;margin-top:1px;
+  }
+  .anno .item.front .tag{color:#1d4ed8;background:rgba(37,99,235,.16);}
+  .anno .item.back .tag{color:#9a5b00;background:rgba(217,119,6,.20);}
+  .anno .item.front .txt{color:#3f3a1e;}
+  .anno .item.back  .txt{color:#5a4a12;}
+
+  /* 浮动开关 */
+  #toggle{
+    position:fixed; top:20px; right:20px;
+    z-index:2147483003;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:9px 16px; font-size:13px; font-weight:600; color:var(--ink);
+    background:rgba(255,255,255,.88); backdrop-filter:blur(10px);
+    border:1px solid var(--line); border-radius:999px; cursor:pointer;
+    box-shadow:0 6px 18px -8px rgba(16,24,40,.25);
+    transition:box-shadow .15s,transform .12s;
+  }
+  #toggle:hover{box-shadow:0 10px 24px -8px rgba(16,24,40,.35);}
+  #toggle:active{transform:translateY(1px);}
+  #toggle .led{
+    width:8px;height:8px;border-radius:50%;background:#cbd5e1;
+    box-shadow:0 0 0 3px rgba(148,163,184,.18);
+    transition:background .15s,box-shadow .15s;
+  }
+  #toggle.on .led{
+    background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.20);
+  }
+
+  /* ============================================================
+     以下为页面功能自身样式（AI 生成时填充）
+     ============================================================ */
+  :root{
+    /* 布局钩子：宽表格（18 列）必须放宽内容区 */
+    --stage-max:1440px;
+    /* 页面自有令牌（05-视觉与交互规范） */
+    --p:#2f7d5a; --p-hover:#3a9169; --p-bg:#eaf4ef;
+    --err:#ff4d4f; --err-bg:#fff1f0; --warn:#faad14;
+    --t1:rgba(0,0,0,.88); --t2:rgba(0,0,0,.65); --t3:rgba(0,0,0,.45);
+    --bd:#d9d9d9; --split:rgba(0,0,0,.06); --fill:#fafafa;
+    --r:6px; --r-sm:4px; --r-lg:8px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  .page-head{margin:0 0 20px;}
+  /* 本页多处用 hidden 属性切换显隐（折叠区 / 加载遮罩 / 空态），
+     而这些元素自身带 display 声明，必须让 hidden 稳定胜出 */
+  [hidden]{display:none!important;}
+  .crumb{font-size:12px;color:var(--t3);margin-bottom:6px;}
+  .page-head h1{margin:0 0 6px;font-size:20px;font-weight:600;}
+  .page-head .sub{margin:0;font-size:12.5px;color:var(--t2);}
+  .card{border:1px solid var(--bd);border-radius:var(--r-lg);background:#fff;margin:0 0 16px;}
+  .card-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--split);}
+  .card-head h2{margin:0;font-size:15px;font-weight:600;}
+  .card-head .hint{margin-left:auto;font-size:12px;color:var(--t3);}
+
+  /* 筛选区：平铺 12 项 + 排序开关 = 13 格，每行 5 个 → 5 / 5 / 3 */
+  .filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 16px;padding:14px 16px;}
+  .filters.fold{padding-top:0;}
+  .field{display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .field>label{display:flex;align-items:center;gap:4px;font-size:12.5px;line-height:16px;color:var(--t2);white-space:nowrap;}
+  .field .req{color:var(--err);font-weight:700;}
+  .field .tip{font-size:11.5px;color:var(--t3);font-weight:400;overflow:hidden;text-overflow:ellipsis;}
+  .input{font:inherit;font-size:13px;height:32px;padding:0 10px;width:100%;min-width:0;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);}
+  .input::placeholder{color:var(--t3);}
+  .input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 2px rgba(47,125,90,.12);}
+  .input:disabled{background:var(--fill);color:var(--t3);cursor:not-allowed;}
+  .input.invalid{border-color:var(--err);box-shadow:0 0 0 2px rgba(255,77,79,.12);}
+  /* 校验提示常驻占位，只用 visibility 切换，避免高度变化顶走下方按钮 */
+  .field .err{min-height:13px;font-size:11px;line-height:13px;color:var(--err);visibility:hidden;}
+  .field.invalid .err{visibility:visible;}
+  .input-group{display:flex;align-items:center;height:32px;background:#fff;border:1px solid var(--bd);
+    border-radius:var(--r);overflow:hidden;}
+  .input-group .prefix{display:flex;align-items:center;height:100%;padding:0 8px;font-size:12.5px;
+    color:var(--t3);background:var(--fill);border-right:1px solid var(--bd);white-space:nowrap;}
+  .input-group .input{border:0;border-radius:0;height:30px;box-shadow:none;}
+  .input-group .input:focus{box-shadow:none;}
+  .switch{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0;font:inherit;font-size:12.5px;
+    color:var(--t2);background:transparent;border:0;cursor:pointer;}
+  .switch .track{position:relative;width:36px;height:20px;border-radius:999px;background:rgba(0,0,0,.25);
+    transition:background .16s;flex:0 0 auto;}
+  .switch .track::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .16s;}
+  .switch.on{color:var(--t1);}
+  .switch.on .track{background:var(--p);}
+  .switch.on .track::after{left:18px;}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 16px;font:inherit;font-size:13px;
+    color:var(--t1);background:#fff;border:1px solid var(--bd);border-radius:var(--r);cursor:pointer;white-space:nowrap;}
+  .btn:hover{border-color:var(--p);color:var(--p);}
+  .btn.primary{color:#fff;background:var(--p);border-color:var(--p);}
+  .btn.primary:hover{background:var(--p-hover);border-color:var(--p-hover);color:#fff;}
+  .btn.ghost{color:var(--p);background:transparent;border-color:transparent;padding:0 8px;}
+  .btn.ghost:hover{background:var(--p-bg);}
+  .btn:disabled{color:var(--t3);background:var(--fill);border-color:var(--bd);cursor:not-allowed;}
+  .btn:disabled:hover{color:var(--t3);border-color:var(--bd);}
+  /* 主按钮禁用：保持主色底 + 降不透明度（05 §4.7） */
+  .btn.primary:disabled{color:#fff;background:var(--p);border-color:var(--p);opacity:.45;}
+  .btn.primary:disabled:hover{background:var(--p);border-color:var(--p);}
+  .actions{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--split);}
+  .actions .spacer{flex:1;}
+  .vline{width:1px;height:18px;background:var(--split);}
+  .arrow{font-size:10px;line-height:1;}
+
+  /* 结果列表 */
+  .table-wrap{position:relative;overflow:auto;border-bottom:1px solid var(--split);}
+  table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;}
+  table.grid th,table.grid td{height:40px;padding:0 12px;text-align:left;white-space:nowrap;
+    border-bottom:1px solid var(--split);background:transparent;}
+  table.grid th{position:sticky;top:0;z-index:3;background:var(--fill);font-size:12.5px;font-weight:600;
+    color:var(--t2);border-bottom:1px solid var(--bd);}
+  table.grid tbody tr:hover td{background:var(--fill);}
+  table.grid tbody tr.selected td{background:var(--p-bg);}
+  .sel-col{width:40px;padding:0;text-align:center;}
+  table.grid thead td{background:var(--fill);}
+  /* 左右固定列必须自身不透明，否则横向滚动时下方列会透出来 */
+  table.grid td.sticky-left,table.grid td.sticky-right{background:#fff;}
+  table.grid tbody tr:hover td.sticky-left,table.grid tbody tr:hover td.sticky-right{background:var(--fill);}
+  table.grid tbody tr.selected td.sticky-left,table.grid tbody tr.selected td.sticky-right{background:var(--p-bg);}
+  .sticky-left{position:sticky;left:0;z-index:2;box-shadow:1px 0 0 var(--split);}
+  thead .sel-col{position:sticky;top:0;left:0;z-index:5;}
+  .sticky-right{position:sticky;right:0;z-index:2;box-shadow:-1px 0 0 var(--split);}
+  thead .sticky-right{z-index:5;}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  /* 动态耗时列 / EXEC_STATUS：确认后注入，用左侧分隔线标出新增范围 */
+  table.grid th.dyn-col{background:#f4f8f6;box-shadow:inset 1px 0 0 var(--split);}
+  table.grid td.dyn-col{box-shadow:inset 1px 0 0 var(--split);}
+  .cell-error{color:var(--err);background:var(--err-bg)!important;}
+  .cell-hang{text-align:center;}
+  .tag{display:inline-block;font-size:11.5px;line-height:18px;padding:0 6px;border-radius:var(--r-sm);
+    color:var(--t2);background:var(--fill);border:1px solid var(--bd);}
+  .tag.rule{color:#256847;background:var(--p-bg);border-color:rgba(47,125,90,.35);}
+  .tag.txn{color:#0958d9;background:#e8f3ff;border-color:rgba(22,119,255,.35);}
+  .badge{display:inline-block;margin-left:4px;padding:0 4px;font-size:10.5px;line-height:15px;
+    border-radius:999px;color:var(--t2);background:rgba(0,0,0,.06);vertical-align:1px;}
+  .row-radio{width:14px;height:14px;accent-color:var(--p);cursor:pointer;vertical-align:middle;}
+  .hang-btn{font:inherit;font-size:12px;height:24px;padding:0 8px;border-radius:var(--r-sm);
+    color:var(--t3);background:var(--fill);border:1px solid var(--bd);cursor:not-allowed;}
+  .table-overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;
+    gap:10px;font-size:13px;color:var(--t2);background:rgba(255,255,255,.72);}
+  .spinner{width:16px;height:16px;border-radius:50%;border:2px solid rgba(47,125,90,.25);
+    border-top-color:var(--p);animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:56px 16px;font-size:13px;color:var(--t3);}
+  .empty .illu{width:72px;height:48px;border:1px dashed var(--bd);border-radius:var(--r);background:var(--fill);}
+
+  /* 分页 */
+  .pager{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:12.5px;color:var(--t2);}
+  .pager .spacer{flex:1;}
+  .pg-btn{min-width:28px;height:28px;padding:0 8px;font:inherit;font-size:12.5px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);cursor:pointer;}
+  .pg-btn.active{color:var(--p);background:var(--p-bg);border-color:var(--p);}
+  .pg-btn:disabled{color:var(--t3);background:var(--fill);cursor:not-allowed;}
+  .pg-btn.active:disabled{color:var(--t3);background:var(--fill);border-color:var(--bd);}
+  .page-size{height:28px;padding:0 6px;font:inherit;font-size:12.5px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);}
+
+  /* 抽屉 / 弹窗 / 遮罩 / 轻提示 */
+  .mask{position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.45);display:none;}
+  .mask.open{display:block;}
+  .drawer{position:fixed;top:0;right:0;z-index:9999;display:flex;flex-direction:column;width:400px;height:100vh;
+    background:#fff;border-left:1px solid var(--bd);box-shadow:-8px 0 24px rgba(0,0,0,.12);
+    transform:translateX(102%);visibility:hidden;transition:transform .24s,visibility .24s;}
+  .drawer.open{transform:translateX(0);visibility:visible;}
+  .drawer-head{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--split);}
+  .drawer-head h3{margin:0;font-size:15px;}
+  .drawer-head .icon-btn{margin-left:auto;}
+  .icon-btn{width:28px;height:28px;font:inherit;font-size:16px;line-height:1;color:var(--t3);
+    background:transparent;border:0;border-radius:var(--r);cursor:pointer;}
+  .icon-btn:hover{color:var(--t1);background:var(--fill);}
+  .drawer-scope{margin:0;padding:10px 16px;font-size:12px;color:var(--t3);background:var(--fill);
+    border-bottom:1px solid var(--split);}
+  .drawer-body{flex:1;overflow:auto;padding:16px;}
+  .group{margin:0 0 20px;}
+  .group-title{margin-bottom:8px;font-size:12.5px;font-weight:600;color:var(--t1);}
+  .chk{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;color:var(--t2);cursor:pointer;}
+  .chk input{accent-color:var(--p);}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;font-size:12.5px;color:var(--t2);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);cursor:pointer;}
+  .chip input{accent-color:var(--p);}
+  .chip:has(input:checked){color:var(--p);background:var(--p-bg);border-color:var(--p);}
+  .drawer-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--split);}
+
+  .modal{position:fixed;top:50%;left:50%;z-index:10000;display:none;flex-direction:column;
+    width:min(1080px,92vw);max-height:86vh;background:#fff;border-radius:var(--r-lg);overflow:hidden;
+    transform:translate(-50%,-50%);box-shadow:0 24px 70px -20px rgba(0,0,0,.5);}
+  .modal.open{display:flex;}
+  .modal-head{display:flex;align-items:baseline;gap:10px;padding:14px 16px;border-bottom:1px solid var(--split);}
+  .modal-head h3{margin:0;font-size:15px;font-weight:600;}
+  .modal-sub{font-family:var(--mono);font-size:12px;color:var(--t3);}
+  .modal-search{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--split);}
+  .modal-search .input{max-width:420px;}
+  .modal-search .count{font-size:12px;color:var(--t3);}
+  .log-view{flex:1;min-height:260px;max-height:52vh;overflow:auto;padding:8px 0;
+    font-family:var(--mono);font-size:12px;line-height:20px;color:var(--t1);background:#fbfbfc;}
+  /* 日志原文一行一条，长行在显示区内自动换行（保留原文空格，不横向截断） */
+  .log-line{padding:0 16px;white-space:pre-wrap;overflow-wrap:anywhere;}
+  .log-line.err{color:var(--err);background:var(--err-bg);}
+  .log-note{padding:6px 16px;font-family:inherit;font-size:12px;color:var(--t3);text-align:center;}
+  .modal-foot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--split);}
+  .modal-foot .spacer{flex:1;}
+  .toast{position:fixed;top:16px;left:50%;z-index:11000;padding:9px 16px;font-size:13px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);opacity:0;pointer-events:none;
+    transform:translate(-50%,-12px);box-shadow:0 8px 24px -8px rgba(0,0,0,.3);
+    transition:opacity .18s,transform .18s;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  .toast.warn{color:#874d00;background:#fffbe6;border-color:var(--warn);}
+</style>
+</head>
+<body>
+
+<button id="toggle"><span class="led"></span>标注已关闭</button>
+
+<div class="stage" id="stage">
+  <div class="page-head">
+  <div class="crumb">日志检索与分析 · 模块 1 · 功能 1</div>
+  <h1>MES Rule 信息检索</h1>
+  <p class="sub">按条件检索已落成的 MES 块日志；Rule / Txn 两类块一并返回，靠 Request Type 列区分</p>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>查询条件</h2><span class="hint">12 项平铺 + 4 项折叠 + 1 个排序开关</span></div>
+  <div class="filters">
+  <div class="field" data-field="envSelect">
+    <label for="envSelect">Environment</label>
+    <select class="input" id="envSelect"><option value="">不限制</option><option>PROD</option><option>PIRUN</option></select>
+  </div>
+  <div class="field" data-field="serverCategorySelect">
+    <label for="serverCategorySelect">Server Category</label>
+    <select class="input" id="serverCategorySelect"><option value="">不限制</option><option>FAB</option><option>LIST</option><option>QUERY</option><option>IDE</option><option>XSITE</option></select>
+  </div>
+  <div class="field" data-field="serverNumberInput">
+    <label for="serverNumberInput">Server Number <span class="tip" id="serverNumberHint">先选 Server Category</span></label>
+    <div class="input-group">
+      <span class="prefix" id="serverNumberPrefix">srv.</span>
+      <input class="input" id="serverNumberInput" type="text" placeholder="1,2" disabled>
+    </div>
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="startTimeInput">
+    <label for="startTimeInput">开始时间 <span class="req">*</span></label>
+    <input class="input" id="startTimeInput" type="text" value="2026-09-22 09:00" placeholder="YYYY-MM-DD HH:mm">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="endTimeInput">
+    <label for="endTimeInput">结束时间 <span class="req">*</span> <span class="tip">（须晚于或等于开始时间）</span></label>
+    <input class="input" id="endTimeInput" type="text" value="2026-09-22 10:00" placeholder="YYYY-MM-DD HH:mm">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="ruleNameInput">
+    <label for="ruleNameInput">Rule Name</label>
+    <input class="input" id="ruleNameInput" type="text" value="" placeholder="ABC 或 ABC*">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="tidInput">
+    <label for="tidInput">TID</label>
+    <input class="input" id="tidInput" type="text" value="" placeholder="20260811172031.05-0001">
+  </div>
+  <div class="field" data-field="eqpInput">
+    <label for="eqpInput">EQP</label>
+    <input class="input" id="eqpInput" type="text" value="" placeholder="ATTAL01 或 ATTA*">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="carrierInput">
+    <label for="carrierInput">Carrier</label>
+    <input class="input" id="carrierInput" type="text" value="" placeholder="C1200317 或 C1200*">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="lotInput">
+    <label for="lotInput">Lot</label>
+    <input class="input" id="lotInput" type="text" value="" placeholder="A031178 或 A0311*">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="minCostInput">
+    <label for="minCostInput">Min Cost Time <span class="req">*</span> <span class="tip">（秒）</span></label>
+    <input class="input" id="minCostInput" type="text" value="0" placeholder="0">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="maxCostInput">
+    <label for="maxCostInput">Max Cost Time <span class="req">*</span> <span class="tip">（秒）</span></label>
+    <input class="input" id="maxCostInput" type="text" value="999" placeholder="999">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="descTimeToggle">
+    <label>排序</label>
+    <button class="switch" id="descTimeToggle" type="button" aria-pressed="false">
+      <span class="track"></span><span>Desc Time</span>
+    </button>
+  </div>
+  </div>
+
+  <div class="filters fold" id="foldPanel" hidden>
+  <div class="field" data-field="hostIpSelect">
+    <label for="hostIpSelect">Host IP</label>
+    <select class="input" id="hostIpSelect"><option value="">不限制</option><option>10.18.100.1</option><option>10.18.100.2</option><option>10.18.100.3</option></select>
+  </div>
+  <div class="field" data-field="userIdInput">
+    <label for="userIdInput">User ID</label>
+    <input class="input" id="userIdInput" type="text" value="" placeholder="本期置灰" disabled>
+  </div>
+  <div class="field" data-field="errorCodeInput">
+    <label for="errorCodeInput">Error Code</label>
+    <input class="input" id="errorCodeInput" type="text" value="" placeholder="E1024">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="ruleResultSelect">
+    <label for="ruleResultSelect">Rule Result</label>
+    <select class="input" id="ruleResultSelect"><option value="">不限制</option><option>PASS</option><option>CANCELRULE</option></select>
+  </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn ghost" id="btnFold">展开更多条件<span class="arrow">▼</span></button>
+    <span class="spacer"></span>
+    <button class="btn primary" id="btnSearch">Search</button>
+    <button class="btn" id="btnReset">重置</button>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>结果列表</h2>
+    <span class="hint">18 列 · 其中 3 列可隐藏、1 列可选（EXEC_STATUS）</span>
+  </div>
+  <div class="table-wrap">
+    <table class="grid" id="ruleTable">
+      <thead><tr><td class="sel-col sticky-left"></td><th data-col="env">Environment</th><th data-col="hostIp">Host IP</th><th data-col="serverId">Server ID</th><th data-col="ruleName">Rule Name</th><th data-col="requestType">Request Type</th><th data-col="startTime">Start Time</th><th data-col="endTime">End Time</th><th data-col="ruleResult">Rule Result</th><th data-col="errorCode">Error Code</th><th data-col="eqpId">EqpID</th><th data-col="lotId">Lot ID</th><th data-col="carrierId">Carrier ID</th><th data-col="userId">User ID</th><th data-col="tid">TID</th><th data-col="totalCostSec" class="num">Total Cost Time</th><th data-col="itemCostSec" class="num">Item Cost Summary</th><th data-col="unaccountedSec" class="num">UnAccounted Cost</th><th data-col="serverHang" class="sticky-right">Server Hang</th></tr></thead>
+      <tbody id="ruleTableBody">
+<tr data-row="1"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-1"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:58:00.000</td><td data-col="endTime">2026-09-22 09:58:01.200</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId"></td><td data-col="tid">20260922095800.000-0001</td><td data-col="totalCostSec" class="num">1.200</td><td data-col="itemCostSec" class="num">0.820</td><td data-col="unaccountedSec" class="num">0.380</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="2"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-2"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:56:23.000</td><td data-col="endTime">2026-09-22 09:56:32.119</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId"></td><td data-col="tid">20260922095707.137-0002</td><td data-col="totalCostSec" class="num">9.119</td><td data-col="itemCostSec" class="num">8.602</td><td data-col="unaccountedSec" class="num">0.517</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="3"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-3"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:54:46.000</td><td data-col="endTime">2026-09-22 09:55:03.038</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId"></td><td data-col="tid">20260922095614.274-0003</td><td data-col="totalCostSec" class="num">17.038</td><td data-col="itemCostSec" class="num">16.384</td><td data-col="unaccountedSec" class="num">0.654</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="4"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-4"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:53:09.000</td><td data-col="endTime">2026-09-22 09:53:33.957</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId"></td><td data-col="tid">20260922095521.411-0004</td><td data-col="totalCostSec" class="num">24.957</td><td data-col="itemCostSec" class="num">24.166</td><td data-col="unaccountedSec" class="num">0.791</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="5"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-5"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:51:32.000</td><td data-col="endTime">2026-09-22 09:52:04.876</td><td data-col="ruleResult" class="cell-error">CANCELRULE</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId"></td><td data-col="tid">20260922095428.548-0005</td><td data-col="totalCostSec" class="num">32.876</td><td data-col="itemCostSec" class="num">31.948</td><td data-col="unaccountedSec" class="num">0.928</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="6"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-6"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:49:55.000</td><td data-col="endTime">2026-09-22 09:50:35.795</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId"></td><td data-col="tid">20260922095335.685-0006</td><td data-col="totalCostSec" class="num">40.795</td><td data-col="itemCostSec" class="num">39.730</td><td data-col="unaccountedSec" class="num">1.065</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="7"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-7"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:48:18.000</td><td data-col="endTime">2026-09-22 09:49:06.714</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId"></td><td data-col="tid">20260922095242.822-0007</td><td data-col="totalCostSec" class="num">48.714</td><td data-col="itemCostSec" class="num">47.512</td><td data-col="unaccountedSec" class="num">1.202</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="8"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-8"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:46:41.000</td><td data-col="endTime">2026-09-22 09:47:37.633</td><td data-col="ruleResult">RETRY</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId"></td><td data-col="tid">20260922095149.959-0008</td><td data-col="totalCostSec" class="num">56.633</td><td data-col="itemCostSec" class="num">56.194</td><td data-col="unaccountedSec" class="num">0.439</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="9"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-9"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:45:04.000</td><td data-col="endTime">2026-09-22 09:46:08.552</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId"></td><td data-col="tid">20260922095056.096-0009</td><td data-col="totalCostSec" class="num">64.552</td><td data-col="itemCostSec" class="num">63.976</td><td data-col="unaccountedSec" class="num">0.576</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="10"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-10"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:43:27.000</td><td data-col="endTime">2026-09-22 09:44:39.471</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId"></td><td data-col="tid">20260922094903.233-0010</td><td data-col="totalCostSec" class="num">72.471</td><td data-col="itemCostSec" class="num">71.758</td><td data-col="unaccountedSec" class="num">0.713</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="11"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-11"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:41:50.000</td><td data-col="endTime">2026-09-22 09:43:10.390</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId"></td><td data-col="tid">20260922094810.370-0011</td><td data-col="totalCostSec" class="num">80.390</td><td data-col="itemCostSec" class="num">79.540</td><td data-col="unaccountedSec" class="num">0.850</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="12"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-12"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:40:13.000</td><td data-col="endTime">2026-09-22 09:41:41.309</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId"></td><td data-col="tid">20260922094717.507-0012</td><td data-col="totalCostSec" class="num">88.309</td><td data-col="itemCostSec" class="num">87.322</td><td data-col="unaccountedSec" class="num">0.987</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="13"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-13"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:38:36.000</td><td data-col="endTime">2026-09-22 09:40:12.228</td><td data-col="ruleResult" class="cell-error">CANCELRULE</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId"></td><td data-col="tid">20260922094624.644-0013</td><td data-col="totalCostSec" class="num">96.228</td><td data-col="itemCostSec" class="num">95.104</td><td data-col="unaccountedSec" class="num">1.124</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="14"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-14"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:36:59.000</td><td data-col="endTime">2026-09-22 09:38:43.147</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId"></td><td data-col="tid">20260922094531.781-0014</td><td data-col="totalCostSec" class="num">104.147</td><td data-col="itemCostSec" class="num">102.886</td><td data-col="unaccountedSec" class="num">1.261</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="15"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-15"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:35:22.000</td><td data-col="endTime">2026-09-22 09:37:14.066</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId"></td><td data-col="tid">20260922094438.918-0015</td><td data-col="totalCostSec" class="num">112.066</td><td data-col="itemCostSec" class="num">111.568</td><td data-col="unaccountedSec" class="num">0.498</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="16"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-16"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:33:45.000</td><td data-col="endTime">2026-09-22 09:35:44.985</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId"></td><td data-col="tid">20260922094345.055-0016</td><td data-col="totalCostSec" class="num">119.985</td><td data-col="itemCostSec" class="num">119.350</td><td data-col="unaccountedSec" class="num">0.635</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="17"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-17"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:32:08.000</td><td data-col="endTime">2026-09-22 09:34:15.904</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId"></td><td data-col="tid">20260922094252.192-0017</td><td data-col="totalCostSec" class="num">127.904</td><td data-col="itemCostSec" class="num">127.132</td><td data-col="unaccountedSec" class="num">0.772</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="18"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-18"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:30:31.000</td><td data-col="endTime">2026-09-22 09:32:46.823</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId"></td><td data-col="tid">20260922094159.329-0018</td><td data-col="totalCostSec" class="num">135.823</td><td data-col="itemCostSec" class="num">134.914</td><td data-col="unaccountedSec" class="num">0.909</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="19"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-19"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:28:54.000</td><td data-col="endTime">2026-09-22 09:31:17.742</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId"></td><td data-col="tid">20260922094006.466-0019</td><td data-col="totalCostSec" class="num">143.742</td><td data-col="itemCostSec" class="num">142.696</td><td data-col="unaccountedSec" class="num">1.046</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="20"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-20"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:27:17.000</td><td data-col="endTime">2026-09-22 09:29:48.661</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId"></td><td data-col="tid">20260922093913.603-0020</td><td data-col="totalCostSec" class="num">151.661</td><td data-col="itemCostSec" class="num">150.478</td><td data-col="unaccountedSec" class="num">1.183</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+      </tbody>
+    </table>
+    <div class="table-overlay" id="tableOverlay" hidden><span class="spinner"></span><span>加载中…</span></div>
+    <div class="empty" id="emptyState" hidden><div class="illu"></div><div>暂无数据 —— 填写条件后点 Search 开始检索</div></div>
+  </div>
+  <div class="pager" id="pager">
+    <span id="pagerTotal">共 128 条</span>
+    <span class="spacer"></span>
+    <select class="page-size" id="pageSize"><option>20</option><option>50</option><option>100</option></select>
+    <span>条 / 页</span>
+    <button class="pg-btn" disabled>‹</button>
+    <button class="pg-btn active">1</button>
+    <button class="pg-btn">2</button>
+    <button class="pg-btn">3</button>
+    <button class="pg-btn">4</button>
+    <button class="pg-btn">5</button>
+    <button class="pg-btn">6</button>
+    <button class="pg-btn">7</button>
+    <button class="pg-btn">›</button>
+  </div>
+  <div class="actions">
+    <button class="btn" id="btnExport">Export</button>
+    <span class="vline"></span>
+    <button class="btn primary" id="btnFullLog" disabled>Full Log</button>
+    <button class="btn primary" id="btnRuleLog" disabled>Rule Log</button>
+    <span class="spacer"></span>
+    <button class="btn" id="btnOptionalCols">可选列</button>
+  </div>
+</section>
+
+<div class="mask" id="drawerMask"></div>
+<aside class="drawer" id="colDrawer" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>列设置</h3>
+    <button class="icon-btn" id="btnDrawerClose" type="button">×</button>
+  </div>
+  <p class="drawer-scope">本设置作用于本页「结果列表」；点确认即按当前页数据重渲染，不重新查询。</p>
+  <div class="drawer-body">
+    <div class="group">
+      <div class="group-title">可隐藏列（默认显示）</div>
+      <label class="chk"><input type="checkbox" id="chkTotalCost" checked> Total Cost Time</label>
+      <label class="chk"><input type="checkbox" id="chkItemCost" checked> Item Cost Summary</label>
+      <label class="chk"><input type="checkbox" id="chkUnaccounted" checked> UnAccounted Cost</label>
+      <label class="chk"><input type="checkbox" id="chkExecStatus"> EXEC_STATUS</label>
+    </div>
+    <div class="group">
+      <div class="group-title">Lock Object（每选中一项追加一列）</div>
+      <div class="chips" id="lockObjectBox">
+        <label class="chip"><input type="checkbox" value="EQP">EQP</label>
+        <label class="chip"><input type="checkbox" value="CARRIER">CARRIER</label>
+        <label class="chip"><input type="checkbox" value="LOT">LOT</label>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-title">Call Sys（每选中一项追加一列）</div>
+      <div class="chips" id="callSysBox">
+        <label class="chip"><input type="checkbox" value="MCS">MCS</label>
+        <label class="chip"><input type="checkbox" value="R2R">R2R</label>
+        <label class="chip"><input type="checkbox" value="RMS">RMS</label>
+        <label class="chip"><input type="checkbox" value="SPC">SPC</label>
+        <label class="chip"><input type="checkbox" value="RTD">RTD</label>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn" id="btnDrawerClose2" type="button">关闭</button>
+    <button class="btn primary" id="btnDrawerConfirm" type="button">确认</button>
+  </div>
+</aside>
+
+<div class="mask" id="detailMask"></div>
+<div class="modal" id="detailModal" role="dialog" aria-hidden="true">
+  <div class="modal-head">
+    <h3>Rule Info Detail</h3>
+    <span class="modal-sub">FABsrv.10 · ruleName POST · lotId A031178 · eqpId ATTAL01</span>
+  </div>
+  <div class="modal-search">
+    <input class="input" id="detailSearch" type="text" placeholder="在已加载的日志行中搜索">
+    <span class="count" id="detailSearchCount"></span>
+  </div>
+  <div class="log-view" id="detailLogList"></div>
+  <div class="modal-foot">
+    <span class="spacer"></span>
+    <button class="btn primary" id="btnFullDownload" type="button" hidden>全量下载</button>
+    <button class="btn" id="btnCauseAnalysis" type="button" disabled>成因分析</button>
+    <button class="btn" id="btnCloseDetail" type="button">退出</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var DEF = { start: '2026-09-22 09:00', end: '2026-09-22 10:00', min: '0', max: '999' };
+  var FOLD_KEY = 'mes-rule-info:fold';
+  var TIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
+
+  /* 状态记忆：本机存储不可用（如沙箱 file://）时静默降级 */
+  function store(key, val) {
+    try {
+      if (val === undefined) return localStorage.getItem(key);
+      localStorage.setItem(key, val);
+    } catch (e) { return null; }
+    return null;
+  }
+
+  var toastEl = $('toast'), toastTimer = null;
+  function toast(msg, kind) {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast show' + (kind ? ' ' + kind : '');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.className = 'toast'; }, 2400);
+  }
+
+  /* 校验提示：常驻占位，只切 visibility，避免高度变化顶走下方按钮 */
+  function setErr(id, msg) {
+    var box = document.querySelector('[data-field="' + id + '"]');
+    if (!box) return;
+    box.classList.toggle('invalid', !!msg);
+    var el = $(id);
+    if (el) el.classList.toggle('invalid', !!msg);
+    var slot = box.querySelector('.err');
+    if (slot && msg) slot.textContent = msg;
+  }
+  function clearErr() {
+    var boxes = document.querySelectorAll('.field.invalid');
+    for (var i = 0; i < boxes.length; i++) boxes[i].classList.remove('invalid');
+    var inputs = document.querySelectorAll('.input.invalid');
+    for (var j = 0; j < inputs.length; j++) inputs[j].classList.remove('invalid');
+  }
+
+  function parseTime(t) {
+    if (!TIME_RE.test(t || '')) return null;
+    var d = new Date(t.replace(' ', 'T') + ':00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function fmtTime(d) {
+    var z = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' +
+      z(d.getHours()) + ':' + z(d.getMinutes());
+  }
+  function shiftTime(t, minutes) {
+    var d = parseTime(t) || new Date(2026, 8, 22, 10, 0, 0);
+    d.setMinutes(d.getMinutes() + minutes);
+    return fmtTime(d);
+  }
+
+  /* 折叠区：默认收起；收起那一刻立即清空这 4 项的值 */
+  function setFold(open) {
+    $('foldPanel').hidden = !open;
+    $('btnFold').innerHTML = open ? '收起更多条件<span class="arrow">▲</span>'
+      : '展开更多条件<span class="arrow">▼</span>';
+    if (!open) {
+      $('hostIpSelect').value = '';
+      $('userIdInput').value = '';
+      $('errorCodeInput').value = '';
+      $('ruleResultSelect').value = '';
+      setErr('errorCodeInput', '');
+    }
+    store(FOLD_KEY, open ? '1' : '0');
+  }
+  $('btnFold').addEventListener('click', function () { setFold($('foldPanel').hidden); });
+
+  /* Server Number 依赖 Server Category：为空置灰并清值，否则拼出 SERVER_ID */
+  function syncServer() {
+    var cat = $('serverCategorySelect').value;
+    var num = $('serverNumberInput');
+    num.disabled = !cat;
+    if (!cat) num.value = '';
+    $('serverNumberPrefix').textContent = (cat || '') + 'srv.';
+    $('serverNumberHint').textContent = cat
+      ? '→ ' + cat + 'srv.' + (num.value.trim() || '1')
+      : '先选 Server Category';
+  }
+  $('serverCategorySelect').addEventListener('change', syncServer);
+  $('serverNumberInput').addEventListener('input', syncServer);
+
+  /* Environment 变化 → 重取 Host IP 候选并清空已选值 */
+  $('envSelect').addEventListener('change', function () {
+    var had = !!$('hostIpSelect').value;
+    $('hostIpSelect').value = '';
+    toast('已按 Environment 重取 Host IP 候选' + (had ? '，原已选值已清空' : ''));
+  });
+
+  /* 排序开关：只影响排序，不影响过滤 */
+  $('descTimeToggle').addEventListener('click', function () {
+    var on = this.classList.toggle('on');
+    this.setAttribute('aria-pressed', on ? 'true' : 'false');
+    toast(on ? 'START_TIME 倒排（新 → 旧）' : 'START_TIME 正序（旧 → 新）');
+  });
+
+  /* 即时校验：时间 */
+  function checkTime() {
+    var s = $('startTimeInput').value.trim(), e = $('endTimeInput').value.trim();
+    if (!s && !e) { setErr('startTimeInput', '请填写开始时间与结束时间'); return false; }
+    if (!TIME_RE.test(s) || !TIME_RE.test(e)) {
+      setErr('startTimeInput', '时间格式应为 YYYY-MM-DD HH:mm（精确到分钟）');
+      setErr('endTimeInput', '时间格式应为 YYYY-MM-DD HH:mm（精确到分钟）');
+      return false;
+    }
+    var a = parseTime(s), b = parseTime(e);
+    if (a > b) { setErr('endTimeInput', '开始时间必须早于或等于结束时间'); return false; }
+    if (b - a > 86400000) { setErr('endTimeInput', '起止跨度不能超过 1 天'); return false; }
+    setErr('startTimeInput', '');
+    setErr('endTimeInput', '');
+    return true;
+  }
+  $('startTimeInput').addEventListener('input', checkTime);
+  $('endTimeInput').addEventListener('input', checkTime);
+  $('startTimeInput').addEventListener('blur', function () {
+    if (!this.value.trim()) { this.value = shiftTime($('endTimeInput').value, -60); checkTime(); }
+  });
+  $('endTimeInput').addEventListener('blur', function () {
+    if (!this.value.trim()) { this.value = shiftTime($('startTimeInput').value, 60); checkTime(); }
+  });
+
+  /* 即时校验：星号规则（Rule Name / EQP / Carrier / Lot 四框一致） */
+  var STAR = [['ruleNameInput', 'Rule Name'], ['eqpInput', 'EQP'], ['carrierInput', 'Carrier'], ['lotInput', 'Lot']];
+  function checkStar(id, label) {
+    var v = $(id).value.trim();
+    if (!v) { setErr(id, ''); return true; }
+    if (!/^[^*,]+$/.test(v) && !/^[^*,]+\*$/.test(v)) {
+      setErr(id, label + '：只支持 ABC 精确匹配或 ABC* 前缀匹配');
+      return false;
+    }
+    setErr(id, '');
+    return true;
+  }
+  STAR.forEach(function (pair) {
+    $(pair[0]).addEventListener('input', function () { checkStar(pair[0], pair[1]); });
+  });
+
+  /* 即时校验：Min / Max Cost Time（单位秒，发请求时 × 1000） */
+  function checkCost() {
+    var ok = true;
+    var min = $('minCostInput').value.trim(), max = $('maxCostInput').value.trim();
+    var form = /^\d{1,3}(\.\d{1,2})?$/;
+    if (!form.test(min) || Number(min) > 999.99) { setErr('minCostInput', '取值 0 ~ 999.99（秒，最多 2 位小数）'); ok = false; }
+    else setErr('minCostInput', '');
+    if (!form.test(max) || Number(max) > 999.99) { setErr('maxCostInput', '取值 0 ~ 999.99（秒，最多 2 位小数）'); ok = false; }
+    else setErr('maxCostInput', '');
+    if (ok && Number(min) > Number(max)) { setErr('maxCostInput', 'Max Cost Time 不能小于 Min Cost Time'); ok = false; }
+    return ok;
+  }
+  $('minCostInput').addEventListener('input', checkCost);
+  $('maxCostInput').addEventListener('input', checkCost);
+  $('minCostInput').addEventListener('blur', function () { if (!this.value.trim()) { this.value = '0'; checkCost(); } });
+  $('maxCostInput').addEventListener('blur', function () { if (!this.value.trim()) { this.value = '999'; checkCost(); } });
+
+  /* 校验：Server Number（点 Search 那一刻才校验） */
+  function checkServerNumber() {
+    var v = $('serverNumberInput').value.trim();
+    if (!v) { setErr('serverNumberInput', ''); return true; }
+    if (/[\uFF0C\u3001;\uFF1B]/.test(v)) { setErr('serverNumberInput', '只认英文逗号，且不能含空段'); return false; }
+    var parts = v.split(',');
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i].trim();
+      if (!/^[0-9]+$/.test(p) || Number(p) < 1 || Number(p) > 1000) {
+        setErr('serverNumberInput', '每段须为 1 ~ 1000 的正整数');
+        return false;
+      }
+    }
+    setErr('serverNumberInput', '');
+    return true;
+  }
+
+  /* 列表状态与按钮可用性 */
+  var state = { busy: false, hasData: true, selected: null };
+  var tbody = $('ruleTableBody');
+  function syncActions() {
+    $('btnExport').disabled = state.busy || !state.hasData;
+    $('btnRuleLog').disabled = state.busy || !state.selected;
+    $('btnFullLog').disabled = state.busy || !state.selected;
+  }
+  /* 分页组件始终显示，但未查询态下不可用、总数为 0 */
+  function syncPager() {
+    $('pagerTotal').textContent = state.hasData ? '共 128 条' : '共 0 条';
+    var btns = $('pager').querySelectorAll('.pg-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].disabled = !state.hasData || i === 0;
+  }
+  function setSelection(tr) {
+    var rows = tbody.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+      var on = rows[i] === tr;
+      rows[i].classList.toggle('selected', on);
+      var radio = rows[i].querySelector('.row-radio');
+      if (radio) radio.checked = on;
+    }
+    state.selected = tr ? tr.getAttribute('data-row') : null;
+    syncActions();
+  }
+  tbody.addEventListener('click', function (ev) {
+    var tr = ev.target.closest ? ev.target.closest('tr') : null;
+    if (!tr) return;
+    setSelection(tr.classList.contains('selected') ? null : tr);
+  });
+
+  $('btnSearch').addEventListener('click', function () {
+    var ok = checkTime();
+    if (!checkServerNumber()) ok = false;
+    if (!checkCost()) ok = false;
+    STAR.forEach(function (pair) { if (!checkStar(pair[0], pair[1])) ok = false; });
+    if (!ok) { toast('条件不合法，已拦住本次检索', 'warn'); return; }
+    state.busy = true;
+    setSelection(null);
+    $('ruleTable').hidden = false;
+    $('emptyState').hidden = true;
+    $('tableOverlay').hidden = false;
+    syncActions();
+    setTimeout(function () {
+      state.busy = false;
+      state.hasData = true;
+      $('tableOverlay').hidden = true;
+      syncActions();
+      syncPager();
+      toast('已按当前条件查询第 1 页（共 128 条）');
+    }, 800);
+  });
+
+  $('btnReset').addEventListener('click', function () {
+    ['envSelect', 'serverCategorySelect', 'serverNumberInput', 'ruleNameInput', 'tidInput',
+      'eqpInput', 'carrierInput', 'lotInput'].forEach(function (id) { $(id).value = ''; });
+    $('startTimeInput').value = DEF.start;
+    $('endTimeInput').value = DEF.end;
+    $('minCostInput').value = DEF.min;
+    $('maxCostInput').value = DEF.max;
+    $('descTimeToggle').classList.remove('on');
+    $('descTimeToggle').setAttribute('aria-pressed', 'false');
+    setFold(false);
+    clearErr();
+    syncServer();
+    setSelection(null);
+    state.hasData = false;
+    $('ruleTable').hidden = true;
+    $('emptyState').hidden = false;
+    syncActions();
+    syncPager();
+    toast('条件已恢复默认，列表回到未查询态（不自动查询）');
+  });
+
+  $('btnExport').addEventListener('click', function () {
+    toast('已导出当前页显示中的列 → RuleInfo_20260922100012.xlsx');
+  });
+  $('btnFullLog').addEventListener('click', function () {
+    toast('已下载该块涉及全部文件的全量日志（zip）');
+  });
+
+  /* 列设置抽屉 */
+  function openDrawer() {
+    $('colDrawer').classList.add('open');
+    $('drawerMask').classList.add('open');
+  }
+  function closeDrawer() {
+    $('colDrawer').classList.remove('open');
+    $('drawerMask').classList.remove('open');
+  }
+  $('btnOptionalCols').addEventListener('click', openDrawer);
+  $('btnDrawerClose').addEventListener('click', closeDrawer);
+  $('btnDrawerClose2').addEventListener('click', closeDrawer);
+  $('drawerMask').addEventListener('click', closeDrawer);
+  $('btnDrawerConfirm').addEventListener('click', function () {
+    applyColumns();
+    closeDrawer();
+    var shown = document.querySelectorAll('#ruleTable thead tr > *:not([hidden])').length;
+    var added = dynColumns().map(function (c) { return c.label; });
+    toast('列设置已应用：当前 ' + shown + ' 列' +
+      (added.length ? '，已追加 ' + added.join('、') : '，无动态耗时列'));
+  });
+  function picked(box) {
+    var inputs = box.querySelectorAll('input:checked');
+    var out = [];
+    for (var i = 0; i < inputs.length; i++) out.push(inputs[i].value);
+    return out;
+  }
+  $('lockObjectBox').addEventListener('change', function () {
+    var list = picked(this);
+    store('mes-rule-info:lock', list.join(','));
+    toast(list.length ? '待确认：将追加 ' + list.map(function (v) { return 'Lock ' + v; }).join('、')
+      : '待确认：移除全部 Lock 动态列');
+  });
+  $('callSysBox').addEventListener('change', function () {
+    var list = picked(this);
+    store('mes-rule-info:call', list.join(','));
+    toast(list.length ? '待确认：将追加 ' + list.map(function (v) { return 'Call ' + v; }).join('、')
+      : '待确认：移除全部 Call 动态列');
+  });
+
+  /* 列设置：确认后按勾选重渲染列表列（静态列显隐 + 动态列增删），不重新查询 */
+  var EXEC_STATUS = ['已完成', '已完成', '已完成', '中断', '已完成', '超时封口', '已完成', '已完成'];
+  /* 动态耗时列取值 = 块行数据 COST_BREAKDOWN 里 ITEM 与 GROUP 命中那条的 SUM_MS（原型用确定性算法模拟，缺项返回 null） */
+  function nameHash(name) {
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h += name.charCodeAt(i) * (i + 7);
+    return h;
+  }
+  function breakdownMs(kind, name, i) {
+    if (kind === 'lock' && i % 5 === 0) return null;
+    if (kind === 'call' && i % 7 === 0) return null;
+    return 40 + ((kind === 'lock' ? 251 : 397) + nameHash(name) + i * 53) % 3800;
+  }
+  function dynColumns() {
+    var cols = [];
+    if ($('chkExecStatus').checked) {
+      cols.push({ label: 'EXEC_STATUS', align: 'center',
+        value: function (i) { return EXEC_STATUS[i % EXEC_STATUS.length]; } });
+    }
+    picked($('lockObjectBox')).forEach(function (obj) {
+      cols.push({ label: 'Lock ' + obj, align: 'right', value: function (i) {
+        var ms = breakdownMs('lock', obj, i);
+        return ms === null ? '' : (ms / 1000).toFixed(3);
+      } });
+    });
+    picked($('callSysBox')).forEach(function (sys) {
+      cols.push({ label: 'Call ' + sys, align: 'right', value: function (i) {
+        var ms = breakdownMs('call', sys, i);
+        return ms === null ? '' : (ms / 1000).toFixed(3);
+      } });
+    });
+    return cols;
+  }
+  function toggleCol(key, show) {
+    var cells = document.querySelectorAll('#ruleTable [data-col="' + key + '"]');
+    for (var i = 0; i < cells.length; i++) cells[i].hidden = !show;
+  }
+  function dynCell(tag, text, align) {
+    var el = document.createElement(tag);
+    el.setAttribute('data-dyn', '1');
+    el.className = 'dyn-col' + (align === 'right' ? ' num' : '');
+    el.textContent = text;
+    return el;
+  }
+  function applyColumns() {
+    toggleCol('totalCostSec', $('chkTotalCost').checked);
+    toggleCol('itemCostSec', $('chkItemCost').checked);
+    toggleCol('unaccountedSec', $('chkUnaccounted').checked);
+    var stale = document.querySelectorAll('#ruleTable [data-dyn]');
+    for (var s = 0; s < stale.length; s++) stale[s].parentNode.removeChild(stale[s]);
+    var cols = dynColumns();
+    if (!cols.length) return;
+    var head = document.querySelector('#ruleTable thead tr');
+    var headAt = head.querySelector('[data-col="serverHang"]');
+    var rows = tbody.querySelectorAll('tr');
+    for (var c = 0; c < cols.length; c++) {
+      head.insertBefore(dynCell('th', cols[c].label, cols[c].align), headAt);
+      for (var r = 0; r < rows.length; r++) {
+        var idx = Number(rows[r].getAttribute('data-row')) - 1;
+        var at = rows[r].querySelector('[data-col="serverHang"]');
+        rows[r].insertBefore(dynCell('td', cols[c].value(idx), cols[c].align), at);
+      }
+    }
+  }
+
+  /* Rule Info Detail 弹窗：游标式按需加载 */
+  var BATCH = 40, MAX_LINES = 120, detail = { lines: 0, done: false, loading: false };
+  /* 日志行格式：MM/DD/YY HH:mm:ss.SS + 空格 + Server 名 + 冒号 + 日志原文。
+     首行即真实块日志的原文样例，其余行按同一格式续写（同一 Server、时间递增）。 */
+  var LOG_SERVER = 'FABsrv.10';
+  var LOG_BODY = [
+    'FwEventManager:message to process: :>>L FwSrvExecuteRuleTxn subjectName="" msgTag="" sendAck=F systemLevelObjects={ } allReferences={ } dirtySubObjects={ } securityContext="" defaultPartitionId=-1 isSecure=F tid="" ruleName="POST" lotId="A031178" eqpId="ATTAL01" attributes={ { class=ASSOC { class=A1 "FWCLIENT" } { class=A1 "FwSrv" } } { "PLAN" "ATNC100005L1P1A01.2" } { "PRODUCT" "T0314A.2" } { "SEQUENCE" "029500.1.029500" } { "STEP" "S-T-TKAL-B-01.0" } { "TIMESTAMP" "3025" } { "USER" "EAP" } } ',
+    'FwSrvRuleRunner:start rule ruleName="POST" tid="20260811172031.05-0001"',
+    'FwRuleDataAccess:select rule condition eqpId="ATTAL01" lotId="A031178" carrierId="C1200317"',
+    'FwRuleEngine:execute rule "POST" branch 1/3 cost=3ms',
+    'FwRuleEngine:execute rule "POST" branch 2/3 cost=6ms',
+    'FWLockMgr:lock object LOT key="A031178" hold=8ms',
+    'FwCarrierMgr:query carrier by lotId="A031178" result=C1200317 state=LOADED',
+    'FwTxnSender:message to send subject="FWCarrierMove" target=MCS ack=F',
+    'FWLockMgr:lock object CARRIER key="C1200317" hold=240ms',
+    '<ERROR> FwLockMgr:lock object CARRIER timeout after 240ms',
+    'FwRuleEngine:execute rule "POST" result=CANCELRULE reason=CARRIER_LOCK_TIMEOUT',
+    'FwEventManager:message to process: :>>L FwSrvExecuteRuleTxn subjectName="FWCarrierMove" msgTag="ACK" tid="20260811172031.05-0001" ruleName="POST" lotId="A031178" eqpId="ATTAL01"',
+  ];
+  function logText(i) {
+    var z = function (n) { return (n < 10 ? '0' : '') + n; };
+    var d = new Date(2026, 7, 11, 17, 20, 31, 50);
+    d.setMilliseconds(50 + (i - 1) * 70);
+    var cs = ('0' + Math.floor(d.getMilliseconds() / 10)).slice(-2);
+    var stamp = z(d.getMonth() + 1) + '/' + z(d.getDate()) + '/' + String(d.getFullYear()).slice(-2) + ' ' +
+      z(d.getHours()) + ':' + z(d.getMinutes()) + ':' + z(d.getSeconds()) + '.' + cs;
+    return stamp + ' ' + LOG_SERVER + ':' + LOG_BODY[(i - 1) % LOG_BODY.length];
+  }
+  function loadBatch() {
+    if (detail.done || detail.loading) return;
+    detail.loading = true;
+    var list = $('detailLogList');
+    var note = document.createElement('div');
+    note.className = 'log-note';
+    note.textContent = '正在加载下一批日志…';
+    list.appendChild(note);
+    setTimeout(function () {
+      list.removeChild(note);
+      for (var i = 0; i < BATCH && detail.lines < MAX_LINES; i++) {
+        detail.lines += 1;
+        var text = logText(detail.lines);
+        var line = document.createElement('div');
+        line.className = 'log-line' + (text.indexOf('<ERROR>') >= 0 || text.indexOf('CANCELRULE') >= 0 ? ' err' : '');
+        line.textContent = text;
+        list.appendChild(line);
+      }
+      detail.loading = false;
+      if (detail.lines >= MAX_LINES) {
+        detail.done = true;
+        var end = document.createElement('div');
+        end.className = 'log-note';
+        end.textContent = '—— 搜索完毕 ——';
+        list.appendChild(end);
+        $('btnFullDownload').hidden = false;
+      }
+    }, 420);
+  }
+  function openDetail() {
+    detail = { lines: 0, done: false, loading: false };
+    $('detailLogList').innerHTML = '';
+    $('detailSearch').value = '';
+    $('detailSearchCount').textContent = '';
+    $('btnFullDownload').hidden = true;
+    $('detailModal').classList.add('open');
+    $('detailMask').classList.add('open');
+    $('detailModal').setAttribute('aria-hidden', 'false');
+    loadBatch();
+  }
+  function closeDetail() {
+    $('detailModal').classList.remove('open');
+    $('detailMask').classList.remove('open');
+    $('detailModal').setAttribute('aria-hidden', 'true');
+  }
+  $('btnRuleLog').addEventListener('click', openDetail);
+  $('btnCloseDetail').addEventListener('click', closeDetail);
+  $('detailMask').addEventListener('click', closeDetail);
+  $('detailLogList').addEventListener('scroll', function () {
+    if (this.scrollTop + this.clientHeight >= this.scrollHeight - 8) loadBatch();
+  });
+  $('detailSearch').addEventListener('input', function () {
+    var q = this.value.trim().toLowerCase();
+    var lines = $('detailLogList').querySelectorAll('.log-line');
+    var hits = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var hit = !q || lines[i].textContent.toLowerCase().indexOf(q) >= 0;
+      lines[i].style.display = hit ? '' : 'none';
+      if (hit && q) hits += 1;
+    }
+    $('detailSearchCount').textContent = q ? '命中 ' + hits + ' 行（仅过滤已加载部分）' : '';
+  });
+  $('btnFullDownload').addEventListener('click', function () {
+    toast('已下载该块全部日志 → RuleLog_FABsrv.1_20260922100012.log');
+  });
+
+  /* 进页面：折叠区按上次状态还原；Host IP 候选与是否收起无关，照旧先取 */
+  setFold(store(FOLD_KEY) === '1');
+  syncServer();
+  syncActions();
+  syncPager();
+})();
+
+</script>
+  <!-- 机器可读规格清单：AI / 开发者照此实现真实页面；人类标注由它派生，二者不会漂移 -->
+  <script type="application/json" id="prototype-spec">
+{
+  "schema": "annotated-prototype/spec@1",
+  "title": "MES Rule 信息检索",
+  "summary": "三段式整页：上 = 查询条件区（12 项平铺 + 4 项折叠 + 1 个排序开关，装进 POST 的 parameters），中 = 结果列表（分页 + 列设置抽屉，列值一律取当前页出参），下 = 针对列表中选中行的操作按钮（Export、Rule Log、Full Log、可选列），另含 Rule Info Detail 弹窗（游标式按需加载）。接口口径依 01 文档 §5。",
+  "regions": [
+    {
+      "id": "search",
+      "label": "查询条件区",
+      "role": "search",
+      "desc": "平铺 12 项 + 排序开关共 13 格，每行 5 个 → 5 / 5 / 3；折叠区 4 项默认收起；末尾一行放折叠开关与 Search、重置"
+    },
+    {
+      "id": "list",
+      "label": "结果列表区",
+      "role": "table",
+      "desc": "分页列表 + 分页组件；默认每页 20 条（档位 20、50、100），总条数取出参 total"
+    },
+    {
+      "id": "actions",
+      "label": "底部操作区",
+      "role": "actions",
+      "desc": "Export、Rule Log、Full Log、可选列"
+    },
+    {
+      "id": "drawer",
+      "label": "列设置抽屉",
+      "role": "drawer",
+      "desc": "可隐藏三列与 EXEC_STATUS 的显隐、Lock Object 与 Call Sys 两个多选；确认后按当前页出参就地重渲染列"
+    },
+    {
+      "id": "detail",
+      "label": "Rule Info Detail 弹窗",
+      "role": "detail",
+      "desc": "全局搜索行 + 日志行滚动区（游标式按需加载）+ 底部全量下载、成因分析、退出"
+    }
+  ],
+  "apis": [
+    {
+      "id": "envList",
+      "method": "GET",
+      "path": "/api/v1/env/list",
+      "desc": "Environment 候选"
+    },
+    {
+      "id": "ipAddressList",
+      "method": "GET",
+      "path": "/api/v1/ipaddress/list",
+      "desc": "Host IP 候选（入参 environment 可缺省）"
+    },
+    {
+      "id": "serverCategoryList",
+      "method": "GET",
+      "path": "/api/v1/server_category/list",
+      "desc": "Server Category 候选"
+    },
+    {
+      "id": "ruleResultList",
+      "method": "GET",
+      "path": "/api/v1/rule_result/list",
+      "desc": "Rule Result 候选"
+    },
+    {
+      "id": "lockObjectList",
+      "method": "GET",
+      "path": "/api/v1/lock_object/list",
+      "desc": "Lock Object 多选候选"
+    },
+    {
+      "id": "callSysList",
+      "method": "GET",
+      "path": "/api/v1/call_sys/list",
+      "desc": "Call Sys 多选候选"
+    },
+    {
+      "id": "ruleInfoPage",
+      "method": "POST",
+      "path": "/api/v1/rule_info/page",
+      "desc": "结果分页查询"
+    },
+    {
+      "id": "ruleInfoDetail",
+      "method": "GET",
+      "path": "/api/v1/rule_info/detail",
+      "desc": "Rule Info Detail 日志按游标分页"
+    },
+    {
+      "id": "ruleInfoFullLog",
+      "method": "POST",
+      "path": "/api/v1/rule_info/full_log",
+      "desc": "按块涉及的全部文件还原、打包 zip 下载"
+    }
+  ],
+  "controls": [
+    {
+      "selector": "#envSelect",
+      "kind": "select",
+      "label": "Environment",
+      "region": "查询条件区",
+      "param": "env",
+      "options": [
+        "PROD",
+        "PIRUN"
+      ],
+      "placeholder": "不限制",
+      "rules": [
+        "非必填；不选 = 不过滤"
+      ],
+      "on": {
+        "load": [
+          "进页面加载候选值"
+        ],
+        "change": [
+          "重取 Host IP 候选值",
+          "清空已选的 Host IP"
+        ]
+      },
+      "apis": [
+        "envList"
+      ],
+      "apiNotes": [
+        "出参：统一响应包里的 `data.env` = 字符串数组（候选值）",
+        "入参位置：`parameters.env`（16 项过滤条件都装在 parameters 里）",
+        "失败时轻提示错误信息，候选保持为空"
+      ]
+    },
+    {
+      "selector": "#serverCategorySelect",
+      "kind": "select",
+      "label": "Server Category",
+      "region": "查询条件区",
+      "param": "serverCategory",
+      "options": [
+        "FAB",
+        "LIST",
+        "QUERY",
+        "IDE",
+        "XSITE"
+      ],
+      "placeholder": "不限制",
+      "rules": [
+        "非必填；不选 = 不过滤",
+        "为空时 Server Number 置灰不可输入"
+      ],
+      "on": {
+        "change": [
+          "清空时一并清空 Server Number",
+          "改选另一个值时 Server Number 保留原值"
+        ]
+      },
+      "apis": [
+        "serverCategoryList"
+      ],
+      "apiNotes": [
+        "出参：`data.serverCategory` = 字符串数组，取值 LIST、QUERY、FAB、IDE、XSITE 这一类服务器类别",
+        "入参位置：`parameters.serverCategory`"
+      ]
+    },
+    {
+      "selector": "#serverNumberInput",
+      "kind": "input",
+      "label": "Server Number",
+      "region": "查询条件区",
+      "param": "serverId",
+      "placeholder": "1,2（英文逗号分隔多值）",
+      "format": "每段 1 ~ 1000 的正整数",
+      "dependsOn": [
+        "Server Category 已有值（无值时本框置灰）"
+      ],
+      "rules": [
+        "以 Category 前缀拼成 SERVER_ID：Category + srv. + Number（如 FAB 配 25 得到 FABsrv.25）",
+        "点 Search 时才校验：按英文逗号拆分 → 逐段去空格 → 逐段验 1 ~ 1000 正整数 → 去重 → 英文逗号拼回",
+        "空段（1, 或 1,,2）与全角逗号（1，2）判非法 → 拦住不发请求",
+        "Category 清空则本框值清空；Category 改选则保留原值"
+      ],
+      "notes": [
+        "本框左侧实时显示拼出的前缀（Category + srv.），标签后实时显示拼出的 SERVER_ID 示例，便于核对"
+      ],
+      "apiNotes": [
+        "入参：`parameters.serverId` 是字符串数组，元素是拼好的 ID（如 FABsrv.25）；命中任一即可"
+      ]
+    },
+    {
+      "selector": "#startTimeInput",
+      "kind": "input",
+      "label": "开始时间",
+      "region": "查询条件区",
+      "required": true,
+      "param": "startTime",
+      "format": "页面上 YYYY-MM-DD HH:mm；入参 yyyyMMddHHmm",
+      "rules": [
+        "区间下界：开始时间 ≤ START_TIME ≤ 结束时间（闭区间）",
+        "即时校验：开始时间 ≤ 结束时间（同一分钟判合法）；两者差值 ≤ 1 天",
+        "不合法时标红 + 错误文案；点 Search 被拦住、不发请求",
+        "清空后自动补为「结束时间 − 1 小时」"
+      ],
+      "notes": [
+        "进页面初值 = 当前时刻 − 1 小时；选择器精确到分钟"
+      ],
+      "apiNotes": [
+        "入参：`parameters.startTime`，格式 `yyyyMMddHHmm`（如 202609221543）",
+        "页面上按 `YYYY-MM-DD HH:mm` 填，提交前转成上述紧凑格式"
+      ]
+    },
+    {
+      "selector": "#endTimeInput",
+      "kind": "input",
+      "label": "结束时间",
+      "region": "查询条件区",
+      "required": true,
+      "param": "endTime",
+      "format": "页面上 YYYY-MM-DD HH:mm；入参 yyyyMMddHHmm",
+      "rules": [
+        "区间上界：开始时间 ≤ START_TIME ≤ 结束时间（闭区间）",
+        "即时校验口径与开始时间一致（同一分钟判合法、差值 ≤ 1 天）",
+        "标签后常显弱提示「（须晚于或等于开始时间）」，不等报错就知道规则",
+        "清空后自动补为「开始时间 + 1 小时」"
+      ],
+      "notes": [
+        "进页面初值 = 当前时刻"
+      ],
+      "apiNotes": [
+        "入参：`parameters.endTime`，格式 `yyyyMMddHHmm`"
+      ]
+    },
+    {
+      "selector": "#ruleNameInput",
+      "kind": "input",
+      "label": "Rule Name",
+      "region": "查询条件区",
+      "param": "ruleName",
+      "placeholder": "ABC 或 ABC*",
+      "rules": [
+        "ABC = 精确匹配；ABC* = 前缀匹配（值以 ABC 开头）",
+        "星号只允许出现在末尾且只有一个：*、*ABC、AB*C、ABC** 判非法 → 拦住不发请求",
+        "即时校验：标红 + 错误文案；点 Search 被拦住（与时间控件同口径）",
+        "块侧字段为多值时，命中其中任一即算",
+        "留空 = 不过滤"
+      ],
+      "apiNotes": [
+        "入参：`parameters.ruleName`；`ABC*` 由后端做前缀匹配"
+      ]
+    },
+    {
+      "selector": "#tidInput",
+      "kind": "input",
+      "label": "TID",
+      "region": "查询条件区",
+      "param": "tid",
+      "placeholder": "20260811172031.05-0001",
+      "rules": [
+        "单项值；精确比对，命中任一即算",
+        "星号当普通字符处理，不做前缀语义、不拦",
+        "留空 = 不过滤"
+      ],
+      "apiNotes": [
+        "入参：`parameters.tid`；后端为 keyword，精确比对"
+      ]
+    },
+    {
+      "selector": "#eqpInput",
+      "kind": "input",
+      "label": "EQP",
+      "region": "查询条件区",
+      "param": "eqpId",
+      "placeholder": "ATTAL01 或 ATTA*",
+      "rules": [
+        "ABC = 精确匹配；ABC* = 前缀匹配（值以 ABC 开头）",
+        "星号只允许出现在末尾且只有一个：*、*ABC、AB*C、ABC** 判非法 → 拦住不发请求",
+        "即时校验：标红 + 错误文案；点 Search 被拦住（与时间控件同口径）",
+        "块侧字段为多值时，命中其中任一即算",
+        "留空 = 不过滤"
+      ],
+      "apiNotes": [
+        "入参：`parameters.eqpId`"
+      ]
+    },
+    {
+      "selector": "#carrierInput",
+      "kind": "input",
+      "label": "Carrier",
+      "region": "查询条件区",
+      "param": "carrierId",
+      "placeholder": "C1200317 或 C1200*",
+      "rules": [
+        "ABC = 精确匹配；ABC* = 前缀匹配（值以 ABC 开头）",
+        "星号只允许出现在末尾且只有一个：*、*ABC、AB*C、ABC** 判非法 → 拦住不发请求",
+        "即时校验：标红 + 错误文案；点 Search 被拦住（与时间控件同口径）",
+        "块侧字段为多值时，命中其中任一即算",
+        "留空 = 不过滤"
+      ],
+      "apiNotes": [
+        "入参：`parameters.carrierId`"
+      ]
+    },
+    {
+      "selector": "#lotInput",
+      "kind": "input",
+      "label": "Lot",
+      "region": "查询条件区",
+      "param": "lotId",
+      "placeholder": "A031178 或 A0311*",
+      "rules": [
+        "ABC = 精确匹配；ABC* = 前缀匹配（值以 ABC 开头）",
+        "星号只允许出现在末尾且只有一个：*、*ABC、AB*C、ABC** 判非法 → 拦住不发请求",
+        "即时校验：标红 + 错误文案；点 Search 被拦住（与时间控件同口径）",
+        "块侧字段为多值时，命中其中任一即算",
+        "留空 = 不过滤"
+      ],
+      "apiNotes": [
+        "入参：`parameters.lotId`"
+      ]
+    },
+    {
+      "selector": "#minCostInput",
+      "kind": "input",
+      "label": "Min Cost Time",
+      "region": "查询条件区",
+      "required": true,
+      "param": "minCost",
+      "format": "0 ~ 999.99（秒，小数点后最多 2 位）",
+      "rules": [
+        "单位秒；入参原样传秒，不做 ×1000 换算 —— 换算由后端做",
+        "过滤：Min ≤ TOTAL_COST_MS ≤ Max（后端把秒换算成毫秒后与 TOTAL_COST_MS 比）",
+        "即时校验：Min > Max 判不合法，标红 + 错误文案",
+        "清空后自动补 0"
+      ],
+      "notes": [
+        "进页面默认值 0"
+      ],
+      "apiNotes": [
+        "入参：`parameters.minCost`，原样传秒（值域 0 ~ 999.99）"
+      ]
+    },
+    {
+      "selector": "#maxCostInput",
+      "kind": "input",
+      "label": "Max Cost Time",
+      "region": "查询条件区",
+      "required": true,
+      "param": "maxCost",
+      "format": "0 ~ 999.99（秒，小数点后最多 2 位）",
+      "rules": [
+        "单位秒；入参原样传秒，不做 ×1000 换算 —— 换算由后端做",
+        "即时校验：Max \u003c Min 判不合法",
+        "清空后自动补 999"
+      ],
+      "notes": [
+        "进页面默认值 999"
+      ],
+      "apiNotes": [
+        "入参：`parameters.maxCost`，原样传秒（值域 0 ~ 999.99）"
+      ]
+    },
+    {
+      "selector": "#descTimeToggle",
+      "kind": "toggle",
+      "label": "排序开关 Desc Time",
+      "region": "查询条件区",
+      "param": "descTime",
+      "rules": [
+        "默认关闭",
+        "关闭 = 按块文档 START_TIME 正序（旧 → 新）；打开 = 按 START_TIME 倒排（新 → 旧）",
+        "只影响排序，不影响过滤"
+      ],
+      "apiNotes": [
+        "入参：`parameters.descTime` 布尔值；true = 倒排（新 → 旧），false = 正序"
+      ]
+    },
+    {
+      "selector": "#btnFold",
+      "kind": "button",
+      "label": "展开更多条件",
+      "region": "查询条件区",
+      "rules": [
+        "控制折叠区 4 项（Host IP、User ID、Error Code、Rule Result）的显隐，默认收起",
+        "状态记入浏览器本地，下次进页面按上次状态还原"
+      ],
+      "on": {
+        "click": [
+          "收起那一刻立即清空这 4 项已填的值（不等点 Search）",
+          "重新展开看到的是空输入"
+        ]
+      }
+    },
+    {
+      "selector": "#btnSearch",
+      "kind": "button",
+      "label": "Search",
+      "region": "查询条件区",
+      "rules": [
+        "调接口前对全部条件做前置校验，不合法不发请求",
+        "被拦住时给轻提示，按钮不做置灰（置灰会让用户不知道为什么点不了）"
+      ],
+      "on": {
+        "click": [
+          "校验通过后把 16 项条件装进 parameters，pageIndex 传 1、pageSize 传 20，查第 1 页",
+          "清空列表的选中行"
+        ]
+      },
+      "apis": [
+        "ruleInfoPage"
+      ],
+      "apiNotes": [
+        "入参：`pageIndex` = 1、`pageSize` = 20；16 项过滤条件放在 `parameters` 里，字段名见各条件控件的标注",
+        "出参：统一响应包 `{ success, errCode, data }`；`data.total` 给分页器显示「共 N 条」，`data.contents[]` 是当前页行数据",
+        "失败时列表区给出错误提示与重试入口"
+      ]
+    },
+    {
+      "selector": "#btnReset",
+      "kind": "button",
+      "label": "重置",
+      "region": "查询条件区",
+      "rules": [
+        "条件区恢复进页面默认值：下拉与输入类清空；开始时间 = 当前时刻 − 1 小时、结束时间 = 当前时刻；Min 与 Max Cost Time = 0 与 999；Desc Time 关闭；User ID 维持置灰",
+        "结果列表清空回到未查询态，Export、Rule Log、Full Log 三个按钮都不可用"
+      ],
+      "on": {
+        "click": [
+          "清空列表选中行",
+          "不自动查询"
+        ]
+      },
+      "apiNotes": [
+        "不调接口，纯前端复位"
+      ]
+    },
+    {
+      "selector": "#hostIpSelect",
+      "kind": "select",
+      "label": "Host IP",
+      "region": "查询条件区",
+      "param": "ipaddress",
+      "placeholder": "不限制",
+      "rules": [
+        "非必填；不选 = 不过滤",
+        "虽默认收起，进页面照旧先取候选",
+        "Environment 变化时清空已选值"
+      ],
+      "on": {
+        "load": [
+          "进页面调候选接口（不带参）",
+          "Environment 选值后再调一次并带上 `environment` 参数"
+        ]
+      },
+      "apis": [
+        "ipAddressList"
+      ],
+      "apiNotes": [
+        "入参：`environment`（可缺省）；出参：`data.ipaddress` = 字符串数组",
+        "提交时键名照原样全小写：`parameters.ipaddress`"
+      ]
+    },
+    {
+      "selector": "#userIdInput",
+      "kind": "input",
+      "label": "User ID",
+      "region": "查询条件区",
+      "param": "userID",
+      "placeholder": "本期置灰",
+      "notes": [
+        "本期置灰、不可输入 —— 块文档未落 USERID 字段",
+        "结果列表的 User ID 列同样恒为空"
+      ],
+      "apiNotes": [
+        "入参：`parameters.userID` 本期恒空"
+      ]
+    },
+    {
+      "selector": "#errorCodeInput",
+      "kind": "input",
+      "label": "Error Code",
+      "region": "查询条件区",
+      "param": "errorCode",
+      "placeholder": "E1024",
+      "rules": [
+        "单项值，不做模糊匹配",
+        "块侧字段为多值时命中其中任一即算",
+        "留空 = 不过滤"
+      ],
+      "apiNotes": [
+        "入参：`parameters.errorCode`"
+      ]
+    },
+    {
+      "selector": "#ruleResultSelect",
+      "kind": "select",
+      "label": "Rule Result",
+      "region": "查询条件区",
+      "param": "ruleResult",
+      "options": [
+        "PASS",
+        "CANCELRULE"
+      ],
+      "placeholder": "不限制",
+      "rules": [
+        "非必填；不选 = 不过滤",
+        "列表里的标红只认 CANCELRULE，与本筛选项是否选中无关"
+      ],
+      "apis": [
+        "ruleResultList"
+      ],
+      "apiNotes": [
+        "出参：`data.ruleResult` = 字符串数组（如 PASS、CANCELRULE）",
+        "入参：`parameters.ruleResult`，等值匹配"
+      ]
+    },
+    {
+      "selector": "#ruleTable",
+      "kind": "table",
+      "label": "结果列表",
+      "region": "结果列表区",
+      "rules": [
+        "列顺序：14 恒显示 → 3 可隐藏 → EXEC_STATUS → 动态耗时列 → Server Hang 末列",
+        "多值字段显示首值 + 角标；耗时三列按秒（3 位小数）；Rule Result = CANCELRULE 标红",
+        "行选择单选（行首单选框或点击整行）；翻页保留，重新 Search 或重置清空",
+        "空结果 / 加载中：三个操作按钮都不可用；加载中显示加载动画"
+      ],
+      "apis": [
+        "ruleInfoPage"
+      ],
+      "apiNotes": [
+        "行数据 = 出参 `data.contents[]`，字段与列同名：env ipaddress serverId ruleName requestType startTime endTime ruleResult errorCode eqpId lotId carrierId userId tid totalCostTime costSummary unaccountedCost execStatus",
+        "多值字段出参为数组（errorCode、eqpId、lotId、carrierId、tid）；出参 `id` = 块 _id，不出列，留给 Rule Log 与 Full Log 当入参",
+        "动态耗时列取 `costBreakDown[]` 里 `item` 与 `group` 命中那条的 `summary`；出参无 Server Hang 字段"
+      ]
+    },
+    {
+      "selector": "#pager",
+      "kind": "pager",
+      "label": "分页组件",
+      "region": "结果列表区",
+      "rules": [
+        "始终显示（只有一页时也显示）",
+        "默认每页 20 条，档位 20、50、100",
+        "总条数显示「共 N 条」，取自出参 `total`"
+      ],
+      "on": {
+        "change": [
+          "切换页码或每页条数后重新请求该页：pageIndex 传目标页、pageSize 传 20 或 50 或 100",
+          "翻页保留已选中的行"
+        ]
+      },
+      "apis": [
+        "ruleInfoPage"
+      ],
+      "apiNotes": [
+        "出参 `data.totalPage` 给页码数量，`data.total` 给总条数；`data.pageIndex` 与 `data.pageSize` 回显当前页"
+      ]
+    },
+    {
+      "selector": ".hang-btn",
+      "kind": "button",
+      "label": "Server Hang 行内按钮",
+      "region": "结果列表区",
+      "rules": [
+        "按钮带数量，如 Hang (3)",
+        "数量 > 0：按钮红色、可点击，打开 Server Hang 弹框；数量 ≤ 0：按钮置灰、不可点击",
+        "本期 Hang 未落库：按钮恒置灰、点不开；落库后按上一条启用"
+      ],
+      "notes": [
+        "列位置：列表最后一列，永远最后",
+        "落库后弹框内容 = 该块全部 Server Hang List，列按序为开始行、结束行、耗时、开始行日志、结束行日志；耗时按秒 3 位小数；开始行与结束行取该行的日志时间；按开始行时间正序；只有「关闭」一个按钮"
+      ],
+      "apiNotes": [
+        "出参 `contents[]` 里没有 Server Hang 相关字段（该功能未落库），所以按钮本期恒置灰"
+      ]
+    },
+    {
+      "selector": "#btnExport",
+      "kind": "button",
+      "label": "Export",
+      "region": "底部操作区",
+      "rules": [
+        "列表有值时可用；空结果时不可用",
+        "范围 = 当前页的列表内容；目标格式 Excel",
+        "只导显示中的列，隐藏列不导出",
+        "Server Hang 列不导出（它是按钮，不是数据）",
+        "文件名：RuleInfo_导出时刻 yyyyMMddHHmmss.xlsx"
+      ],
+      "apiNotes": [
+        "不调后端：当前页出参在前端生成 Excel；导出接口文档未给出（待确认）"
+      ]
+    },
+    {
+      "selector": "#btnRuleLog",
+      "kind": "button",
+      "label": "Rule Log",
+      "region": "底部操作区",
+      "dependsOn": [
+        "列表已选中一行"
+      ],
+      "rules": [
+        "选中一行时可用；取消选中则不可用"
+      ],
+      "on": {
+        "click": [
+          "用该行的块 _id 拉取日志，打开 Rule Info Detail 弹窗"
+        ]
+      },
+      "apis": [
+        "ruleInfoDetail"
+      ],
+      "apiNotes": [
+        "入参：`id` = 该行的块 `_id`；首次调用 `lastInode` 与 `lastOffset` 留空",
+        "失败时轻提示错误信息"
+      ]
+    },
+    {
+      "selector": "#btnFullLog",
+      "kind": "button",
+      "label": "Full Log",
+      "region": "底部操作区",
+      "dependsOn": [
+        "列表已选中一行"
+      ],
+      "rules": [
+        "选中一行时可用",
+        "入参 id = 该行的块 _id；后端由它找出该块涉及的全部文件，逐个做文件级还原，打包成 zip",
+        "每个文件一个 .log，文件内按 LOG_OFFSET 升序；块只落在一个文件里时 zip 内就 1 个",
+        "与弹窗底部「全量下载」刻意分成两个动作：Full Log 是文件级（块涉及的全部文件、每个文件的全部行，先按文件分组）；全量下载是块级（本块自己的全部行，先按 LOG_INODE 分组）"
+      ],
+      "apis": [
+        "ruleInfoFullLog"
+      ],
+      "apiNotes": [
+        "出参是 zip 文件本身（直接下载，不走统一响应包）"
+      ]
+    },
+    {
+      "selector": "#btnOptionalCols",
+      "kind": "button",
+      "label": "可选列",
+      "region": "底部操作区",
+      "on": {
+        "click": [
+          "打开列设置抽屉"
+        ]
+      },
+      "apiNotes": [
+        "不调接口（纯前端行为）"
+      ]
+    },
+    {
+      "selector": "#colDrawer",
+      "kind": "drawer",
+      "label": "列设置抽屉",
+      "region": "列设置抽屉",
+      "rules": [
+        "内容四项：可隐藏三列显隐（默认勾上）、EXEC_STATUS 显隐（默认不勾）、Lock Object 多选、Call Sys 多选",
+        "不做列拖拽排序，也不设「恢复默认」按钮",
+        "首行小字写明作用域 = 本页结果主列表",
+        "列值一律取当前页接口出参，不额外请求"
+      ],
+      "on": {
+        "load": [
+          "进页面取 Lock Object 与 Call Sys 的候选值"
+        ]
+      },
+      "apiNotes": [
+        "Lock Object 与 Call Sys 的勾选记入浏览器本地，下次进页面还原"
+      ]
+    },
+    {
+      "selector": "#lockObjectBox",
+      "kind": "checkbox",
+      "label": "Lock Object 多选",
+      "region": "列设置抽屉",
+      "rules": [
+        "每选中一个锁对象追加一列，列名 = Lock 加一个空格加对象名（如 Lock EQP）",
+        "动态耗时列追加在列表最后、Server Hang 列之前；选 N 项追加 N 列",
+        "取值：出参 `costBreakDown[]` 里 `item` = LOCK 且 `group` = 本列锁对象那条的 `summary`（秒）；缺该项耗时则单元格显示空"
+      ],
+      "on": {
+        "change": [
+          "勾选记入浏览器本地"
+        ]
+      },
+      "apis": [
+        "lockObjectList"
+      ],
+      "apiNotes": [
+        "出参：`data.lockObject` = 字符串数组（如 EQP、CARRIER、LOT）"
+      ]
+    },
+    {
+      "selector": "#callSysBox",
+      "kind": "checkbox",
+      "label": "Call Sys 多选",
+      "region": "列设置抽屉",
+      "rules": [
+        "每选中一个调用系统追加一列，列名 = Call 加一个空格加系统名（如 Call MCS）",
+        "取值：出参 `costBreakDown[]` 里 `item` = CALL 且 `group` = 本列被调系统那条的 `summary`（秒）",
+        "动态列总条数 N = Lock Object 与 Call Sys 选中项数之和"
+      ],
+      "on": {
+        "change": [
+          "勾选记入浏览器本地"
+        ]
+      },
+      "apis": [
+        "callSysList"
+      ],
+      "apiNotes": [
+        "出参：`data.calledSystem` = 字符串数组（如 MCS、R2R、RMS、SPC、RTD）"
+      ]
+    },
+    {
+      "selector": "#btnDrawerConfirm",
+      "kind": "button",
+      "label": "确认（列设置）",
+      "region": "列设置抽屉",
+      "rules": [
+        "点确认后关闭抽屉，按当前页已有数据直接重渲染列表的列，不重新查询",
+        "可隐藏三列按勾选显隐；EXEC_STATUS 勾上才出现，位置在可隐藏列之后",
+        "Lock Object 与 Call Sys 的每个勾选项各追加一列，列名 = Lock 或 Call 加一个空格加选项名，追加在 Server Hang 之前",
+        "取消勾选即撤掉对应列；重新勾选再确认即重新追加",
+        "列显隐同时影响 Export 的列范围"
+      ],
+      "on": {
+        "click": [
+          "应用列显隐与动态耗时列"
+        ]
+      },
+      "apiNotes": [
+        "不调接口：列值一律取当前页出参（`contents[]` 与 `costBreakDown[]`），就地追加或撤掉，行数据不动、不重查"
+      ]
+    },
+    {
+      "selector": "#detailModal",
+      "kind": "modal",
+      "label": "Rule Info Detail 弹窗",
+      "region": "Rule Info Detail 弹窗",
+      "rules": [
+        "结构自上而下：全局搜索行、日志行滚动区、底部按钮（全量下载、成因分析、退出）",
+        "关闭后再打开，从头重新加载（`lastInode` 与 `lastOffset` 重新置空）",
+        "日志按原文一行一条显示，不做加工",
+        "全局搜索只过滤已加载到前端的那部分日志行"
+      ],
+      "on": {
+        "load": [
+          "打开弹窗即按 `id` 拉第一批日志"
+        ]
+      },
+      "apiNotes": [
+        "打开弹窗触发一次日志接口：入参 `id` = 该行块 _id，`lastInode` 与 `lastOffset` 留空"
+      ]
+    },
+    {
+      "selector": "#detailSearch",
+      "kind": "input",
+      "label": "全局搜索行",
+      "region": "Rule Info Detail 弹窗",
+      "placeholder": "在已加载的日志行中搜索",
+      "rules": [
+        "只过滤已加载到前端的那部分日志行"
+      ],
+      "on": {
+        "input": [
+          "输入即时过滤当前已加载的日志行并给出命中行数"
+        ]
+      }
+    },
+    {
+      "selector": "#detailLogList",
+      "kind": "other",
+      "label": "日志行滚动区",
+      "region": "Rule Info Detail 弹窗",
+      "rules": [
+        "首次入参：`id` = 块 _id，`lastInode` 与 `lastOffset` 留空",
+        "返回：`data.raw` = 本次日志原文（多行以换行符拼接成一个字符串），`data.finished` = 是否搜索完毕",
+        "每批条数由后端定，前端不传",
+        "滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastInode` = 上次返回的 `inode`、`lastOffset` = 上次返回的 `offset`",
+        "新日志追加到最底部；加载中显示加载效果；全部取完后最底部显示「搜索完毕」",
+        "日志原文一条一行；超过显示区宽度时自动换行，不横向滚动、不截断"
+      ],
+      "apis": [
+        "ruleInfoDetail"
+      ],
+      "apiNotes": [
+        "出参 `data.inode` 与 `data.offset` 是下一批的游标，原样回传给 `lastInode` 与 `lastOffset`"
+      ]
+    },
+    {
+      "selector": "#btnFullDownload",
+      "kind": "button",
+      "label": "全量下载",
+      "region": "Rule Info Detail 弹窗",
+      "rules": [
+        "全部日志加载完毕后按钮才出现",
+        "把该块全部日志行拼成一个 .log 文件下载"
+      ],
+      "apiNotes": [
+        "不调接口：数据来源 = 已加载的该块全部日志行（前端拼接，不重新请求）"
+      ]
+    },
+    {
+      "selector": "#btnCauseAnalysis",
+      "kind": "button",
+      "label": "成因分析（占位、禁用）",
+      "region": "Rule Info Detail 弹窗",
+      "rules": [
+        "本期暂存、禁用，为后续的 AI 分析预留"
+      ],
+      "apiNotes": [
+        "分析接口未定（待确认）"
+      ]
+    },
+    {
+      "selector": "#btnCloseDetail",
+      "kind": "button",
+      "label": "退出",
+      "region": "Rule Info Detail 弹窗",
+      "rules": [
+        "关闭弹窗；再次打开从头重新加载"
+      ],
+      "on": {
+        "click": [
+          "关闭弹窗"
+        ]
+      },
+      "apiNotes": [
+        "不调接口（纯前端行为）"
+      ]
+    }
+  ],
+  "table": {
+    "selector": "#ruleTable",
+    "dataApi": "ruleInfoPage",
+    "columns": [
+      {
+        "key": "env",
+        "label": "Environment",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "hostIp",
+        "label": "Host IP",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "serverId",
+        "label": "Server ID",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "ruleName",
+        "label": "Rule Name",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "requestType",
+        "label": "Request Type",
+        "align": "left",
+        "format": "tag",
+        "enum": [
+          "Rule",
+          "TXN"
+        ]
+      },
+      {
+        "key": "startTime",
+        "label": "Start Time",
+        "align": "left",
+        "format": "datetime-ms"
+      },
+      {
+        "key": "endTime",
+        "label": "End Time",
+        "align": "left",
+        "format": "datetime-ms"
+      },
+      {
+        "key": "ruleResult",
+        "label": "Rule Result",
+        "align": "left",
+        "format": "text",
+        "note": "CANCELRULE 单元格标红"
+      },
+      {
+        "key": "errorCode",
+        "label": "Error Code",
+        "align": "left",
+        "format": "multi"
+      },
+      {
+        "key": "eqpId",
+        "label": "EqpID",
+        "align": "left",
+        "format": "multi"
+      },
+      {
+        "key": "lotId",
+        "label": "Lot ID",
+        "align": "left",
+        "format": "multi"
+      },
+      {
+        "key": "carrierId",
+        "label": "Carrier ID",
+        "align": "left",
+        "format": "multi"
+      },
+      {
+        "key": "userId",
+        "label": "User ID",
+        "align": "left",
+        "format": "text",
+        "note": "块文档无对应字段，值恒为空"
+      },
+      {
+        "key": "tid",
+        "label": "TID",
+        "align": "left",
+        "format": "multi"
+      },
+      {
+        "key": "totalCostSec",
+        "label": "Total Cost Time",
+        "align": "right",
+        "format": "duration-s"
+      },
+      {
+        "key": "itemCostSec",
+        "label": "Item Cost Summary",
+        "align": "right",
+        "format": "duration-s"
+      },
+      {
+        "key": "unaccountedSec",
+        "label": "UnAccounted Cost",
+        "align": "right",
+        "format": "duration-s"
+      },
+      {
+        "key": "serverHang",
+        "label": "Server Hang",
+        "align": "center",
+        "format": "action"
+      }
+    ],
+    "pagination": {
+      "api": "ruleInfoPage",
+      "pageParam": "pageIndex",
+      "pageSize": 20,
+      "serverSide": true,
+      "totalField": "total"
+    },
+    "rowSelection": {
+      "mode": "single",
+      "requiredBy": [
+        "#btnRuleLog",
+        "#btnFullLog"
+      ],
+      "clearedOn": [
+        "重新 Search",
+        "点重置"
+      ]
+    }
+  },
+  "mock": [
+    "所有接口的路径、方法、入参与出参字段依 01 文档 §5；原型不真实发请求，数据全为本地模拟",
+    "统一响应包 `{ success, errCode, data }` 未在原型里体现（没有真实请求）；下载类出参不走该包",
+    "进页面即呈现「正常态」数据；真实页面进页面是未查询态，点 Search 后才有结果（点重置可看到未查询态、点 Search 可看到加载态）",
+    "列表 20 行为本地模拟数据；总条数 128、翻页与每页条数档位均为静态演示",
+    "搜索区候选值（Environment、Host IP、Server Category、Rule Result、Lock Object、Call Sys）为本地静态数组，取值集合按文档 §5.3 对齐",
+    "Rule Info Detail 的日志行与游标触底加载为前端模拟（每批 40 行、共 120 行后显示搜索完毕）",
+    "日志行示例取自真实块日志：格式为 MM/DD/YY HH:mm:ss.SS 加空格加 Server 名加冒号加日志原文；首行是原文样例，其余行按同一格式续写",
+    "Export、Full Log、全量下载只弹轻提示，不产生真实文件下载",
+    "列设置会真的增删列表列（静态列显隐 + EXEC_STATUS 与动态耗时列注入）；动态耗时列的取值由确定性算法模拟，真实页面取当前页出参 `costBreakDown[]` 里命中那条的 `summary`",
+    "Server Hang 本期未落库：行内按钮恒置灰、弹框在本原型中不出现（落库后的弹框内容见 Server Hang 行内按钮的标注）"
+  ],
+  "openQuestions": [
+    "Server Hang 落库的字段命名与形态未定（Server Hang Time 是单值还是多值、Hang Info 是否嵌套数组）→ 落库前按钮恒置灰、弹框不可打开",
+    "Export 的导出接口文档未给出，当前按「前端生成 Excel」实现",
+    "弹窗「成因分析」为后续 AI 分析预留，接口未定",
+    "01 文档与 05 文档 §4.8 对时间区间口径不一致：01 为「开始 ≤ 结束、同分钟判合法」，05 为「开始 \u003c 结束、同分钟不合法」；本原型依 01"
+  ]
+}
+  </script>
+
+</div>
+
+<svg id="lines"></svg>
+<div class="anno" id="annoBox"></div>
+
+<script>
+/* ============================================================
+   热区配置（AI 生成时填充）
+   ============================================================ */
+const hotspots = [
+    {
+    id: "env-select",
+    selector: "#envSelect",
+    title: "Environment｜下拉框",
+    items: [
+      { type: "front", text: "非必填；不选 = 不过滤" },
+      { type: "front", text: "进入页面：进页面加载候选值" },
+      { type: "front", text: "选项变化：重取 Host IP 候选值" },
+      { type: "front", text: "选项变化：清空已选的 Host IP" },
+      { type: "back", text: "GET /api/v1/env/list —— Environment 候选" },
+      { type: "back", text: "值作为查询参数 `env` 随请求提交" },
+      { type: "back", text: "出参：统一响应包里的 `data.env` = 字符串数组（候选值）" },
+      { type: "back", text: "入参位置：`parameters.env`（16 项过滤条件都装在 parameters 里）" },
+      { type: "back", text: "失败时轻提示错误信息，候选保持为空" }
+    ],
+  },
+  {
+    id: "server-category-select",
+    selector: "#serverCategorySelect",
+    title: "Server Category｜下拉框",
+    items: [
+      { type: "front", text: "非必填；不选 = 不过滤" },
+      { type: "front", text: "为空时 Server Number 置灰不可输入" },
+      { type: "front", text: "选项变化：清空时一并清空 Server Number" },
+      { type: "front", text: "选项变化：改选另一个值时 Server Number 保留原值" },
+      { type: "back", text: "GET /api/v1/server_category/list —— Server Category 候选" },
+      { type: "back", text: "值作为查询参数 `serverCategory` 随请求提交" },
+      { type: "back", text: "出参：`data.serverCategory` = 字符串数组，取值 LIST、QUERY、FAB、IDE、XSITE 这一类服务器类别" },
+      { type: "back", text: "入参位置：`parameters.serverCategory`" }
+    ],
+  },
+  {
+    id: "server-number-input",
+    selector: "#serverNumberInput",
+    title: "Server Number｜输入框",
+    items: [
+      { type: "front", text: "以 Category 前缀拼成 SERVER_ID：Category + srv. + Number（如 FAB 配 25 得到 FABsrv.25）" },
+      { type: "front", text: "点 Search 时才校验：按英文逗号拆分 → 逐段去空格 → 逐段验 1 ~ 1000 正整数 → 去重 → 英文逗号拼回" },
+      { type: "front", text: "空段（1, 或 1,,2）与全角逗号（1，2）判非法 → 拦住不发请求" },
+      { type: "front", text: "Category 清空则本框值清空；Category 改选则保留原值" },
+      { type: "front", text: "本框左侧实时显示拼出的前缀（Category + srv.），标签后实时显示拼出的 SERVER_ID 示例，便于核对" },
+      { type: "front", text: "前置条件：Server Category 已有值（无值时本框置灰）" },
+      { type: "back", text: "值作为查询参数 `serverId` 随请求提交" },
+      { type: "back", text: "入参：`parameters.serverId` 是字符串数组，元素是拼好的 ID（如 FABsrv.25）；命中任一即可" }
+    ],
+  },
+  {
+    id: "start-time-input",
+    selector: "#startTimeInput",
+    title: "开始时间｜输入框",
+    items: [
+      { type: "front", text: "必填" },
+      { type: "front", text: "区间下界：开始时间 ≤ START_TIME ≤ 结束时间（闭区间）" },
+      { type: "front", text: "即时校验：开始时间 ≤ 结束时间（同一分钟判合法）；两者差值 ≤ 1 天" },
+      { type: "front", text: "不合法时标红 + 错误文案；点 Search 被拦住、不发请求" },
+      { type: "front", text: "清空后自动补为「结束时间 − 1 小时」" },
+      { type: "front", text: "进页面初值 = 当前时刻 − 1 小时；选择器精确到分钟" },
+      { type: "back", text: "值作为查询参数 `startTime` 随请求提交" },
+      { type: "back", text: "入参：`parameters.startTime`，格式 `yyyyMMddHHmm`（如 202609221543）" },
+      { type: "back", text: "页面上按 `YYYY-MM-DD HH:mm` 填，提交前转成上述紧凑格式" }
+    ],
+  },
+  {
+    id: "end-time-input",
+    selector: "#endTimeInput",
+    title: "结束时间｜输入框",
+    items: [
+      { type: "front", text: "必填" },
+      { type: "front", text: "区间上界：开始时间 ≤ START_TIME ≤ 结束时间（闭区间）" },
+      { type: "front", text: "即时校验口径与开始时间一致（同一分钟判合法、差值 ≤ 1 天）" },
+      { type: "front", text: "标签后常显弱提示「（须晚于或等于开始时间）」，不等报错就知道规则" },
+      { type: "front", text: "清空后自动补为「开始时间 + 1 小时」" },
+      { type: "front", text: "进页面初值 = 当前时刻" },
+      { type: "back", text: "值作为查询参数 `endTime` 随请求提交" },
+      { type: "back", text: "入参：`parameters.endTime`，格式 `yyyyMMddHHmm`" }
+    ],
+  },
+  {
+    id: "rule-name-input",
+    selector: "#ruleNameInput",
+    title: "Rule Name｜输入框",
+    items: [
+      { type: "front", text: "ABC = 精确匹配；ABC* = 前缀匹配（值以 ABC 开头）" },
+      { type: "front", text: "星号只允许出现在末尾且只有一个：*、*ABC、AB*C、ABC** 判非法 → 拦住不发请求" },
+      { type: "front", text: "即时校验：标红 + 错误文案；点 Search 被拦住（与时间控件同口径）" },
+      { type: "front", text: "块侧字段为多值时，命中其中任一即算" },
+      { type: "front", text: "留空 = 不过滤" },
+      { type: "back", text: "值作为查询参数 `ruleName` 随请求提交" },
+      { type: "back", text: "入参：`parameters.ruleName`；`ABC*` 由后端做前缀匹配" }
+    ],
+  },
+  {
+    id: "tid-input",
+    selector: "#tidInput",
+    title: "TID｜输入框",
+    items: [
+      { type: "front", text: "单项值；精确比对，命中任一即算" },
+      { type: "front", text: "星号当普通字符处理，不做前缀语义、不拦" },
+      { type: "front", text: "留空 = 不过滤" },
+      { type: "back", text: "值作为查询参数 `tid` 随请求提交" },
+      { type: "back", text: "入参：`parameters.tid`；后端为 keyword，精确比对" }
+    ],
+  },
+  {
+    id: "eqp-input",
+    selector: "#eqpInput",
+    title: "EQP｜输入框",
+    items: [
+      { type: "front", text: "ABC = 精确匹配；ABC* = 前缀匹配（值以 ABC 开头）" },
+      { type: "front", text: "星号只允许出现在末尾且只有一个：*、*ABC、AB*C、ABC** 判非法 → 拦住不发请求" },
+      { type: "front", text: "即时校验：标红 + 错误文案；点 Search 被拦住（与时间控件同口径）" },
+      { type: "front", text: "块侧字段为多值时，命中其中任一即算" },
+      { type: "front", text: "留空 = 不过滤" },
+      { type: "back", text: "值作为查询参数 `eqpId` 随请求提交" },
+      { type: "back", text: "入参：`parameters.eqpId`" }
+    ],
+  },
+  {
+    id: "carrier-input",
+    selector: "#carrierInput",
+    title: "Carrier｜输入框",
+    items: [
+      { type: "front", text: "ABC = 精确匹配；ABC* = 前缀匹配（值以 ABC 开头）" },
+      { type: "front", text: "星号只允许出现在末尾且只有一个：*、*ABC、AB*C、ABC** 判非法 → 拦住不发请求" },
+      { type: "front", text: "即时校验：标红 + 错误文案；点 Search 被拦住（与时间控件同口径）" },
+      { type: "front", text: "块侧字段为多值时，命中其中任一即算" },
+      { type: "front", text: "留空 = 不过滤" },
+      { type: "back", text: "值作为查询参数 `carrierId` 随请求提交" },
+      { type: "back", text: "入参：`parameters.carrierId`" }
+    ],
+  },
+  {
+    id: "lot-input",
+    selector: "#lotInput",
+    title: "Lot｜输入框",
+    items: [
+      { type: "front", text: "ABC = 精确匹配；ABC* = 前缀匹配（值以 ABC 开头）" },
+      { type: "front", text: "星号只允许出现在末尾且只有一个：*、*ABC、AB*C、ABC** 判非法 → 拦住不发请求" },
+      { type: "front", text: "即时校验：标红 + 错误文案；点 Search 被拦住（与时间控件同口径）" },
+      { type: "front", text: "块侧字段为多值时，命中其中任一即算" },
+      { type: "front", text: "留空 = 不过滤" },
+      { type: "back", text: "值作为查询参数 `lotId` 随请求提交" },
+      { type: "back", text: "入参：`parameters.lotId`" }
+    ],
+  },
+  {
+    id: "min-cost-input",
+    selector: "#minCostInput",
+    title: "Min Cost Time｜输入框",
+    items: [
+      { type: "front", text: "必填" },
+      { type: "front", text: "单位秒；入参原样传秒，不做 ×1000 换算 —— 换算由后端做" },
+      { type: "front", text: "过滤：Min ≤ TOTAL_COST_MS ≤ Max（后端把秒换算成毫秒后与 TOTAL_COST_MS 比）" },
+      { type: "front", text: "即时校验：Min > Max 判不合法，标红 + 错误文案" },
+      { type: "front", text: "清空后自动补 0" },
+      { type: "front", text: "进页面默认值 0" },
+      { type: "back", text: "值作为查询参数 `minCost` 随请求提交" },
+      { type: "back", text: "入参：`parameters.minCost`，原样传秒（值域 0 ~ 999.99）" }
+    ],
+  },
+  {
+    id: "max-cost-input",
+    selector: "#maxCostInput",
+    title: "Max Cost Time｜输入框",
+    items: [
+      { type: "front", text: "必填" },
+      { type: "front", text: "单位秒；入参原样传秒，不做 ×1000 换算 —— 换算由后端做" },
+      { type: "front", text: "即时校验：Max < Min 判不合法" },
+      { type: "front", text: "清空后自动补 999" },
+      { type: "front", text: "进页面默认值 999" },
+      { type: "back", text: "值作为查询参数 `maxCost` 随请求提交" },
+      { type: "back", text: "入参：`parameters.maxCost`，原样传秒（值域 0 ~ 999.99）" }
+    ],
+  },
+  {
+    id: "desc-time-toggle",
+    selector: "#descTimeToggle",
+    title: "排序开关 Desc Time｜开关",
+    items: [
+      { type: "front", text: "默认关闭" },
+      { type: "front", text: "关闭 = 按块文档 START_TIME 正序（旧 → 新）；打开 = 按 START_TIME 倒排（新 → 旧）" },
+      { type: "front", text: "只影响排序，不影响过滤" },
+      { type: "back", text: "值作为查询参数 `descTime` 随请求提交" },
+      { type: "back", text: "入参：`parameters.descTime` 布尔值；true = 倒排（新 → 旧），false = 正序" }
+    ],
+  },
+  {
+    id: "btn-fold",
+    selector: "#btnFold",
+    title: "展开更多条件｜按钮",
+    items: [
+      { type: "front", text: "控制折叠区 4 项（Host IP、User ID、Error Code、Rule Result）的显隐，默认收起" },
+      { type: "front", text: "状态记入浏览器本地，下次进页面按上次状态还原" },
+      { type: "front", text: "点击：收起那一刻立即清空这 4 项已填的值（不等点 Search）" },
+      { type: "front", text: "点击：重新展开看到的是空输入" },
+      { type: "back", text: "不调接口（纯前端行为）" }
+    ],
+  },
+  {
+    id: "btn-search",
+    selector: "#btnSearch",
+    title: "Search｜按钮",
+    items: [
+      { type: "front", text: "调接口前对全部条件做前置校验，不合法不发请求" },
+      { type: "front", text: "被拦住时给轻提示，按钮不做置灰（置灰会让用户不知道为什么点不了）" },
+      { type: "front", text: "点击：校验通过后把 16 项条件装进 parameters，pageIndex 传 1、pageSize 传 20，查第 1 页" },
+      { type: "front", text: "点击：清空列表的选中行" },
+      { type: "back", text: "POST /api/v1/rule_info/page —— 结果分页查询" },
+      { type: "back", text: "入参：`pageIndex` = 1、`pageSize` = 20；16 项过滤条件放在 `parameters` 里，字段名见各条件控件的标注" },
+      { type: "back", text: "出参：统一响应包 `{ success, errCode, data }`；`data.total` 给分页器显示「共 N 条」，`data.contents[]` 是当前页行数据" },
+      { type: "back", text: "失败时列表区给出错误提示与重试入口" }
+    ],
+  },
+  {
+    id: "btn-reset",
+    selector: "#btnReset",
+    title: "重置｜按钮",
+    items: [
+      { type: "front", text: "条件区恢复进页面默认值：下拉与输入类清空；开始时间 = 当前时刻 − 1 小时、结束时间 = 当前时刻；Min 与 Max Cost Time = 0 与 999；Desc Time 关闭；User ID 维持置灰" },
+      { type: "front", text: "结果列表清空回到未查询态，Export、Rule Log、Full Log 三个按钮都不可用" },
+      { type: "front", text: "点击：清空列表选中行" },
+      { type: "front", text: "点击：不自动查询" },
+      { type: "back", text: "不调接口，纯前端复位" }
+    ],
+  },
+  {
+    id: "host-ip-select",
+    selector: "#hostIpSelect",
+    title: "Host IP｜下拉框",
+    items: [
+      { type: "front", text: "非必填；不选 = 不过滤" },
+      { type: "front", text: "虽默认收起，进页面照旧先取候选" },
+      { type: "front", text: "Environment 变化时清空已选值" },
+      { type: "front", text: "进入页面：进页面调候选接口（不带参）" },
+      { type: "front", text: "进入页面：Environment 选值后再调一次并带上 `environment` 参数" },
+      { type: "back", text: "GET /api/v1/ipaddress/list —— Host IP 候选（入参 environment 可缺省）" },
+      { type: "back", text: "值作为查询参数 `ipaddress` 随请求提交" },
+      { type: "back", text: "入参：`environment`（可缺省）；出参：`data.ipaddress` = 字符串数组" },
+      { type: "back", text: "提交时键名照原样全小写：`parameters.ipaddress`" }
+    ],
+  },
+  {
+    id: "user-id-input",
+    selector: "#userIdInput",
+    title: "User ID｜输入框",
+    items: [
+      { type: "front", text: "本期置灰、不可输入 —— 块文档未落 USERID 字段" },
+      { type: "front", text: "结果列表的 User ID 列同样恒为空" },
+      { type: "back", text: "值作为查询参数 `userID` 随请求提交" },
+      { type: "back", text: "入参：`parameters.userID` 本期恒空" }
+    ],
+  },
+  {
+    id: "error-code-input",
+    selector: "#errorCodeInput",
+    title: "Error Code｜输入框",
+    items: [
+      { type: "front", text: "单项值，不做模糊匹配" },
+      { type: "front", text: "块侧字段为多值时命中其中任一即算" },
+      { type: "front", text: "留空 = 不过滤" },
+      { type: "back", text: "值作为查询参数 `errorCode` 随请求提交" },
+      { type: "back", text: "入参：`parameters.errorCode`" }
+    ],
+  },
+  {
+    id: "rule-result-select",
+    selector: "#ruleResultSelect",
+    title: "Rule Result｜下拉框",
+    items: [
+      { type: "front", text: "非必填；不选 = 不过滤" },
+      { type: "front", text: "列表里的标红只认 CANCELRULE，与本筛选项是否选中无关" },
+      { type: "back", text: "GET /api/v1/rule_result/list —— Rule Result 候选" },
+      { type: "back", text: "值作为查询参数 `ruleResult` 随请求提交" },
+      { type: "back", text: "出参：`data.ruleResult` = 字符串数组（如 PASS、CANCELRULE）" },
+      { type: "back", text: "入参：`parameters.ruleResult`，等值匹配" }
+    ],
+  },
+  {
+    id: "rule-table",
+    selector: "#ruleTable",
+    title: "结果列表｜表格",
+    items: [
+      { type: "front", text: "列顺序：14 恒显示 → 3 可隐藏 → EXEC_STATUS → 动态耗时列 → Server Hang 末列" },
+      { type: "front", text: "多值字段显示首值 + 角标；耗时三列按秒（3 位小数）；Rule Result = CANCELRULE 标红" },
+      { type: "front", text: "行选择单选（行首单选框或点击整行）；翻页保留，重新 Search 或重置清空" },
+      { type: "front", text: "空结果 / 加载中：三个操作按钮都不可用；加载中显示加载动画" },
+      { type: "back", text: "POST /api/v1/rule_info/page —— 结果分页查询" },
+      { type: "back", text: "行数据 = 出参 `data.contents[]`，字段与列同名：env ipaddress serverId ruleName requestType startTime endTime ruleResult errorCode eqpId lotId carrierId userId tid totalCostTime costSummary unaccountedCost execStatus" },
+      { type: "back", text: "多值字段出参为数组（errorCode、eqpId、lotId、carrierId、tid）；出参 `id` = 块 _id，不出列，留给 Rule Log 与 Full Log 当入参" },
+      { type: "back", text: "动态耗时列取 `costBreakDown[]` 里 `item` 与 `group` 命中那条的 `summary`；出参无 Server Hang 字段" }
+    ],
+  },
+  {
+    id: "pager",
+    selector: "#pager",
+    title: "分页组件｜分页控件",
+    items: [
+      { type: "front", text: "始终显示（只有一页时也显示）" },
+      { type: "front", text: "默认每页 20 条，档位 20、50、100" },
+      { type: "front", text: "总条数显示「共 N 条」，取自出参 `total`" },
+      { type: "front", text: "选项变化：切换页码或每页条数后重新请求该页：pageIndex 传目标页、pageSize 传 20 或 50 或 100" },
+      { type: "front", text: "选项变化：翻页保留已选中的行" },
+      { type: "back", text: "POST /api/v1/rule_info/page —— 结果分页查询" },
+      { type: "back", text: "出参 `data.totalPage` 给页码数量，`data.total` 给总条数；`data.pageIndex` 与 `data.pageSize` 回显当前页" }
+    ],
+  },
+  {
+    id: "hang-btn",
+    selector: ".hang-btn",
+    title: "Server Hang 行内按钮｜按钮",
+    items: [
+      { type: "front", text: "按钮带数量，如 Hang (3)" },
+      { type: "front", text: "数量 > 0：按钮红色、可点击，打开 Server Hang 弹框；数量 ≤ 0：按钮置灰、不可点击" },
+      { type: "front", text: "本期 Hang 未落库：按钮恒置灰、点不开；落库后按上一条启用" },
+      { type: "front", text: "列位置：列表最后一列，永远最后" },
+      { type: "front", text: "落库后弹框内容 = 该块全部 Server Hang List，列按序为开始行、结束行、耗时、开始行日志、结束行日志；耗时按秒 3 位小数；开始行与结束行取该行的日志时间；按开始行时间正序；只有「关闭」一个按钮" },
+      { type: "back", text: "出参 `contents[]` 里没有 Server Hang 相关字段（该功能未落库），所以按钮本期恒置灰" }
+    ],
+  },
+  {
+    id: "btn-export",
+    selector: "#btnExport",
+    title: "Export｜按钮",
+    items: [
+      { type: "front", text: "列表有值时可用；空结果时不可用" },
+      { type: "front", text: "范围 = 当前页的列表内容；目标格式 Excel" },
+      { type: "front", text: "只导显示中的列，隐藏列不导出" },
+      { type: "front", text: "Server Hang 列不导出（它是按钮，不是数据）" },
+      { type: "front", text: "文件名：RuleInfo_导出时刻 yyyyMMddHHmmss.xlsx" },
+      { type: "back", text: "不调后端：当前页出参在前端生成 Excel；导出接口文档未给出（待确认）" }
+    ],
+  },
+  {
+    id: "btn-rule-log",
+    selector: "#btnRuleLog",
+    title: "Rule Log｜按钮",
+    items: [
+      { type: "front", text: "选中一行时可用；取消选中则不可用" },
+      { type: "front", text: "点击：用该行的块 _id 拉取日志，打开 Rule Info Detail 弹窗" },
+      { type: "front", text: "前置条件：列表已选中一行" },
+      { type: "back", text: "GET /api/v1/rule_info/detail —— Rule Info Detail 日志按游标分页" },
+      { type: "back", text: "入参：`id` = 该行的块 `_id`；首次调用 `lastInode` 与 `lastOffset` 留空" },
+      { type: "back", text: "失败时轻提示错误信息" }
+    ],
+  },
+  {
+    id: "btn-full-log",
+    selector: "#btnFullLog",
+    title: "Full Log｜按钮",
+    items: [
+      { type: "front", text: "选中一行时可用" },
+      { type: "front", text: "入参 id = 该行的块 _id；后端由它找出该块涉及的全部文件，逐个做文件级还原，打包成 zip" },
+      { type: "front", text: "每个文件一个 .log，文件内按 LOG_OFFSET 升序；块只落在一个文件里时 zip 内就 1 个" },
+      { type: "front", text: "与弹窗底部「全量下载」刻意分成两个动作：Full Log 是文件级（块涉及的全部文件、每个文件的全部行，先按文件分组）；全量下载是块级（本块自己的全部行，先按 LOG_INODE 分组）" },
+      { type: "front", text: "前置条件：列表已选中一行" },
+      { type: "back", text: "POST /api/v1/rule_info/full_log —— 按块涉及的全部文件还原、打包 zip 下载" },
+      { type: "back", text: "出参是 zip 文件本身（直接下载，不走统一响应包）" }
+    ],
+  },
+  {
+    id: "btn-optional-cols",
+    selector: "#btnOptionalCols",
+    title: "可选列｜按钮",
+    items: [
+      { type: "front", text: "点击：打开列设置抽屉" },
+      { type: "back", text: "不调接口（纯前端行为）" }
+    ],
+  },
+  {
+    id: "col-drawer",
+    selector: "#colDrawer",
+    title: "列设置抽屉｜抽屉",
+    items: [
+      { type: "front", text: "内容四项：可隐藏三列显隐（默认勾上）、EXEC_STATUS 显隐（默认不勾）、Lock Object 多选、Call Sys 多选" },
+      { type: "front", text: "不做列拖拽排序，也不设「恢复默认」按钮" },
+      { type: "front", text: "首行小字写明作用域 = 本页结果主列表" },
+      { type: "front", text: "列值一律取当前页接口出参，不额外请求" },
+      { type: "front", text: "进入页面：进页面取 Lock Object 与 Call Sys 的候选值" },
+      { type: "back", text: "Lock Object 与 Call Sys 的勾选记入浏览器本地，下次进页面还原" }
+    ],
+  },
+  {
+    id: "lock-object-box",
+    selector: "#lockObjectBox",
+    title: "Lock Object 多选｜复选框",
+    items: [
+      { type: "front", text: "每选中一个锁对象追加一列，列名 = Lock 加一个空格加对象名（如 Lock EQP）" },
+      { type: "front", text: "动态耗时列追加在列表最后、Server Hang 列之前；选 N 项追加 N 列" },
+      { type: "front", text: "取值：出参 `costBreakDown[]` 里 `item` = LOCK 且 `group` = 本列锁对象那条的 `summary`（秒）；缺该项耗时则单元格显示空" },
+      { type: "front", text: "选项变化：勾选记入浏览器本地" },
+      { type: "back", text: "GET /api/v1/lock_object/list —— Lock Object 多选候选" },
+      { type: "back", text: "出参：`data.lockObject` = 字符串数组（如 EQP、CARRIER、LOT）" }
+    ],
+  },
+  {
+    id: "call-sys-box",
+    selector: "#callSysBox",
+    title: "Call Sys 多选｜复选框",
+    items: [
+      { type: "front", text: "每选中一个调用系统追加一列，列名 = Call 加一个空格加系统名（如 Call MCS）" },
+      { type: "front", text: "取值：出参 `costBreakDown[]` 里 `item` = CALL 且 `group` = 本列被调系统那条的 `summary`（秒）" },
+      { type: "front", text: "动态列总条数 N = Lock Object 与 Call Sys 选中项数之和" },
+      { type: "front", text: "选项变化：勾选记入浏览器本地" },
+      { type: "back", text: "GET /api/v1/call_sys/list —— Call Sys 多选候选" },
+      { type: "back", text: "出参：`data.calledSystem` = 字符串数组（如 MCS、R2R、RMS、SPC、RTD）" }
+    ],
+  },
+  {
+    id: "btn-drawer-confirm",
+    selector: "#btnDrawerConfirm",
+    title: "确认（列设置）｜按钮",
+    items: [
+      { type: "front", text: "点确认后关闭抽屉，按当前页已有数据直接重渲染列表的列，不重新查询" },
+      { type: "front", text: "可隐藏三列按勾选显隐；EXEC_STATUS 勾上才出现，位置在可隐藏列之后" },
+      { type: "front", text: "Lock Object 与 Call Sys 的每个勾选项各追加一列，列名 = Lock 或 Call 加一个空格加选项名，追加在 Server Hang 之前" },
+      { type: "front", text: "取消勾选即撤掉对应列；重新勾选再确认即重新追加" },
+      { type: "front", text: "列显隐同时影响 Export 的列范围" },
+      { type: "front", text: "点击：应用列显隐与动态耗时列" },
+      { type: "back", text: "不调接口：列值一律取当前页出参（`contents[]` 与 `costBreakDown[]`），就地追加或撤掉，行数据不动、不重查" }
+    ],
+  },
+  {
+    id: "detail-modal",
+    selector: "#detailModal",
+    title: "Rule Info Detail 弹窗｜弹窗",
+    items: [
+      { type: "front", text: "结构自上而下：全局搜索行、日志行滚动区、底部按钮（全量下载、成因分析、退出）" },
+      { type: "front", text: "关闭后再打开，从头重新加载（`lastInode` 与 `lastOffset` 重新置空）" },
+      { type: "front", text: "日志按原文一行一条显示，不做加工" },
+      { type: "front", text: "全局搜索只过滤已加载到前端的那部分日志行" },
+      { type: "front", text: "进入页面：打开弹窗即按 `id` 拉第一批日志" },
+      { type: "back", text: "打开弹窗触发一次日志接口：入参 `id` = 该行块 _id，`lastInode` 与 `lastOffset` 留空" }
+    ],
+  },
+  {
+    id: "detail-search",
+    selector: "#detailSearch",
+    title: "全局搜索行｜输入框",
+    items: [
+      { type: "front", text: "只过滤已加载到前端的那部分日志行" },
+      { type: "front", text: "输入：输入即时过滤当前已加载的日志行并给出命中行数" },
+      { type: "back", text: "不调接口（纯前端行为）" }
+    ],
+  },
+  {
+    id: "detail-log-list",
+    selector: "#detailLogList",
+    title: "日志行滚动区｜控件",
+    items: [
+      { type: "front", text: "首次入参：`id` = 块 _id，`lastInode` 与 `lastOffset` 留空" },
+      { type: "front", text: "返回：`data.raw` = 本次日志原文（多行以换行符拼接成一个字符串），`data.finished` = 是否搜索完毕" },
+      { type: "front", text: "每批条数由后端定，前端不传" },
+      { type: "front", text: "滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastInode` = 上次返回的 `inode`、`lastOffset` = 上次返回的 `offset`" },
+      { type: "front", text: "新日志追加到最底部；加载中显示加载效果；全部取完后最底部显示「搜索完毕」" },
+      { type: "front", text: "日志原文一条一行；超过显示区宽度时自动换行，不横向滚动、不截断" },
+      { type: "back", text: "GET /api/v1/rule_info/detail —— Rule Info Detail 日志按游标分页" },
+      { type: "back", text: "出参 `data.inode` 与 `data.offset` 是下一批的游标，原样回传给 `lastInode` 与 `lastOffset`" }
+    ],
+  },
+  {
+    id: "btn-full-download",
+    selector: "#btnFullDownload",
+    title: "全量下载｜按钮",
+    items: [
+      { type: "front", text: "全部日志加载完毕后按钮才出现" },
+      { type: "front", text: "把该块全部日志行拼成一个 .log 文件下载" },
+      { type: "back", text: "不调接口：数据来源 = 已加载的该块全部日志行（前端拼接，不重新请求）" }
+    ],
+  },
+  {
+    id: "btn-cause-analysis",
+    selector: "#btnCauseAnalysis",
+    title: "成因分析（占位、禁用）｜按钮",
+    items: [
+      { type: "front", text: "本期暂存、禁用，为后续的 AI 分析预留" },
+      { type: "back", text: "分析接口未定（待确认）" }
+    ],
+  },
+  {
+    id: "btn-close-detail",
+    selector: "#btnCloseDetail",
+    title: "退出｜按钮",
+    items: [
+      { type: "front", text: "关闭弹窗；再次打开从头重新加载" },
+      { type: "front", text: "点击：关闭弹窗" },
+      { type: "back", text: "不调接口（纯前端行为）" }
+    ],
+  },
+];
+
+const annoBox = document.getElementById('annoBox');
+const svg = document.getElementById('lines');
+const toggle = document.getElementById('toggle');
+
+let enabled = false;
+const hotspotEls = {};
+let hovered = null;
+let frameNo = 0;
+
+/* 悬停判定不依赖 DOM 事件的目标元素，而是「指针坐标 + 矩形包含 + 遮挡校验」。
+   这样延迟注入的元素、被 innerHTML 换掉的元素、父层 pointer-events:none 的
+   控件、禁用态控件都能命中；被弹层遮住的控件则不会被误命中。
+   且指针不动时页面滚动 / 布局变化（展开折叠面板等）也会实时重判。 */
+const pointer = { x: -1, y: -1, active: false };
+
+/* ============================================================
+   1. 建热区元素
+   ============================================================ */
+hotspots.forEach(h => {
+  const el = document.createElement('div');
+  el.className = 'hotspot';
+  document.body.appendChild(el);
+  hotspotEls[h.id] = el;
+  h._el = el;
+});
+
+/* ============================================================
+   2. 目标解析：只缓存「仍挂在文档里」的引用，失效就按 selector 重查
+   ============================================================ */
+const ro = new ResizeObserver(() => repositionAll());
+
+function targetOf(h){
+  if (h._target && h._target.isConnected) return h._target;
+  h._target = null;
+  const missAt = typeof h._missAt === 'number' ? h._missAt : -999;
+  if (frameNo - missAt < 12) return null;   // 未命中时限频重试，避免每帧 querySelector
+  h._missAt = frameNo;
+  const t = document.querySelector(h.selector);
+  if (t) { h._target = t; ro.observe(t); }
+  return h._target;
+}
+
+function depthOf(el){
+  let d = 0, p = el;
+  while ((p = p.parentElement)) d++;
+  return d;
+}
+
+/* 指针下方的热区：先按矩形圈定候选，再用 elementFromPoint 排除被遮挡的，
+   最后对嵌套热区取最内层 */
+function pickAt(x, y){
+  const top = document.elementFromPoint(x, y);
+  let best = null, bestDepth = -1;
+
+  for (let i = 0; i < hotspots.length; i++){
+    const h = hotspots[i];
+    const t = targetOf(h);
+    if (!t) continue;
+    const r = t.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    if (top && !(t.contains(top) || top.contains(t))) continue;
+    const d = depthOf(t);
+    if (d > bestDepth) { best = h; bestDepth = d; }
+  }
+  return best;
+}
+
+/* ============================================================
+   3. 统一重定位入口
+   ============================================================ */
+function repositionAll(){
+  hotspots.forEach(h => {
+    const t = targetOf(h);
+    const el = h._el;
+    if (!t) {
+      el.style.opacity = '0';
+      el._hidden = true;
+      return;
+    }
+    const r = t.getBoundingClientRect();
+
+    if (r.width === 0 && r.height === 0) {
+      el.style.opacity = '0';
+      el._hidden = true;
+      return;
+    }
+    el._hidden = false;
+    /* 目标重新可见时必须回清行内 opacity：
+       行内样式优先级高于 .hotspot.active{opacity:1}，不回清红框会永久不可见 */
+    if (el.style.opacity === '0') el.style.opacity = '';
+
+    el.style.left   = (r.left - 4) + 'px';
+    el.style.top    = (r.top  - 4) + 'px';
+    el.style.width  = (r.width  + 8) + 'px';
+    el.style.height = (r.height + 8) + 'px';
+  });
+
+  if (annoBox._current) {
+    const target = annoBox._current._target;
+    if (!target || !target.isConnected) { hide(); return; }
+    const r = target.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) { hide(); return; }
+    positionAnno(annoBox._current);
+    drawLine(annoBox._current);
+  }
+}
+
+/* ============================================================
+   4. 事件驱动
+   ============================================================ */
+window.addEventListener('resize', repositionAll);
+window.addEventListener('scroll', repositionAll, true);
+
+let _moPending = false;
+const mo = new MutationObserver(() => {
+  hotspots.forEach(h => { if (!h._target) h._missAt = -999; });   // DOM 变了，允许立刻重查
+  if (_moPending) return;
+  _moPending = true;
+  requestAnimationFrame(() => {
+    _moPending = false;
+    repositionAll();
+  });
+});
+mo.observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['class', 'style', 'hidden', 'open']
+});
+
+document.addEventListener('pointermove', e => {
+  pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true;
+}, true);
+document.documentElement.addEventListener('mouseleave', () => { pointer.active = false; });
+document.addEventListener('pointercancel', () => { pointer.active = false; }, true);
+window.addEventListener('blur', () => { pointer.active = false; });
+
+/* body 上的 transform / filter / contain 会把叠加层的包含块从视口改到 body，
+   坐标系随之变化；这里一次性告警，避免静默错位 */
+(function warnContainingBlock(){
+  const keys = ['transform', 'filter', 'perspective', 'contain', 'willChange'];
+  const hit = keys.filter(k => {
+    const v = getComputedStyle(document.body)[k];
+    return v && v !== 'none' && v !== 'auto' && v !== 'normal';
+  });
+  if (hit.length) console.warn('标注框架告警：body 上的 ' + hit.join(' / ') + ' 会成为叠加层的包含块，标注可能错位');
+})();
+
+/* ============================================================
+   5. 逐帧重定位 + 悬停重判（兜底：动画、过渡、指针不动时的滚动与布局变化）
+   ============================================================ */
+let _lastKey = '';
+function tick(){
+  frameNo++;
+
+  /* 跑满约 2 秒仍未命中的 selector 一次性告警：
+     延迟注入的元素会在这里之前被解析到，所以告警留下的就是真拼错的 selector */
+  if (frameNo === 120) {
+    hotspots.forEach(h => {
+      if (!h._target) console.warn('热区 selector 未命中：', h.selector);
+    });
+  }
+
+  let key = '';
+  for (let i = 0; i < hotspots.length; i++){
+    const t = targetOf(hotspots[i]);
+    if (!t) { key += '-|'; continue; }
+    const r = t.getBoundingClientRect();
+    key += Math.round(r.left) + ',' + Math.round(r.top) + ','
+         + Math.round(r.width) + ',' + Math.round(r.height) + '|';
+  }
+  if (key !== _lastKey) {
+    _lastKey = key;
+    repositionAll();
+  }
+
+  reconcileHover();
+  requestAnimationFrame(tick);
+}
+
+function reconcileHover(){
+  if (!enabled) return;
+  const h = pointer.active ? pickAt(pointer.x, pointer.y) : null;
+  if (h === hovered) return;
+  hovered = h;
+  if (h) show(h, h._el);
+  else hide();
+}
+
+requestAnimationFrame(tick);
+
+/* ============================================================
+   6. 显示 / 隐藏
+   ============================================================ */
+function show(h, el){
+  Object.values(hotspotEls).forEach(e => e.classList.remove('active'));
+  if (el.style.opacity === '0') el.style.opacity = '';
+  el.classList.add('active');
+
+  annoBox.innerHTML =
+    `<div class="head"><span class="dot"></span><h4>${h.title || ''}</h4></div>
+     <div class="body">` +
+     (h.items || []).map(it =>
+       `<div class="item ${it.type}">` +
+          `<span class="tag">${it.type==='back'?'后端':'前端'}</span>` +
+          `<span class="txt">${it.text || ''}</span>` +
+        `</div>`).join('') +
+     `</div>`;
+
+  annoBox.classList.add('show');
+  annoBox._current = h;
+
+  positionAnno(h);
+  requestAnimationFrame(() => drawLine(h));
+}
+
+function hide(){
+  hovered = null;
+  annoBox.classList.remove('show');
+  Object.values(hotspotEls).forEach(e => e.classList.remove('active'));
+  svg.innerHTML = '';
+  annoBox._current = null;
+}
+
+/* ============================================================
+   7. 标注框定位（自动避让视口）
+   ============================================================ */
+function positionAnno(h){
+  const r = h._el.getBoundingClientRect();
+  const gap = 28, pad = 16;
+  const w = annoBox.offsetWidth;
+  const ht = annoBox.offsetHeight;
+
+  let x, y, side;
+  if (r.right + gap + w <= innerWidth - pad) {
+    side = 'right';
+    x = r.right + gap;
+    y = r.top + r.height/2 - ht/2;
+  } else if (r.left - gap - w >= pad) {
+    side = 'left';
+    x = r.left - gap - w;
+    y = r.top + r.height/2 - ht/2;
+  } else {
+    side = 'bottom';
+    x = r.left + r.width/2 - w/2;
+    y = r.bottom + gap;
+  }
+
+  x = Math.max(pad, Math.min(x, innerWidth  - w  - pad));
+  y = Math.max(pad, Math.min(y, innerHeight - ht - pad));
+
+  annoBox.style.left = x + 'px';
+  annoBox.style.top  = y + 'px';
+  annoBox._rect = { x, y, w, h: ht, side };
+}
+
+/* ============================================================
+   8. 引线绘制
+   ============================================================ */
+function drawLine(h){
+  const r = h._el.getBoundingClientRect();
+  const a = annoBox._rect;
+  if (!a) return;
+  const ns = 'http://www.w3.org/2000/svg';
+
+  let p1, p2;
+  if (a.side === 'right') {
+    p1 = { x: r.right, y: r.top + r.height/2 };
+    p2 = { x: a.x,     y: a.y + a.h/2 };
+  } else if (a.side === 'left') {
+    p1 = { x: r.left,    y: r.top + r.height/2 };
+    p2 = { x: a.x + a.w, y: a.y + a.h/2 };
+  } else {
+    p1 = { x: r.left + r.width/2, y: r.bottom };
+    p2 = { x: a.x + a.w/2,        y: a.y };
+  }
+
+  let d;
+  if (a.side === 'bottom') {
+    const midY = (p1.y + p2.y) / 2;
+    d = `M ${p1.x} ${p1.y} L ${p1.x} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`;
+  } else {
+    const midX = (p1.x + p2.x) / 2;
+    d = `M ${p1.x} ${p1.y} L ${midX} ${p1.y} L ${midX} ${p2.y} L ${p2.x} ${p2.y}`;
+  }
+
+  const defs = document.createElementNS(ns,'defs');
+  defs.innerHTML = `<linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#e5484d" stop-opacity="0.35"/>
+    <stop offset="100%" stop-color="#e5484d" stop-opacity="1"/></linearGradient>`;
+
+  const path = document.createElementNS(ns,'path');
+  path.setAttribute('d', d);
+  path.setAttribute('stroke','url(#lg)');
+  path.setAttribute('stroke-width','1.75');
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke-linejoin','round');
+  path.setAttribute('stroke-linecap','round');
+
+  const halo = document.createElementNS(ns,'circle');
+  halo.setAttribute('cx',p1.x); halo.setAttribute('cy',p1.y); halo.setAttribute('r','8');
+  halo.setAttribute('fill','rgba(229,72,77,.15)');
+
+  const dot = document.createElementNS(ns,'circle');
+  dot.setAttribute('cx',p1.x); dot.setAttribute('cy',p1.y); dot.setAttribute('r','4');
+  dot.setAttribute('fill','#e5484d'); dot.setAttribute('stroke','#fff'); dot.setAttribute('stroke-width','1.5');
+
+  const dot2 = document.createElementNS(ns,'circle');
+  dot2.setAttribute('cx',p2.x); dot2.setAttribute('cy',p2.y); dot2.setAttribute('r','3');
+  dot2.setAttribute('fill','#e5484d');
+
+  svg.innerHTML = '';
+  [defs,path,halo,dot,dot2].forEach(n => svg.appendChild(n));
+
+  if (!h._drawn) {
+    const len = path.getTotalLength();
+    path.style.strokeDasharray = len;
+    path.style.strokeDashoffset = len;
+    path.getBoundingClientRect();
+    path.style.transition = 'stroke-dashoffset .28s ease';
+    path.style.strokeDashoffset = 0;
+    h._drawn = true;
+  }
+}
+
+/* ============================================================
+   9. 开关
+   ============================================================ */
+toggle.addEventListener('click', () => {
+  enabled = !enabled;
+  toggle.classList.toggle('on', enabled);
+  toggle.lastChild.textContent = enabled ? '标注已开启' : '标注已关闭';
+  if (!enabled) hide();
+});
+</script>
+</body>
+</html>
