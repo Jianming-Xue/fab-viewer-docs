@@ -1,0 +1,48 @@
+{
+  "policy": {
+    "description": "mes-log-line-*：热 0~30d / 温 30~180d / 冷 180~360d / 360d 到期删除。按天命名、不用 rollover，min_index_age 就是索引年龄。口径见 docs/04-后台链路与数据模型.md §5.2.5。",
+    "default_state": "hot",
+    "states": [
+      {
+        "name": "hot",
+        "actions": [
+          { "set_priority": { "priority": 100 } }
+        ],
+        "transitions": [
+          { "state_name": "warm", "conditions": { "min_index_age": "30d" } }
+        ]
+      },
+      {
+        "name": "warm",
+        "actions": [
+          { "read_only": {} },
+          { "replica_count": { "number_of_replicas": 1 } },
+          { "force_merge": { "max_num_segments": 1 } },
+          { "set_priority": { "priority": 50 } }
+        ],
+        "transitions": [
+          { "state_name": "cold", "conditions": { "min_index_age": "180d" } }
+        ]
+      },
+      {
+        "name": "cold",
+        "actions": [
+          { "set_priority": { "priority": 0 } }
+        ],
+        "transitions": [
+          { "state_name": "delete", "conditions": { "min_index_age": "360d" } }
+        ]
+      },
+      {
+        "name": "delete",
+        "actions": [
+          { "delete": {} }
+        ],
+        "transitions": []
+      }
+    ],
+    "ism_template": [
+      { "index_patterns": ["mes-log-line-*"], "priority": 100 }
+    ]
+  }
+}

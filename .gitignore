@@ -1,0 +1,12 @@
+# 本仓库只收录交付物：docs 下的四份文档 + deploy 全目录
+/*
+!/.gitignore
+!/docs/
+!/deploy/
+
+# docs 下只留这四份
+/docs/*
+!/docs/04-后台链路与数据模型.md
+!/docs/06-派生服务工程实现.md
+!/docs/06-附录A-块首行解析方案.md
+!/docs/09-OpenSearch索引模板.md

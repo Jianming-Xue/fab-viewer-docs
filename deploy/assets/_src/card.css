@@ -1,0 +1,36 @@
+* { box-sizing: border-box; }
+body { margin:0; padding:24px; background:#F7F8F8;
+       font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif; }
+.shot { width:1040px; margin:0 0 24px; background:#fff; border:1px solid #E5E8E6;
+        border-radius:12px; overflow:hidden; }
+.bar { display:flex; align-items:center; gap:10px; padding:12px 18px;
+       border-bottom:1px solid #EDF0EE; background:#FBFCFB; }
+.dot { width:10px; height:10px; border-radius:50%; background:#D8DDDA; }
+.fname { font:600 14px/1 Menlo,monospace; color:#1A1D1B; }
+.tag { margin-left:auto; font:600 12px/1 -apple-system,"PingFang SC"; color:#fff;
+       background:#2F7D5A; padding:5px 10px; border-radius:20px; white-space:nowrap; }
+.tag.gray { background:#8A938F; }
+.body { padding:16px 20px 18px; }
+.lead { font:13.5px/1.65 -apple-system,"PingFang SC"; color:#6B7470; margin:0 0 12px; }
+.lead b { color:#1A1D1B; }
+.code { font:13px/1.7 Menlo,"SF Mono","PingFang SC",monospace;
+        border:1px solid #EDF0EE; border-radius:8px; overflow:hidden; }
+.code + .code { margin-top:10px; }
+.code .hd { display:block; padding:7px 14px; background:#F5F7F6; color:#3A403D;
+            border-bottom:1px solid #EDF0EE; font-size:12.5px; }
+.code .bd { display:block; padding:8px 0; }
+.ln { display:block; white-space:pre; padding:0 14px; }
+.del { background:#FEF3F2; color:#B42318; }
+.add { background:#ECFDF3; color:#067647; }
+.dim { color:#8A938F; }
+.cmd { color:#1A1D1B; }
+.p { color:#2F7D5A; font-weight:700; }
+.out { color:#3A403D; }
+.ok { color:#067647; font-weight:600; }
+.bad { color:#B42318; font-weight:600; }
+.note { color:#8A938F; font-style:italic; }
+.k { color:#2F7D5A; }
+.goal { margin:14px 0 0; padding:10px 14px; border-left:3px solid #2F7D5A;
+        background:#F4F9F6; font:13.5px/1.7 -apple-system,"PingFang SC"; color:#3A403D;
+        border-radius:0 6px 6px 0; }
+.goal b { color:#1A1D1B; }

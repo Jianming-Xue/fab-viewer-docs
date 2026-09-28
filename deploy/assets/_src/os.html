@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><link rel="stylesheet" href="card.css"></head><body>
+
+<div class="shot" data-name="opensearch-step2">
+  <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="fname">$ ./apply.sh</span><span class="tag">第 2 步 · 一条命令装完</span></div>
+  <div class="body">
+    <p class="lead">只发 PUT，不删任何东西。脚本连着做四件事：<b>前置检查 → 装策略 → 装模板 → 预建索引</b>。</p>
+    <div class="code"><span class="bd">
+<span class="ln"><span class="p">$</span> <span class="cmd">OPENSEARCH_URL="http://mes-os-01:9200" ./apply.sh</span></span>
+<span class="ln out">--- 0/4 前置检查 ---</span>
+<span class="ln out">  集群 mes-opensearch   版本 2.11.0</span>
+<span class="ln out">  ISM 插件  可用</span>
+<span class="ln out">  action.auto_create_index = true      <span class="ok">← 允许自动建 mes-log-* 索引</span></span>
+<span class="ln out">  数据节点数 = 6</span>
+<span class="ln out">--- 1/4 ISM 策略 ---</span>
+<span class="ln out">== PUT _plugins/_ism/policies/mes-log-line-360d  &lt;=  01-ism-line-360d.json</span>
+<span class="ln out">{"acknowledged":true}</span>
+<span class="ln out">--- 2/4 索引模板 ---</span>
+<span class="ln out">== PUT _index_template/mes-log-line  &lt;=  11-template-line.json</span>
+<span class="ln out">{"acknowledged":true}</span>
+<span class="ln out">--- 3/4 预建索引（当天行索引 + 当月块索引） ---</span>
+<span class="ln out">   已建  mes-log-line-prod-2026.09.22</span>
+<span class="ln out">   已建  mes-log-exec-prod-2026.09</span>
+<span class="ln out">--- 4/4 核对 ---</span>
+<span class="ln out">  模板 mes-log-line  →  mes-log-line-*</span>
+<span class="ln out">  模板 mes-log-exec  →  mes-log-exec-*</span>
+<span class="ln out">  索引 mes-log-line-prod-2026.09.22  green  1主/1副</span>
+    </span></div>
+    <div class="goal"><b>目的：</b><span class="bad">前置检查里 `action.auto_create_index` 若不是 `true` 或 `+mes-log-*`</span>，脚本会把放开命令打给你 —— 不放开则 Logstash 的第一个事件就被拒，而报错落在死信队列里、表面看不出来。</div>
+  </div>
+</div>
+
+<div class="shot" data-name="opensearch-step3">
+  <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="fname">$ curl $OS/...</span><span class="tag gray">第 3 步 · 验证</span></div>
+  <div class="body">
+    <p class="lead">装完自己再核一遍。前两条看「装上了没」，<b>第三条看「模板有没有真生效」</b>。</p>
+    <div class="code"><span class="bd">
+<span class="ln"><span class="p">$</span> <span class="cmd">export OS=http://mes-os-01:9200</span></span>
+<span class="ln"> </span>
+<span class="ln"><span class="p">$</span> <span class="cmd">curl -s $OS/_index_template/mes-log-* | jq -r '.index_templates[].name'</span></span>
+<span class="ln out">mes-log-line</span>
+<span class="ln out">mes-log-exec</span>
+<span class="ln"> </span>
+<span class="ln"><span class="p">$</span> <span class="cmd">curl -s $OS/mes-log-line-prod-2026.09.22/_alias | jq 'keys'</span></span>
+<span class="ln out">[</span>
+<span class="ln out">  "mes-log-line-read"        <span class="ok">← 别名自动挂上了</span></span>
+<span class="ln out">]</span>
+<span class="ln"> </span>
+<span class="ln"><span class="p">$</span> <span class="cmd">curl -s $OS/mes-log-line-prod-2026.09.22/_mapping | jq '.[].mappings.properties.SORT_KEY'</span></span>
+<span class="ln out">{</span>
+<span class="ln out">  "type": "keyword"           <span class="ok">← 关键：字段类型是模板给的</span></span>
+<span class="ln out">}</span>
+    </span></div>
+    <div class="goal"><b>目的：</b>第三条是唯一的真凭据。若返回 <span class="bad">{"type":"text","fields":{"keyword":{…}}}</span> 说明模板没生效、类型是写入时猜出来的 —— 字段类型改不回来，只能删索引重建，所以要<b>在第一个事件落地之前装模板</b>。</div>
+  </div>
+</div>
+
+</body></html>

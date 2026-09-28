@@ -1,0 +1,28 @@
+{
+  "policy": {
+    "description": "mes-log-exec-*：热 0~360d / 360d 之后转归档，不删除。归档后不再回写（块写哪个索引由块首行时刻决定）。口径见 docs/04-后台链路与数据模型.md §5.2.5。",
+    "default_state": "hot",
+    "states": [
+      {
+        "name": "hot",
+        "actions": [
+          { "set_priority": { "priority": 100 } }
+        ],
+        "transitions": [
+          { "state_name": "cold", "conditions": { "min_index_age": "360d" } }
+        ]
+      },
+      {
+        "name": "cold",
+        "actions": [
+          { "read_only": {} },
+          { "set_priority": { "priority": 0 } }
+        ],
+        "transitions": []
+      }
+    ],
+    "ism_template": [
+      { "index_patterns": ["mes-log-exec-*"], "priority": 100 }
+    ]
+  }
+}

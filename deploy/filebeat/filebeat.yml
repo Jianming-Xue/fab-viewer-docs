@@ -1,0 +1,218 @@
+# ==============================================================================
+# MES 日志采集 · Filebeat 配置（采集层）
+# 口径见 docs/04-后台链路与数据模型.md §2.1 ~ §2.4
+#
+# 部署形态：**多台物理独立主机，各自挂各自的日志盘**；日志目录**统一为 /mes/<env>/systemlogs/**；
+# 同一台机器上 PIRUN 与 PROD 两套环境的日志可能并存（共享 IP）。
+# 因此：**一台机器一份本配置** —— 一份配置覆盖该机器上的全部环境与全部服务族。
+#
+# 落地必改一处：output.logstash 的地址。
+# 挂载点：日志盘统一挂 /mes，日志目录 /mes/<env>/systemlogs/
+#   PIRUN → /mes/pirun/systemlogs/ ；PROD → /mes/prod/systemlogs/
+#   同一台机器上 PIRUN 与 PROD 是两个目录；哪台机器若挂到别处，只改该机器这份配置的前缀。
+#
+# 路径划分：**逐服务族显式列** ——
+#   plain 组列出除 COMM_SND 以外的全部服务族（含 COMM_RCV / POLL）；
+#   COMM_SND 单独成组，因为只有它要开多行合并（§2.2）。
+#
+# 归档件不回采：只采 systemlogs/ 下的活动件；
+#   原地压缩或改名的归档件由每组 input 的 prospector.scanner.exclude_files 挡掉，
+#   被搬到别处的归档件不在 paths 的匹配面里。
+# ==============================================================================
+
+###################### Filebeat 输入 ######################
+
+filebeat.inputs:
+
+  # ============ PIRUN · 不合并（业务族 / POLL / COMM_RCV） ============
+  - type: filestream
+    id: mes-pirun-plain
+    enabled: true
+    paths:
+      # 业务族：按大小滚，`*` 同时覆盖 .log / .log.1 / .log.10（MBX 前缀可有可无，故前缀也放 *）
+      - /mes/pirun/systemlogs/*FABsrv.log*
+      - /mes/pirun/systemlogs/*LISTsrv.log*
+      - /mes/pirun/systemlogs/*QUERYsrv.log*
+      - /mes/pirun/systemlogs/*OCAPsrv.log*
+      - /mes/pirun/systemlogs/*TRANSsrv.log*
+      - /mes/pirun/systemlogs/*XSITEsrv.log*
+      - /mes/pirun/systemlogs/*IDEsrv.log*
+      - /mes/pirun/systemlogs/*RTDLOGsrv.log*
+      # 定时器族：格式同业务族，开始标志未知，本期不切块，但行照采（§2.1、§4.2.1）
+      - /mes/pirun/systemlogs/*POLLsrv.log*
+      # 通信族的 RCV：不合并。按时段滚，文件名带编号（COMM_RCVsrv.1.0920.12-18.log.0）
+      - /mes/pirun/systemlogs/*COMM_RCVsrv*.log*
+      # 注：上面文件名的大小写按现场实际写，Linux 文件系统区分大小写
+    prospector.scanner.exclude_files:        # 归档件不回采（04 §2.1）：压缩件 + 原地改名的
+      - '\.(gz|zip|bz2|xz|zst|tar|tgz)$'
+      - '\.(bak|old|tmp)$'
+    encoding: utf-8
+    fields:
+      ENV: PIRUN                            # 环境名 = 配置常量，跟日志目录绑定（§2.1）
+      system.name: MES-300Works
+    fields_under_root: true                 # 落成顶层字段；false 会变成 fields.ENV，加工层对不上
+    ignore_older: 0                         # 禁用：首次部署要补齐现存全部滚动件（§2.1）
+    tail_files: false                       # 从文件头读，不跳历史
+    file_identity:
+      inode: ~                              # 滚动改名后仍认作同一文件（§2.1）
+    prospector.scanner.check_interval: 5s
+    prospector.scanner.recursive_glob: true
+    buffer_size: 16KiB
+    close.on_state_change.renamed: false    # 关键：改名（滚动）不关 harvester，继续读完
+    close.on_state_change.removed: true
+    close.on_state_change.inactive: 5m
+    clean_removed: true
+    harvester_limit: 256                    # 最佳实践取值：稳定态文件总数上浮；部署前确认 ulimit -n ≥ 4096（04 §2.4）
+
+  # ============ PIRUN · COMM_SND（唯一开多行合并的一组） ============
+  # 规则：行首是时间戳就另起一条，不是时间戳的行并入上一行（§2.2）
+  - type: filestream
+    id: mes-pirun-comm-snd
+    enabled: true
+    paths:
+      - /mes/pirun/systemlogs/*COMM_SNDsrv*.log*
+    prospector.scanner.exclude_files:        # 归档件不回采（04 §2.1）：压缩件 + 原地改名的
+      - '\.(gz|zip|bz2|xz|zst|tar|tgz)$'
+      - '\.(bak|old|tmp)$'
+    encoding: utf-8
+    fields:
+      ENV: PIRUN
+      system.name: MES-300Works
+    fields_under_root: true
+    multiline:
+      pattern: '^\d{4}/\d{2}/\d{2} '
+      negate: true
+      match: after
+      max_lines: 500
+      timeout: 5s
+    ignore_older: 0
+    tail_files: false
+    file_identity:
+      inode: ~
+    prospector.scanner.check_interval: 5s
+    prospector.scanner.recursive_glob: true
+    buffer_size: 16KiB
+    close.on_state_change.renamed: false
+    close.on_state_change.removed: true
+    close.on_state_change.inactive: 5m
+    clean_removed: true
+    harvester_limit: 256                    # 最佳实践取值：稳定态文件总数上浮；部署前确认 ulimit -n ≥ 4096（04 §2.4）
+
+  # ============ PROD · 不合并（同 PIRUN，只换目录与 ENV） ============
+  - type: filestream
+    id: mes-prod-plain
+    enabled: true
+    paths:
+      - /mes/prod/systemlogs/*FABsrv.log*
+      - /mes/prod/systemlogs/*LISTsrv.log*
+      - /mes/prod/systemlogs/*QUERYsrv.log*
+      - /mes/prod/systemlogs/*OCAPsrv.log*
+      - /mes/prod/systemlogs/*TRANSsrv.log*
+      - /mes/prod/systemlogs/*XSITEsrv.log*
+      - /mes/prod/systemlogs/*IDEsrv.log*
+      - /mes/prod/systemlogs/*RTDLOGsrv.log*
+      - /mes/prod/systemlogs/*POLLsrv.log*
+      - /mes/prod/systemlogs/*COMM_RCVsrv*.log*
+    prospector.scanner.exclude_files:        # 归档件不回采（04 §2.1）：压缩件 + 原地改名的
+      - '\.(gz|zip|bz2|xz|zst|tar|tgz)$'
+      - '\.(bak|old|tmp)$'
+    encoding: utf-8
+    fields:
+      ENV: PROD
+      system.name: MES-300Works
+    fields_under_root: true
+    ignore_older: 0
+    tail_files: false
+    file_identity:
+      inode: ~
+    prospector.scanner.check_interval: 5s
+    prospector.scanner.recursive_glob: true
+    buffer_size: 16KiB
+    close.on_state_change.renamed: false
+    close.on_state_change.removed: true
+    close.on_state_change.inactive: 5m
+    clean_removed: true
+    harvester_limit: 256                    # 最佳实践取值：稳定态文件总数上浮；部署前确认 ulimit -n ≥ 4096（04 §2.4）
+
+  # ============ PROD · COMM_SND ============
+  - type: filestream
+    id: mes-prod-comm-snd
+    enabled: true
+    paths:
+      - /mes/prod/systemlogs/*COMM_SNDsrv*.log*
+    prospector.scanner.exclude_files:        # 归档件不回采（04 §2.1）：压缩件 + 原地改名的
+      - '\.(gz|zip|bz2|xz|zst|tar|tgz)$'
+      - '\.(bak|old|tmp)$'
+    encoding: utf-8
+    fields:
+      ENV: PROD
+      system.name: MES-300Works
+    fields_under_root: true
+    multiline:
+      pattern: '^\d{4}/\d{2}/\d{2} '
+      negate: true
+      match: after
+      max_lines: 500
+      timeout: 5s
+    ignore_older: 0
+    tail_files: false
+    file_identity:
+      inode: ~
+    prospector.scanner.check_interval: 5s
+    prospector.scanner.recursive_glob: true
+    buffer_size: 16KiB
+    close.on_state_change.renamed: false
+    close.on_state_change.removed: true
+    close.on_state_change.inactive: 5m
+    clean_removed: true
+    harvester_limit: 256                    # 最佳实践取值：稳定态文件总数上浮；部署前确认 ulimit -n ≥ 4096（04 §2.4）
+
+# 单环境机器：把另一环境的两组 input 删掉即可；留着也只是空跑（路径不存在时只在日志里提示）
+
+###################### 主机元数据 ######################
+
+# 提供 host.ip（全部网卡，多值）与 host.name。
+# 采集层不挑网段 —— HOSTIP 由加工层按 CIDR 从数组里选（§2.1、§2.4）
+processors:
+  - add_host_metadata:
+      netinfo.enabled: true        # 必须 true。它管的就是往事件里带不带 host.ip / host.mac；写 false 则 host.ip 不产生，HOSTIP 缺一段、锁流三元组失效（04 §2.4）
+      cache.ttl: 5m
+
+###################### 内存队列 ######################
+
+# 输出抖动时不丢事件，又不无界占内存
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 1s
+
+###################### 输出 ######################
+
+output.logstash:
+  hosts: ["logstash-01:5044", "logstash-02:5044"]
+  loadbalance: true
+  worker: 2
+  bulk_max_size: 2048
+  compression_level: 3
+  ttl: 60s                  # 加工层实例增减后一分钟内重新分配
+  backoff.init: 1s
+  backoff.max: 60s
+  slow_start: true
+
+###################### 进度与日志 ######################
+
+# registry 是采集进度的唯一凭据；flush 1s 把重启后的重读窗口压到最小
+# （重投递不会产生重复行：行文档按行 ID 去重，§5.3.1）
+filebeat.registry.path: /var/lib/filebeat/registry
+filebeat.registry.flush: 1s
+filebeat.shutdown_timeout: 10s
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: "0644"
+
+monitoring.enabled: false

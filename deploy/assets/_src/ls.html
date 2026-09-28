@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><link rel="stylesheet" href="card.css"></head><body>
+
+<div class="shot" data-name="logstash-step1">
+  <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="fname">pipeline/*.conf</span><span class="tag">第 1 步 · 只改这 2 行</span></div>
+  <div class="body">
+    <p class="lead">本目录的 5 个 conf 里，只有这两行要按现场改，<b>改完其余文件原样可用</b>。</p>
+    <div class="code"><span class="hd">① pipeline/50-output.conf　第 16 行 —— 写到哪个 OpenSearch</span><span class="bd">
+<span class="ln">output {</span>
+<span class="ln">  opensearch {</span>
+<span class="ln del">-   hosts =&gt; ["https://os-node-01:9200", "https://os-node-02:9200", "https://os-node-03:9200"]</span>
+<span class="ln add">+   hosts =&gt; ["https://mes-os-01:9200", "https://mes-os-02:9200", "https://mes-os-03:9200"]</span>
+<span class="ln">    index =&gt; "%{[@metadata][index]}"</span>
+<span class="ln">    document_id =&gt; "%{LOG_LINE_ID}"</span>
+<span class="ln note">    ↑ 节点有几个写几个；内网走 HTTP 就把下面那行 ssl =&gt; true 改成 false，并删掉两行证书校验</span>
+    </span></div>
+    <div class="code"><span class="hd">② pipeline/10-input.conf　第 12 行 —— 收哪个端口</span><span class="bd">
+<span class="ln">input {</span>
+<span class="ln">  beats {</span>
+<span class="ln del">-   port =&gt; 5044</span>
+<span class="ln add">+   port =&gt; 5045</span>
+<span class="ln">  }</span>
+<span class="ln">}</span>
+<span class="ln note">  ↑ 5044 是默认值。别的系统的管道若已占，必须换；Filebeat 侧 hosts 必须同值</span>
+    </span></div>
+    <div class="goal"><b>目的：</b>去掉本链路对现场的最后一处假设 —— 往哪写（①）、从哪收（②）。这两行对了，加工层就没有需要现场定制的参数。</div>
+  </div>
+</div>
+
+<div class="shot" data-name="logstash-step3">
+  <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="fname">/etc/logstash/{pipelines.yml · logstash.yml}</span><span class="tag">第 3 步 · 追加，不覆盖</span></div>
+  <div class="body">
+    <p class="lead">现有实例是<b>多系统共用</b>的，所以要动的是「别人的文件」，规矩只有一条：<b>只追加，绝不覆盖</b>。</p>
+    <div class="code"><span class="hd">③ pipelines.yml —— 在<b>文件末尾</b>追加这一整段（别人的条目一个字不动）</span><span class="bd">
+<span class="ln add">+ - pipeline.id: mes-lines</span>
+<span class="ln add">+   path.config: "/etc/logstash-mes/pipeline/*.conf"</span>
+<span class="ln add">+   pipeline.workers: 4</span>
+<span class="ln add">+   pipeline.batch.size: 500</span>
+<span class="ln add">+   pipeline.ecs_compatibility: disabled</span>
+<span class="ln add">+   queue.type: persisted</span>
+<span class="ln note">  ↑ ecs_compatibility 必须 disabled：开着会补 ecs / host 元字段，而行索引模板是 strict，多一个字段整篇写入失败</span>
+    </span></div>
+    <div class="code"><span class="hd">④ logstash.yml —— 逐项确认，<b>缺才加</b>（这两项整实例生效，会让别的管道也受影响）</span><span class="bd">
+<span class="ln add">+ dead_letter_queue.enable: true</span>
+<span class="ln add">+ config.reload.automatic: true</span>
+<span class="ln add">+ config.reload.interval: 3s</span>
+<span class="ln note">  ↑ jvm.options 不用动：本管道的时间是显式按 +08:00 构造的，不吃 JVM 时区</span>
+    </span></div>
+    <div class="goal"><b>目的：</b>让本链路跑起来，同时不动别人的管道。加错地方的代价是<b>别的系统一起停</b>，所以这两处必须逐字核对再保存。</div>
+  </div>
+</div>
+
+<div class="shot" data-name="logstash-verify">
+  <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="fname">$ curl localhost:9600</span><span class="tag">第 4 步 · 重启后验证</span></div>
+  <div class="body">
+    <p class="lead">重启整个实例后（别的管道也会断几秒），看两件事：<b>事件在不在流</b>、<b>有没有被拒</b>。</p>
+    <div class="code"><span class="bd">
+<span class="ln"><span class="p">$</span> <span class="cmd">curl -s localhost:9600/_node/stats/pipelines | jq '.pipelines["mes-lines"].events'</span></span>
+<span class="ln out">{</span>
+<span class="ln out">  "in": 182456,</span>
+<span class="ln out">  "filtered": 182456,</span>
+<span class="ln out">  "out": 182456,        <span class="note">← out 与 in 持平 = 没在丢</span></span>
+<span class="ln out">  "duration_in_millis": 128430</span>
+<span class="ln out">}</span>
+<span class="ln"> </span>
+<span class="ln"><span class="p">$</span> <span class="cmd">ls -l /var/lib/logstash/dead_letter_queue/</span></span>
+<span class="ln out">total 0                 <span class="ok">← 空 = 没有写入被拒的事件</span></span>
+    </span></div>
+    <div class="goal"><b>目的：</b><b>in 涨 / out 不涨</b> 只有两种原因 —— 字段被 strict 拒了（去看 DLQ），或 OpenSearch 侧不可写（模板没装、认证错）。前者回第 1 步①，后者回存储层。</div>
+  </div>
+</div>
+
+</body></html>

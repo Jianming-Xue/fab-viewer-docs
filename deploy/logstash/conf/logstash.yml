@@ -1,0 +1,44 @@
+# ==============================================================================
+# Logstash 主配置（加工层）
+# 口径见 docs/04-后台链路与数据模型.md §3.1 ~ §3.4
+#
+# 目标版本：Logstash 9.5。本文件按 9.x 写 —— 与 8.x 的差别都在注释里标了
+# 落地必改：无（地址类参数都在 pipeline 与 pipelines.yml 里）
+# 堆大小见 jvm.options；本文件只管管道行为与队列
+# ==============================================================================
+
+api.http.host: 127.0.0.1        # 监控 API 只监听本机，不对业务网暴露
+api.http.port: 9600             # 9.0 起 http.* 两个参数已被移除、改名 api.* —— 留旧名会直接启动失败
+log.level: info
+path.logs: /var/log/logstash
+
+# ---- 规则热加载（04 §3.4）----
+# msg_kinds 的规则改完由 tools/render_msgkinds.py 渲染进 pipeline/30-msgkind.conf，
+# 这里开自动重载，渲染完 3 秒内生效，**不用重启进程**
+config.reload.automatic: true
+config.reload.interval: 3s
+
+# ---- 管道 ----
+pipeline.workers: 4             # 与 CPU 核数相当；单条事件的处理是纯 CPU（grok + ruby）
+pipeline.batch.size: 500
+pipeline.batch.delay: 50
+# 9.0 起 buffer 默认从堆外（direct）改成堆内（heap）—— 本管道走 Beats input，内存模型跟着变。
+# 上面 -Xmx4g 是按堆外 buffer 估的；若堆压力偏大，解开下一行回到 8.x 的行为。
+# 注意这是**整实例**设置，会影响别的管道，别在别人不知情时打开。
+# pipeline.buffer.type: direct
+pipeline.ordered: false         # 不要求保序：行文档写一次不再改，日志顺序由派生层按二级重排还原（04 §5.2.4）
+# 关键：关掉 ECS 兼容。开着的话 Logstash 会给事件补 ecs / host 等元字段，
+# 而行索引模板是 dynamic: strict，多一个字段整篇写入失败（04 §5.3.1）
+pipeline.ecs_compatibility: disabled
+
+# ---- 队列 ----
+# 持久化队列：Logstash 重启不丢事件。行文档按 LOG_LINE_ID 幂等（_id），
+# 重放同一批不会产生重复行（04 §3.2.2）；纯文本行例外，它每次派生的 SORT_KEY 不同
+queue.type: persisted
+queue.max_bytes: 8gb
+queue.checkpoint.writes: 1024
+
+# ---- 死信队列 ----
+# 写不进索引的事件落这里（映射不符、字段类型错），不静默丢
+dead_letter_queue.enable: true
+dead_letter_queue.max_bytes: 1gb

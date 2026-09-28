@@ -1,0 +1,24 @@
+# ==============================================================================
+# MES 日志行首模式（外置 patterns 文件，口径见 docs/04-后台链路与数据模型.md §3.2.1）
+# 用法：pipeline/20-parse.conf 里写 patterns_dir => [".../patterns"]，或直接写死在此文件
+#
+# 两套前缀，按**文件来源**分流，不试错匹配：
+#   MES_RULE_LINE  业务族（含 POLL）——  行首 MM/dd/yy HH:mm:ss.cc <类别>srv.<编号>:<正文>
+#   COMM_LINE      通信族（COMM_RCV / COMM_SND）—— 行首 yyyy/MM/dd HH:mm:ss.SSS + 空白 + 主机-进程 + 空白 + ::R::/::S:: + 空白 + 正文（正文可跨行）
+#
+# 写作要点（04 §3.2.1 的位置表）：
+#   业务族末段必须 GREEDYDATA —— 用 DATA / WORD 会在第一个冒号处截断
+#   通信族末段必须**跨行** (?<log_body>[\s\S]*) —— GREEDYDATA 等于 .*、不匹配换行，
+#     会把 COMM_SND 合并进来的报文丢掉、只剩首行
+#   通信族段间空白写 \s+ —— Tab 与空格都收
+#   server_id 段必须 DATA（非贪婪）—— WORD 会被点号断掉（FABsrv.63 只取到 FABsrv），
+#   NOTSPACE 会一路吃到最后一个冒号
+# ==============================================================================
+
+MES_RULE_LINE %{DATE_US:log_date} %{TIME:log_time}\.%{INT:log_cs} %{DATA:server_id}:%{GREEDYDATA:log_body}
+
+# 通信族时间戳：yyyy/MM/dd HH:mm:ss.SSS。不能用内置 TIMESTAMP_ISO8601 ——
+#   它要求日期是横杠（%{YEAR}-%{MONTHNUM}-%{MONTHDAY}），通信族是斜杠。
+COMM_TS \d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}
+
+COMM_LINE %{COMM_TS:log_time}\s+%{DATA:proc_info}\s+%{DATA:dir_flag}\s+(?<log_body>[\s\S]*)

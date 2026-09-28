@@ -1,0 +1,77 @@
+{
+  "index_patterns": ["mes-log-exec-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s",
+      "index.codec": "best_compression"
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp":       { "type": "date" },
+        "START_LINE_ID":    { "type": "keyword" },
+        "END_LINE_ID":      { "type": "keyword" },
+        "ENV":              { "type": "keyword" },
+        "HOSTIP":           { "type": "keyword" },
+        "SERVER_ID":        { "type": "keyword" },
+        "SERVER_CATEGORY":  { "type": "keyword" },
+        "SERVER_NUMBER":    { "type": "keyword" },
+        "system.name":      { "type": "keyword" },
+        "REQUEST_TYPE":     { "type": "keyword" },
+        "START_SORT_KEY":   { "type": "keyword" },
+        "ORDER_BY":         { "type": "long" },
+        "END_SORT_KEY":     { "type": "keyword" },
+        "START_TIME":       { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+        "END_TIME":         { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+        "LAST_LINE_TIME":   { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+        "CLOSE_TIME":       { "type": "date", "format": "strict_date_optional_time||epoch_millis" },
+        "EXEC_STATUS":      { "type": "keyword" },
+        "REOPEN_LOG": {
+          "type": "nested",
+          "properties": {
+            "PREV_END_SORT_KEY": { "type": "keyword" },
+            "FIRST_SORT_KEY":    { "type": "keyword" },
+            "GAP_MS":            { "type": "long" },
+            "REOPENED_AT":       { "type": "date", "format": "strict_date_optional_time||epoch_millis" }
+          }
+        },
+        "TOTAL_COST_MS":       { "type": "long" },
+        "COST_SUM_MS":         { "type": "long" },
+        "UNACCOUNTED_COST_MS": { "type": "long" },
+        "COST_BREAKDOWN": {
+          "type": "nested",
+          "properties": {
+            "ITEM":          { "type": "keyword" },
+            "GROUP":         { "type": "keyword" },
+            "COUNT":         { "type": "integer" },
+            "SUM_MS":        { "type": "long" },
+            "MAX_MS":        { "type": "long" },
+            "FIRST_BEGIN_TS":{ "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+            "LAST_END_TS":   { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" }
+          }
+        },
+        "RULENAME":    { "type": "keyword" },
+        "LOTID":       { "type": "keyword" },
+        "EQPID":       { "type": "keyword" },
+        "PORTID":      { "type": "keyword" },
+        "CARRIERID":   { "type": "keyword" },
+        "USERID":      { "type": "keyword" },
+        "TID":         { "type": "keyword" },
+        "ERR_CODE":    { "type": "keyword" },
+        "RULE_RESULT": { "type": "keyword" }
+      }
+    },
+    "aliases": {
+      "mes-log-exec-read": {}
+    }
+  },
+  "_meta": {
+    "doc": "docs/09-OpenSearch索引模板.md",
+    "field_list": "docs/04-后台链路与数据模型.md §5.3.2",
+    "note": "七个业务字段与 ERR_CODE 可多值（同字段多值 = keyword 数组）；START_TIME / END_TIME / LAST_LINE_TIME / COST_BREAKDOWN 的时间子字段走日志格式，CLOSE_TIME / REOPENED_AT 是墙钟、走 ISO",
+    "ism": "策略**不写**在索引模板里 —— 靠 ISM policy 的 ism_template 按索引模式自动挂（官方唯一推荐路径，见 OpenSearch ISM 文档）。旧的 plugins.index_state_management.policy_id 已弃用、OpenSearch 3.x 下可能让索引创建被 unknown setting 直接拒掉，不要加回来。"
+  }
+}

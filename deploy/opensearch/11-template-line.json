@@ -1,0 +1,47 @@
+{
+  "index_patterns": ["mes-log-line-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s",
+      "index.codec": "best_compression"
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp":      { "type": "date" },
+        "LOG_LINE_ID":     { "type": "keyword" },
+        "SORT_KEY":        { "type": "keyword" },
+        "system.name":     { "type": "keyword" },
+        "ENV":             { "type": "keyword" },
+        "HOSTIP":          { "type": "keyword" },
+        "SERVER_ID":       { "type": "keyword" },
+        "SERVER_CATEGORY": { "type": "keyword" },
+        "SERVER_NUMBER":   { "type": "keyword" },
+        "LOG_TIME":        { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+        "LOG_FILE":        { "type": "keyword" },
+        "LOG_INODE":       { "type": "long" },
+        "LOG_OFFSET":      { "type": "long" },
+        "LOG_RAW":         { "type": "keyword", "index": false, "doc_values": false },
+        "LOG_BODY":        { "type": "text" },
+        "MSG_KIND":        { "type": "keyword" },
+        "CALL_SYS":        { "type": "keyword" },
+        "LOCK_OBJ":        { "type": "keyword" },
+        "LOCK_ID":         { "type": "keyword" },
+        "ERR_CODE":        { "type": "keyword" },
+        "RULE_RESULT":     { "type": "keyword" }
+      }
+    },
+    "aliases": {
+      "mes-log-line-read": {}
+    }
+  },
+  "_meta": {
+    "doc": "docs/09-OpenSearch索引模板.md",
+    "field_list": "docs/04-后台链路与数据模型.md §5.3.1",
+    "note": "LOG_RAW 只在 _source 里供还原用，不建索引也不建 doc_values；LOG_BODY 是唯一分词字段",
+    "ism": "策略**不写**在索引模板里 —— 靠 ISM policy 的 ism_template 按索引模式自动挂（官方唯一推荐路径，见 OpenSearch ISM 文档）。旧的 plugins.index_state_management.policy_id 已弃用、OpenSearch 3.x 下可能让索引创建被 unknown setting 直接拒掉，不要加回来。"
+  }
+}
