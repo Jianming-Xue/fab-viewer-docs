@@ -7,7 +7,7 @@
 | `filebeat-step1.png` | 采集层第一步：`output.logstash.hosts` 改哪一行 |
 | `filebeat-step2.png` | 采集层第二步：`test config` / `test output` 的期望输出 |
 | `filebeat-verify.png` | 采集层第三步:registry 的 mtime 在动 |
-| `logstash-step1.png` | 加工层第一步：`50-output.conf` 第 16 行、`10-input.conf` 第 12 行 |
+| `logstash-step1.png` | 加工层第一步：`50-output.conf` 第 23 行、`10-input.conf` 第 12 行 |
 | `logstash-step3.png` | 加工层第三步：`pipelines.yml` 追加的管道块、`logstash.yml` 缺才加的两项 |
 | `logstash-verify.png` | 加工层第四步：`events.in` / `events.out` / DLQ 目录 |
 | `opensearch-step2.png` | 存储层第二步：`apply.sh` 的四步输出 |
