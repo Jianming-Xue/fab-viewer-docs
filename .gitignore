@@ -3,6 +3,7 @@
 
 # 仓库自身
 !/.gitignore
+!/README.md
 
 # ── deploy：整个目录都要 ──
 !/deploy/
