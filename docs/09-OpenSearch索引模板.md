@@ -67,7 +67,8 @@
         "LOCK_OBJ":        { "type": "keyword" },
         "LOCK_ID":         { "type": "keyword" },
         "ERR_CODE":        { "type": "keyword" },
-        "RULE_RESULT":     { "type": "keyword" }
+        "RULE_RESULT":     { "type": "keyword" },
+        "INNER_RULE_NAME": { "type": "keyword" }
       }
     },
     "aliases": { "mes-log-line-read": {} }
@@ -85,18 +86,20 @@
 
 ## 四、块索引
 
-块索引字段就是 04 §5.3.2 那张表，两组 `nested` 是重点：
+块索引字段就是 04 §5.3.2 那张表，三组 `nested` 是重点：
 
 | 字段 | 类型 | 子字段 |
 |---|---|---|
 | `REOPEN_LOG` | nested | `PREV_END_SORT_KEY` / `FIRST_SORT_KEY`（keyword）、`GAP_MS`（long）、`REOPENED_AT`（date，墙钟） |
 | `COST_BREAKDOWN` | nested | `ITEM` / `GROUP`（keyword）、`COUNT`（integer）、`SUM_MS` / `MAX_MS`（long）、`FIRST_BEGIN_TS` / `LAST_END_TS`（date，日志格式） |
+| `INNER_RULES` | nested | `NAME`（keyword）、`START_TIME` / `END_TIME`（date，日志格式）。一次内部 Rule 调用一条，按 `START_TIME` 升序；**`NAME` 与块 `RULENAME` 同名的整对放弃**（04 §3.2.3） |
+| `LOCK_SEQ` | keyword（多值） | 无子字段。元素形如 `CARRIER\|FPB08765`，**首现定序、同值去重**的锁顺序（04 §3.2.3）；数组保序，空 `LOCK_ID` 的加锁行不进序列 |
 
 **`ORDER_BY` 是 `long`** —— 19 位纯数字（单位时间戳 14 位 + 5 位序号），排序与 `range` 都按数值走，「取最新一块」直接按它 `desc`。
 
-时间字段分两种格式，别混：`START_TIME` / `END_TIME` / `LAST_LINE_TIME` / `COST_BREAKDOWN` 的时间子字段走**日志格式**，`CLOSE_TIME` / `REOPENED_AT` 是**墙钟**、走 `strict_date_optional_time||epoch_millis`。
+时间字段分两种格式，别混：`START_TIME` / `END_TIME` / `LAST_LINE_TIME` / `COST_BREAKDOWN` / `INNER_RULES` 的时间子字段走**日志格式**，`CLOSE_TIME` / `REOPENED_AT` 是**墙钟**、走 `strict_date_optional_time||epoch_millis`。
 
-七个业务字段（`RULENAME` / `LOTID` / `EQPID` / `PORTID` / `CARRIERID` / `USERID` / `TID`）与 `ERR_CODE` 都可能多值 —— mapping 不用特殊处理，同字段多值就是 `keyword` 数组。`ERR_CODE` 是**并集去重**后的数组，不代表块失败。
+七个业务字段（`RULENAME` / `LOTID` / `EQPID` / `PORTID` / `CARRIERID` / `USERID` / `TID`）与 `ERR_CODE`、`LOCK_SEQ` 都可能多值 —— mapping 不用特殊处理，同字段多值就是 `keyword` 数组。`ERR_CODE` 是**并集去重**后的数组，不代表块失败；`LOCK_SEQ` 是**首现定序**的锁顺序数组。
 
 ## 五、`dynamic: strict` 的前置条件
 

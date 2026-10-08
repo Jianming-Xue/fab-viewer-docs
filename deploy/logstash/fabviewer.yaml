@@ -82,6 +82,15 @@ msg_kinds:
   - kind: RULE_REPLY
     regex: 'FwSrvExecuteRuleTxn::store:rule reply =\s*(\S+)\s*$'
     capture: RULE_RESULT
+  # 内部 Rule 调用起止（04 §3.2.3）：名字进 INNER_RULE_NAME、不进标签。
+  #   注意前缀是小写 f 开头的 fwsrvExecServerRule，与大写 F 的 FwSrvExecuteRuleTxn 不是同一个方法名。
+  #   与所属块 RULENAME 同名的是外层自身的执行行，派生层配对时整对放弃（04 §3.2.3 / 06 §2.2）
+  - kind: INNER_RULE_START
+    regex: 'fwsrvExecServerRule:start executing rule (\S+)'
+    capture: INNER_RULE_NAME
+  - kind: INNER_RULE_END
+    regex: 'fwsrvExecServerRule:finish executing rule (\S+)'
+    capture: INNER_RULE_NAME
 
 # 第 2 段：派生层消费。耗时项由哪一对 MSG_KIND 界定
 cost_items:

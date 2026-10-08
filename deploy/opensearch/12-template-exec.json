@@ -53,6 +53,14 @@
             "LAST_END_TS":   { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" }
           }
         },
+        "INNER_RULES": {
+          "type": "nested",
+          "properties": {
+            "NAME":       { "type": "keyword" },
+            "START_TIME": { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+            "END_TIME":   { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" }
+          }
+        },
         "RULENAME":    { "type": "keyword" },
         "LOTID":       { "type": "keyword" },
         "EQPID":       { "type": "keyword" },
@@ -61,7 +69,8 @@
         "USERID":      { "type": "keyword" },
         "TID":         { "type": "keyword" },
         "ERR_CODE":    { "type": "keyword" },
-        "RULE_RESULT": { "type": "keyword" }
+        "RULE_RESULT": { "type": "keyword" },
+        "LOCK_SEQ":    { "type": "keyword" }
       }
     },
     "aliases": {

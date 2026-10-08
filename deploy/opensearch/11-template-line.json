@@ -31,7 +31,8 @@
         "LOCK_OBJ":        { "type": "keyword" },
         "LOCK_ID":         { "type": "keyword" },
         "ERR_CODE":        { "type": "keyword" },
-        "RULE_RESULT":     { "type": "keyword" }
+        "RULE_RESULT":     { "type": "keyword" },
+        "INNER_RULE_NAME": { "type": "keyword" }
       }
     },
     "aliases": {

@@ -6,8 +6,8 @@
 |---|---|---|
 | ISM 策略 `mes-log-line-360d` | `01-ism-line-360d.json` | 行索引：热 0~30d / 温 30~180d / 冷 180~360d / 360d 删除 |
 | ISM 策略 `mes-log-exec-keep` | `02-ism-exec-keep.json` | 块索引：热 0~360d / 之后只读归档，**不删** |
-| 索引模板 `mes-log-line` | `11-template-line.json` | `mes-log-line-*`：21 字段、1 主 1 副、读别名 `mes-log-line-read` |
-| 索引模板 `mes-log-exec` | `12-template-exec.json` | `mes-log-exec-*`：32 字段（含 2 个 `nested`）、读别名 `mes-log-exec-read` |
+| 索引模板 `mes-log-line` | `11-template-line.json` | `mes-log-line-*`：22 字段、1 主 1 副、读别名 `mes-log-line-read` |
+| 索引模板 `mes-log-exec` | `12-template-exec.json` | `mes-log-exec-*`：34 字段（含 3 个 `nested`）、读别名 `mes-log-exec-read` |
 
 命令里的 `$OS` = `OPENSEARCH_URL` 的值。三步：**确认一条设置 → 跑脚本 → 验证**。
 
@@ -81,10 +81,16 @@ MES_ENVS="" ./apply.sh
 |---|---|---|
 | 保留期（天数、热温冷档位） | 改 `0x-ism-*.json` → 重跑 `apply.sh` | **立即生效**，不重建 |
 | 副本数、`refresh_interval`、codec | 改 `1x-template-*.json` → 重跑 | 只对新索引生效 |
-| 加字段 | 改模板 JSON **＋** `docs/04` 字段表 **＋** 加工层白名单 | 只对新索引生效 |
+| 加字段 | 改模板 JSON **＋** `docs/04` 字段表 **＋** 写入方（行=加工层白名单，块=派生服务）**＋ 先给存量索引 `PUT mapping` 追加字段** | 模板只对新索引生效 |
 | 改字段类型 | **改不了** | 必须重建索引 + 重灌 |
 
-加字段必须三处同步。漏掉加工层那处会因 `strict` 整篇写入失败 —— 这是有意设计的：宁可立刻报错，也不要悄悄多出一个查不到的字段。
+加字段必须三处同步。漏掉写入方那处、或忘了给存量索引补 mapping，都会因 `strict` 整篇写入失败 —— 这是有意设计的：宁可立刻报错，也不要悄悄多出一个查不到的字段。**模板管不到已建出来的索引**，给存量索引追加字段用（加新字段合法，改旧字段才不允许）：
+
+```bash
+# 例：给现存的块索引补 LOCK_SEQ（派生服务带新字段发版之前先跑这句）
+curl -X PUT "$OS/mes-log-exec-*/_mapping" -H 'Content-Type: application/json' \
+  -d '{"properties":{"LOCK_SEQ":{"type":"keyword"}}}'
+```
 
 **装完之后，本方案在集群里留下的东西只有**：`mes-log-*` 索引、2 个模板、2 个 ISM 策略、2 个读别名。别的系统的索引与集群设置一概不碰。
 
@@ -113,8 +119,8 @@ curl -X DELETE "$OS/_plugins/_ism/policies/mes-log-exec-keep"
 | 内容 | 出处 |
 |---|---|
 | 索引划分、读 / 写别名、`{env}` 大小写 | `docs/04` §5.2.1 |
-| 行文档字段清单（21 个） | `docs/04` §5.3.1 |
-| 块文档字段清单（32 个） | `docs/04` §5.3.2 |
+| 行文档字段清单（22 个） | `docs/04` §5.3.1 |
+| 块文档字段清单（34 个） | `docs/04` §5.3.2 |
 | 保留策略三档 | `docs/04` §5.2.5 |
 | 模板全文与取值理由 | `docs/09-OpenSearch索引模板.md` |
 

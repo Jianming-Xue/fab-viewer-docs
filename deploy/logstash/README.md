@@ -148,7 +148,7 @@ sudo -u logstash python3 /etc/logstash-mes/tools/render_msgkinds.py
 | 内容 | 出处 |
 |---|---|
 | 加工逻辑三段（粗解析 / 行键 / 标签） | `docs/04` §3.2 |
-| 行文档字段清单（21 个） | `docs/04` §3.3、§5.3.1 |
+| 行文档字段清单（22 个） | `docs/04` §3.3、§5.3.1 |
 | 关键参数与取值理由 | `docs/04` §3.4 |
 | `fabviewer.yaml` 六段的结构 | `docs/06-派生服务工程实现.md` §四 |
 
