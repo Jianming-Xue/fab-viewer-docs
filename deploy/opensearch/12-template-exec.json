@@ -66,8 +66,8 @@
           "properties": {
             "START_LINE_ID":  { "type": "keyword" },
             "END_LINE_ID":    { "type": "keyword" },
-            "START_LINE_LOG": { "type": "text" },
-            "END_LINE_LOG":   { "type": "text" },
+            "START_LINE_LOG": { "type": "keyword", "index": false, "doc_values": false },
+            "END_LINE_LOG":   { "type": "keyword", "index": false, "doc_values": false },
             "HANG_REASON":    { "type": "keyword" },
             "HANG_COST_MS":   { "type": "long" },
             "START_TIME":     { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },

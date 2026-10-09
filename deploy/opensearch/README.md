@@ -89,7 +89,7 @@ MES_ENVS="" ./apply.sh
 ```bash
 # 例：给现存的块索引补 HANG_LIST（派生服务带 Server Hang 判定发版之前先跑这句）
 curl -X PUT "$OS/mes-log-exec-*/_mapping" -H 'Content-Type: application/json' \
-  -d '{"properties":{"HANG_LIST":{"type":"nested","properties":{"START_LINE_ID":{"type":"keyword"},"END_LINE_ID":{"type":"keyword"},"START_LINE_LOG":{"type":"text"},"END_LINE_LOG":{"type":"text"},"HANG_REASON":{"type":"keyword"},"HANG_COST_MS":{"type":"long"},"START_TIME":{"type":"date","format":"yyyy/MM/dd HH:mm:ss.SSS||epoch_millis"},"END_TIME":{"type":"date","format":"yyyy/MM/dd HH:mm:ss.SSS||epoch_millis"}}}}}'
+  -d '{"properties":{"HANG_LIST":{"type":"nested","properties":{"START_LINE_ID":{"type":"keyword"},"END_LINE_ID":{"type":"keyword"},"START_LINE_LOG":{"type":"keyword","index":false,"doc_values":false},"END_LINE_LOG":{"type":"keyword","index":false,"doc_values":false},"HANG_REASON":{"type":"keyword"},"HANG_COST_MS":{"type":"long"},"START_TIME":{"type":"date","format":"yyyy/MM/dd HH:mm:ss.SSS||epoch_millis"},"END_TIME":{"type":"date","format":"yyyy/MM/dd HH:mm:ss.SSS||epoch_millis"}}}}}'
 ```
 
 **装完之后，本方案在集群里留下的东西只有**：`mes-log-*` 索引、2 个模板、2 个 ISM 策略、2 个读别名。别的系统的索引与集群设置一概不碰。
