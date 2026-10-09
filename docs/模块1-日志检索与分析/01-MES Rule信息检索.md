@@ -267,6 +267,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 | 形态 | 行内操作按钮，**按钮带数量**，如 `Hang (3)` |
 | 数量 > 0 | 按钮**红色**、可点击 → 打开 **Server Hang 弹框** |
 | 数量 ≤ 0 | 按钮**置灰**、不可点击 |
+| 数据来源 | 数量 = page 出参 `hangCount`（`HANG_LIST` 长度，§5.3-9）；弹框内容 = 10 号接口 `rule_info/hang_list`（§5.3-10） |
 | 本期 | Hang **未落库**：列照出现，按钮**恒置灰**（按 `≤ 0` 渲染）、**点不开**；落库后再启用 |
 
 > **落库形态已定（2026-10-09）**：块文档嵌套数组 `HANG_LIST`，每条 **8 项** —— Start / End 两行的 `LOG_LINE_ID` + 完整原文、Hang Reason、耗时、起止时间。判定与配置归模块 5 **Server Hang Reason Config**（`模块5-系统管理/01`），运行在派生服务。落库后启用：行内按钮按「数量 > 0 红 / ≤ 0 灰」判断，弹框内容见下（弹框加 Hang Reason 列**推后**，先做后端）。
@@ -424,6 +425,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 | 7 | `/api/v1/rule_info/detail` | `GET` | Rule Info Detail 弹窗的日志，按游标分页 | 点 `Rule Log` 时；触底再调 |
 | 8 | `/api/v1/rule_info/full_log` | `POST` | Full Log 打包下载 | 点 `Full Log` 时 |
 | 9 | `/api/v1/rule_info/page` | `POST` | 结果分页查询 | 点 `Search` 时 |
+| 10 | `/api/v1/rule_info/hang_list` | `GET` | Server Hang 弹框的明细（块内全部 Hang） | 点 `Hang (N)` 按钮时 |
 
 ### 5.3 各接口入参 / 出参
 
@@ -528,6 +530,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
       "costSummary": "<COST_SUM_MS 列的值>",
       "unaccountedCost": "<UNACCOUNTED_COST_MS 列的值>",
       "execStatus": "<EXEC_STATUS 列的值>",
+      "hangCount": "<HANG_LIST 长度，int；Server Hang 列按钮的数字>",
       "costBreakDown": [
         { "item": "<ITEM>", "group": "<GROUP>", "summary": "<SUM_MS>" }
       ]
@@ -559,6 +562,28 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 | `costSummary` | Item Cost Summary | `COST_SUM_MS` | |
 | `unaccountedCost` | UnAccounted Cost | `UNACCOUNTED_COST_MS` | |
 | `execStatus` | EXEC_STATUS | `EXEC_STATUS` | 可选列 |
+| `hangCount` | Server Hang 列（按钮数字） | `HANG_LIST` | **数组长度**；> 0 按钮红色可点、= 0 置灰（§3.6）；明细走 10 号接口，**列表不带 HANG_LIST 本体** |
 | `costBreakDown[]` | 动态耗时列 | `COST_BREAKDOWN` | 取 `item` + `group` 命中那条的 `summary` |
 
-出参**无 Server Hang 相关字段**（该功能未落库）。
+**10 · `rule_info/hang_list`**（2026-10-09 补，配合 `HANG_LIST` 落库）
+
+| 项 | 内容 |
+|---|---|
+| 方法 | `GET` |
+| 入参 | URL 参数 `id`（同 `rule_info/detail` 的取法：page 出参 `contents[].id`） |
+| 出参 | `data` = **该块全部 Hang 的数组，不分页**（一个块内条数有限）；按 `startTime` 升序（块内条目本就按 `START_TIME` 升序存储，原样输出） |
+
+```json
+[
+  {
+    "startTime": "<开始行时间>",
+    "endTime": "<结束行时间>",
+    "hangCostMs": "<耗时 ms>",
+    "startLineLog": "<开始行完整原文>",
+    "endLineLog": "<结束行完整原文>",
+    "hangReason": "<Hang Reason，弹框加列推后，字段先带上>",
+    "startLineId": "<开始行 LOG_LINE_ID，不出列，跳原文锚备用>",
+    "endLineId": "<结束行 LOG_LINE_ID，同上>"
+  }
+]
+```

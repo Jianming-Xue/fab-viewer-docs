@@ -9,7 +9,7 @@
 
 > 字段与取值以 `04-后台链路与数据模型.md` 为准；检索条件与接口的通用口径同 `01-MES Rule信息检索.md`，本文只记本功能的专属部分与差异。
 >
-> **2026-10-09 新增**：本功能列为 Server Hang 第一类（`HANG_LIST`）的**第二个展示出口**（第一个是 `01` §3.6）—— Hang 数据在 Source / Target / Compare 各自怎么呈现**待定**；正文多处「`Server Hang` 列本期未落库恒置灰」待落库后联动更新。口径源头见模块 5 `01-Server Hang Reason Config.md`。
+> **2026-10-09 新增**：本功能列为 Server Hang 第一类（`HANG_LIST`）的**第二个展示出口**（第一个是 `01` §3.6）。**列表侧已定**（2026-10-09 补齐）：Source / Target 列表沿用 `01` 的 `page` 出参 **`hangCount`** 与 10 号接口 **`rule_info/hang_list`**（`01` §5.3）；**Compare 区怎么用 Hang 数据仍待定**。正文多处「`Server Hang` 列本期未落库恒置灰」为部署态描述，落库后启用。口径源头见模块 5 `01-Server Hang Reason Config.md`。
 
 ---
 
