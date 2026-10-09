@@ -61,6 +61,19 @@
             "END_TIME":   { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" }
           }
         },
+        "HANG_LIST": {
+          "type": "nested",
+          "properties": {
+            "START_LINE_ID":  { "type": "keyword" },
+            "END_LINE_ID":    { "type": "keyword" },
+            "START_LINE_LOG": { "type": "text" },
+            "END_LINE_LOG":   { "type": "text" },
+            "HANG_REASON":    { "type": "keyword" },
+            "HANG_COST_MS":   { "type": "long" },
+            "START_TIME":     { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+            "END_TIME":       { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" }
+          }
+        },
         "RULENAME":    { "type": "keyword" },
         "LOTID":       { "type": "keyword" },
         "EQPID":       { "type": "keyword" },

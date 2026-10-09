@@ -26,3 +26,8 @@
 /docs/模块1-日志检索与分析/prototype/*
 !/docs/模块1-日志检索与分析/prototype/MES-Rule信息检索-annotated-prototype.html
 !/docs/模块1-日志检索与分析/prototype/build.mjs
+
+# ── 模块 5：Server Hang Reason Config（已定稿） ──
+!/docs/模块5-系统管理/
+/docs/模块5-系统管理/*
+!/docs/模块5-系统管理/01-Server Hang Reason Config.md
