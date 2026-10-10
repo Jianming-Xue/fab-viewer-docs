@@ -430,7 +430,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 
 ### 5.3 各接口入参 / 出参
 
-**候选类接口 1 ~ 6**：入参走 URL 参数；`data` 为一个键 + 字符串数组。
+**候选类接口 1 ~ 6**：入参走 URL 参数；`data` 为一个键 + 字符串数组。**数据源 = 模块 5 System Misc（`FabViewerMisc`）**，`item` 命名约定见 `模块5-系统管理/02-System Misc.md` §六（2026-10-10 拍板）；`ipaddress/list` 的 `environment` 参数 = 取 `ip_list`（Map 型）对应键。
 
 | # | 接口 | 入参 | `data` |
 |---|---|---|---|
