@@ -354,23 +354,23 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 | 项 | 口径 |
 |---|---|
 | 接口 | `GET /api/v1/rule_info/detail` |
-| 首次入参 | `id` = 选中行的块 `id`（列表出参的 `id` 字段）；`lastInode`、`lastOffset` **为空** |
+| 首次入参 | `id` = 选中行的块 `id`（列表出参的 `id` 字段）；`lastFingerprint`、`lastOffset` **为空** |
 | 返回 | `data.raw` = 本次的日志原文（**多行以换行符拼接成一个字符串**）；`data.finished` = 是否搜索完毕 |
 | 显示 | 按返回顺序逐行显示在显示控件里 |
 | 每批条数 | **后端定**，前端不传 |
 | 触底加载 | 滚动到**最底部**时，按**上一次是否搜索完毕**决定是否再调 |
-| 再调入参 | `id` = 同一个块；`lastInode` = 上次返回的 `inode`、`lastOffset` = 上次返回的 `offset` |
+| 再调入参 | `id` = 同一个块；`lastFingerprint` = 上次返回的 `fingerprint`、`lastOffset` = 上次返回的 `offset` |
 | 追加方式 | 新日志**追加到最底下** |
 | 加载中 | 滑动时加**加载效果** |
 | 全部取完 | 后端返回搜索完毕后，**最底部显示「搜索完毕」** |
 
-> 与既有口径对齐：块文档的日志还原按 `LOG_INODE` + `LOG_OFFSET` **两级排序**（`04` §5.2.4），游标用 (inode, offset) 这一对正落在同一套键上。
+> 与既有口径对齐：日志还原按 `LOG_FINGERPRINT` + `LOG_OFFSET` **两级排序**（`04` §5.2.4），游标用 (fingerprint, offset) 这一对正落在同一套键上。
 
 **日志行显示**：按日志**原文一行一条**，不做加工；长行**自动换行**（折行显示，不出横向滚动条）。
 
 **全局搜索行**：只过滤**已加载到前端**的那部分日志行。
 
-**重开弹窗**：关闭再打开**从头重新加载**（`inode` / `offset` 重新置空）。
+**重开弹窗**：关闭再打开**从头重新加载**（`fingerprint` / `offset` 重新置空）。
 
 **底部按钮**
 
@@ -397,7 +397,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 > | | Full Log | 弹窗 · 全量下载 |
 > |---|---|---|
 > | 作用域 | **文件级** —— 块涉及的全部文件，每个文件的**全量行** | **块级** —— 本块自己的全部行 |
-> | 排序 | 文件内按 `LOG_OFFSET` 升序 | 先按 `LOG_INODE` 分组、组间按文件时序、组内按 `LOG_OFFSET` 升序 |
+> | 排序 | 文件内按 `LOG_OFFSET` 升序 | 先按 `LOG_FINGERPRINT` 分组、组间按文件时序、组内按 `LOG_OFFSET` 升序 |
 > | 产物 | `.zip`（每个文件一个 `.log`） | `.log`（一个文本文件） |
 > | 对应 `04` | §5.2.4 文件级还原 | §5.2.4 执行级还原 |
 
@@ -445,11 +445,11 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 
 | 项 | 内容 |
 |---|---|
-| 入参（URL） | `id=块 id&lastInode=&lastOffset=`（`id` 取列表出参的 `id` 字段，§4）；首次 `lastInode` / `lastOffset` 留空 |
-| `data` | `{"raw": "<日志原文>", "finished": false, "inode": 8000098, "offset": 985678}` |
+| 入参（URL） | `id=块 id&lastFingerprint=&lastOffset=`（`id` 取列表出参的 `id` 字段，§4）；首次 `lastFingerprint` / `lastOffset` 留空 |
+| `data` | `{"raw": "<日志原文>", "finished": false, "fingerprint": "<文件指纹>", "offset": 985678}` |
 | `raw` | 本次返回的日志原文；**多行以换行符拼接成一个字符串** |
 | `finished` | 是否搜索完毕 |
-| `inode` / `offset` | 下次调用时回传给 `lastInode` / `lastOffset` |
+| `fingerprint` / `offset` | 下次调用时回传给 `lastFingerprint` / `lastOffset` |
 
 **8 · `rule_info/full_log`**
 

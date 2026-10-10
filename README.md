@@ -136,7 +136,7 @@ flowchart LR
 | 行文档 | 一条物理行一篇，`_id = LOG_LINE_ID`，写一次不改，21 字段，**不含业务参数** |
 | 块文档 | 一次请求执行一篇，`_id = REQUEST_EXEC_ID`，三批长出来（建块①/重放②/闭口③），35 字段（nested 4 组） |
 | `SORT_KEY` | 16 位厘秒时间串，**只做区间粗筛与翻页**，不承担顺序 |
-| 两级重排 | inode 分堆 → 堆间按首行 `LOG_TIME` → 堆内按 `LOG_OFFSET`；**全系统唯一排序方案**（重放与还原共用） |
+| 两级重排 | 指纹分堆 → 堆间按首行 `LOG_TIME` → 堆内按 `LOG_OFFSET`；**全系统唯一排序方案**（重放与还原共用） |
 | `MSG_KIND` | 加工层打的行标签；派生层全部跨行判断的唯一输入，规则外置 `fabviewer.yaml` 热加载 |
 | 四终态 | 进行中 / 已完成 / 中断 / 超时封口 |
 | 五路 | 路 1 无块翻找建块 · 路 2 进行中（入口静默探测+主体走完区间）· 路 3 已闭合往后翻 · 路 4 超时封口重启 · 路 5 老块收尾封`中断` |
@@ -154,8 +154,8 @@ flowchart LR
 |---|---|
 | 环境 | `PIRUN` / `PROD`；日志目录 `/mes/<env>/systemlogs/`；同一台机器可并存两套环境 |
 | 系统名 | `system.name = MES-300Works`（常量，**大小写敏感**，每条查询都带） |
-| 版本矩阵 | OpenSearch **3.8.0**（可组合模板、ISM 靠 `ism_template` 挂）/ Logstash **9.5.0**（`api.http.*`、ECS 关）/ logstash-output-opensearch **2.x** / Filebeat 待确认 |
-| 现场形态 | OpenSearch 与 Logstash **已存在、别的系统在用** → 三层全部**追加部署**；上线顺序 **存储 → 加工 → 采集**（顺序不能反） |
+| 版本矩阵 | OpenSearch **3.8.0**（可组合模板、ISM 靠 `ism_template` 挂）/ Logstash **9.5.0**（`api.http.*`、ECS 关）/ logstash-output-opensearch **2.x** / Filebeat **≥ 9.5**（fingerprint 身份 + `log.file.fingerprint` 输出，2026-10-10 定） |
+| 现场形态 | OpenSearch 与 Logstash **已存在、别的系统在用** → 三层全部**追加部署**；上线顺序 **存储 → 加工 → 派生 → 采集**（顺序不能反；2026-10-10 起派生层先于采集 —— 行文档 `LOG_INODE` 换 `LOG_FINGERPRINT`，旧派生读不到新行的文件身份） |
 | 索引 | 行 `mes-log-line-{env}-{yyyy.MM.dd}`（`{env}` 小写）360 天删；块 `mes-log-exec-{env}-{yyyy.MM}` 永久归档 |
 | Oracle（派生层调度态） | 四表：`FabViewerTurn`（轮次，恒两行）/ `FabViewerTask`（待办，一行一流）/ `FabViewerNode`（心跳）/ `FabViewerStream`（哈希环落点） |
 | 共用配置 | `deploy/logstash/fabviewer.yaml` 六段：`msg_kinds`（加工层唯一消费段）/ `cost_items` / `biz_fields` / `derive` / `worker_health` / `alert` |

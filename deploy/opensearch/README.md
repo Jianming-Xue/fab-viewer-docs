@@ -87,7 +87,11 @@ MES_ENVS="" ./apply.sh
 加字段必须三处同步。漏掉写入方那处、或忘了给存量索引补 mapping，都会因 `strict` 整篇写入失败 —— 这是有意设计的：宁可立刻报错，也不要悄悄多出一个查不到的字段。**模板管不到已建出来的索引**，给存量索引追加字段用（加新字段合法，改旧字段才不允许）：
 
 ```bash
-# 例：给现存的块索引补 HANG_LIST（派生服务带 Server Hang 判定发版之前先跑这句）
+# 例①：给现存的行索引补 LOG_FINGERPRINT（LOG_INODE 换指纹字段，Filebeat ≥9.5 升级之前先跑这句）
+curl -X PUT "$OS/mes-log-line-*/_mapping" -H 'Content-Type: application/json' \
+  -d '{"properties":{"LOG_FINGERPRINT":{"type":"keyword"}}}'
+
+# 例②：给现存的块索引补 HANG_LIST（派生服务带 Server Hang 判定发版之前先跑这句）
 curl -X PUT "$OS/mes-log-exec-*/_mapping" -H 'Content-Type: application/json' \
   -d '{"properties":{"HANG_LIST":{"type":"nested","properties":{"START_LINE_ID":{"type":"keyword"},"END_LINE_ID":{"type":"keyword"},"START_LINE_LOG":{"type":"keyword","index":false,"doc_values":false},"END_LINE_LOG":{"type":"keyword","index":false,"doc_values":false},"HANG_REASON":{"type":"keyword"},"HANG_COST_MS":{"type":"long"},"START_TIME":{"type":"date","format":"yyyy/MM/dd HH:mm:ss.SSS||epoch_millis"},"END_TIME":{"type":"date","format":"yyyy/MM/dd HH:mm:ss.SSS||epoch_millis"}}}}}'
 ```

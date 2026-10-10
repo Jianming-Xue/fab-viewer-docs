@@ -53,8 +53,8 @@ filebeat.inputs:
     fields_under_root: true                 # 落成顶层字段；false 会变成 fields.ENV，加工层对不上
     ignore_older: 0                         # 禁用：首次部署要补齐现存全部滚动件（§2.1）
     tail_files: false                       # 从文件头读，不跳历史
-    file_identity:
-      inode: ~                              # 滚动改名后仍认作同一文件（§2.1）
+    # file_identity 走 9.x 默认 fingerprint（文件头 1KiB 的 SHA-256）—— 不依赖 inode、身份不复用；
+    # include_file_fingerprint（9.5+ 默认 true）把指纹输出为事件字段 log.file.fingerprint
     prospector.scanner.check_interval: 5s
     prospector.scanner.recursive_glob: true
     buffer_size: 16KiB
@@ -87,8 +87,8 @@ filebeat.inputs:
       timeout: 5s
     ignore_older: 0
     tail_files: false
-    file_identity:
-      inode: ~
+    # file_identity 走 9.x 默认 fingerprint（文件头 1KiB 的 SHA-256）—— 不依赖 inode、身份不复用；
+    # include_file_fingerprint（9.5+ 默认 true）把指纹输出为事件字段 log.file.fingerprint
     prospector.scanner.check_interval: 5s
     prospector.scanner.recursive_glob: true
     buffer_size: 16KiB
@@ -123,8 +123,8 @@ filebeat.inputs:
     fields_under_root: true
     ignore_older: 0
     tail_files: false
-    file_identity:
-      inode: ~
+    # file_identity 走 9.x 默认 fingerprint（文件头 1KiB 的 SHA-256）—— 不依赖 inode、身份不复用；
+    # include_file_fingerprint（9.5+ 默认 true）把指纹输出为事件字段 log.file.fingerprint
     prospector.scanner.check_interval: 5s
     prospector.scanner.recursive_glob: true
     buffer_size: 16KiB
@@ -156,8 +156,8 @@ filebeat.inputs:
       timeout: 5s
     ignore_older: 0
     tail_files: false
-    file_identity:
-      inode: ~
+    # file_identity 走 9.x 默认 fingerprint（文件头 1KiB 的 SHA-256）—— 不依赖 inode、身份不复用；
+    # include_file_fingerprint（9.5+ 默认 true）把指纹输出为事件字段 log.file.fingerprint
     prospector.scanner.check_interval: 5s
     prospector.scanner.recursive_glob: true
     buffer_size: 16KiB

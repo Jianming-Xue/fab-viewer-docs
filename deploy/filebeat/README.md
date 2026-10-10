@@ -83,7 +83,7 @@ sudo systemctl enable --now filebeat
 
 | 现象 | 原因 | 处置 |
 |---|---|---|
-| **漏行**（滚动之后丢一段） | `close.on_state_change.renamed` 被设成 `true`，改名即关 harvester | 必须 `false`；`file_identity.inode` 保持开启 |
+| **漏行**（滚动之后丢一段） | `close.on_state_change.renamed` 被设成 `true`，改名即关 harvester | 必须 `false`；文件身份走 9.x 默认的 fingerprint，改名后指纹不变、继续读完 |
 | 采到归档件（`.log.1.gz`） | 通配把压缩件匹配进来了 | `prospector.scanner.exclude_files` 里要有压缩与改名两类 |
 | `HOSTIP` 为空、锁流三元组缺一段 | `add_host_metadata.netinfo.enabled` 是 `false` | 改 `true`。这个开关管的就是往事件里带不带 `host.ip` |
 | `too many open files` | `harvester_limit` 或 `ulimit -n` 太小 | 见第二步第 2 条 |

@@ -58,7 +58,7 @@
         "SERVER_NUMBER":   { "type": "keyword" },
         "LOG_TIME":        { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
         "LOG_FILE":        { "type": "keyword" },
-        "LOG_INODE":       { "type": "long" },
+        "LOG_FINGERPRINT": { "type": "keyword" },
         "LOG_OFFSET":      { "type": "long" },
         "LOG_RAW":         { "type": "keyword", "index": false, "doc_values": false },
         "LOG_BODY":        { "type": "text" },

@@ -1630,7 +1630,7 @@
         "选中一行时可用",
         "入参 id = 该行的块 _id；后端由它找出该块涉及的全部文件，逐个做文件级还原，打包成 zip",
         "每个文件一个 .log，文件内按 LOG_OFFSET 升序；块只落在一个文件里时 zip 内就 1 个",
-        "与弹窗底部「全量下载」刻意分成两个动作：Full Log 是文件级（块涉及的全部文件、每个文件的全部行，先按文件分组）；全量下载是块级（本块自己的全部行，先按 LOG_INODE 分组）"
+        "与弹窗底部「全量下载」刻意分成两个动作：Full Log 是文件级（块涉及的全部文件、每个文件的全部行，先按文件分组）；全量下载是块级（本块自己的全部行，先按 LOG_FINGERPRINT 分组）"
       ],
       "apis": [
         "ruleInfoFullLog"
@@ -2358,7 +2358,7 @@ const hotspots = [
       { type: "front", text: "选中一行时可用" },
       { type: "front", text: "入参 id = 该行的块 _id；后端由它找出该块涉及的全部文件，逐个做文件级还原，打包成 zip" },
       { type: "front", text: "每个文件一个 .log，文件内按 LOG_OFFSET 升序；块只落在一个文件里时 zip 内就 1 个" },
-      { type: "front", text: "与弹窗底部「全量下载」刻意分成两个动作：Full Log 是文件级（块涉及的全部文件、每个文件的全部行，先按文件分组）；全量下载是块级（本块自己的全部行，先按 LOG_INODE 分组）" },
+      { type: "front", text: "与弹窗底部「全量下载」刻意分成两个动作：Full Log 是文件级（块涉及的全部文件、每个文件的全部行，先按文件分组）；全量下载是块级（本块自己的全部行，先按 LOG_FINGERPRINT 分组）" },
       { type: "front", text: "前置条件：列表已选中一行" },
       { type: "back", text: "POST /api/v1/rule_info/full_log —— 按块涉及的全部文件还原、打包 zip 下载" },
       { type: "back", text: "出参是 zip 文件本身（直接下载，不走统一响应包）" }
