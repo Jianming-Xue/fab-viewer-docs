@@ -50,11 +50,11 @@
 
    ```bash
    curl -s "$OS/mes-log-line-read/_count?q=system.name:MES-300Works"
-   curl -s "$OS/mes-log-line-prod-$(date +%Y.%m.%d)/_mapping" | jq '.[].mappings.properties.SORT_KEY'
+   curl -s "$OS/mes-log-line-prod-$(date +%Y.%m.%d)/_mapping" | jq '.[].mappings.properties.LOG_TIME'
    # 期望：{"type":"keyword"}；若出现 "text" 或带 fields.keyword，说明模板没生效，索引是猜出来的
    ```
 
-4. **三处时间一致** —— 抽一条文档，`@timestamp`（入库时间）、`LOG_TIME`（日志时间）、`SORT_KEY`（位置键）三个值应当同源自同一行且量级一致。这一条能一次抓出时区、厘秒补位、模板三类问题。
+4. **三处时间一致** —— 抽一条文档，`@timestamp`（入库时间）、`LOG_TIME`（日志时间）、`_id` 末段（17 位毫秒串）三个值应当同源自同一行且量级一致。这一条能一次抓出时区、厘秒补位、模板三类问题。
 
 ## 改口径时动哪个文件
 

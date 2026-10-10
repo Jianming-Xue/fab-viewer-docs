@@ -69,7 +69,7 @@ MES_ENVS="" ./apply.sh
 | 两个模板在 | `curl $OS/_index_template/mes-log-*` | 有 `mes-log-line`、`mes-log-exec`，pattern 正确 |
 | 索引自动带别名 | `curl $OS/mes-log-line-prod-<当天>/_alias` | 含 `mes-log-line-read` |
 | 索引自动挂策略 | `curl $OS/_plugins/_ism/explain/mes-log-line-prod-<当天>` | `policy_id = mes-log-line-360d` |
-| **字段类型是模板给的** | `curl $OS/mes-log-line-prod-<当天>/_mapping` 看 `SORT_KEY` | `keyword` |
+| **字段类型是模板给的** | `curl $OS/mes-log-line-prod-<当天>/_mapping` 看 `LOG_TIME` / `LOG_FINGERPRINT` | `date` / `keyword` |
 
 **最后一条是唯一的真凭据**：出现 `text` + `fields.keyword` 就说明模板没生效、类型是写入时**猜**出来的 —— 字段类型一旦被猜出来就**改不回来**，只能删索引重建。所以模板必须在第一个事件落地**之前**装好，这也是上线顺序把存储排在第一的原因。
 

@@ -48,7 +48,7 @@
 <span class="ln out">  "mes-log-line-read"        <span class="ok">← 别名自动挂上了</span></span>
 <span class="ln out">]</span>
 <span class="ln"> </span>
-<span class="ln"><span class="p">$</span> <span class="cmd">curl -s $OS/mes-log-line-prod-2026.09.22/_mapping | jq '.[].mappings.properties.SORT_KEY'</span></span>
+<span class="ln"><span class="p">$</span> <span class="cmd">curl -s $OS/mes-log-line-prod-2026.09.22/_mapping | jq '.[].mappings.properties.LOG_TIME'</span></span>
 <span class="ln out">{</span>
 <span class="ln out">  "type": "keyword"           <span class="ok">← 关键：字段类型是模板给的</span></span>
 <span class="ln out">}</span>
