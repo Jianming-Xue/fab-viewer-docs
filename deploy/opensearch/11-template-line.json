@@ -12,8 +12,6 @@
       "dynamic": "strict",
       "properties": {
         "@timestamp":      { "type": "date" },
-        "LOG_LINE_ID":     { "type": "keyword" },
-        "SORT_KEY":        { "type": "keyword" },
         "system.name":     { "type": "keyword" },
         "ENV":             { "type": "keyword" },
         "HOSTIP":          { "type": "keyword" },

@@ -6,8 +6,8 @@
 |---|---|---|
 | ISM 策略 `mes-log-line-360d` | `01-ism-line-360d.json` | 行索引：热 0~30d / 温 30~180d / 冷 180~360d / 360d 删除 |
 | ISM 策略 `mes-log-exec-keep` | `02-ism-exec-keep.json` | 块索引：热 0~360d / 之后只读归档，**不删** |
-| 索引模板 `mes-log-line` | `11-template-line.json` | `mes-log-line-*`：22 字段、1 主 1 副、读别名 `mes-log-line-read` |
-| 索引模板 `mes-log-exec` | `12-template-exec.json` | `mes-log-exec-*`：35 字段（含 4 个 `nested`）、读别名 `mes-log-exec-read` |
+| 索引模板 `mes-log-line` | `11-template-line.json` | `mes-log-line-*`：20 字段、1 主 1 副、读别名 `mes-log-line-read` |
+| 索引模板 `mes-log-exec` | `12-template-exec.json` | `mes-log-exec-*`：33 字段（含 4 个 `nested`）、读别名 `mes-log-exec-read` |
 
 命令里的 `$OS` = `OPENSEARCH_URL` 的值。三步：**确认一条设置 → 跑脚本 → 验证**。
 
@@ -124,7 +124,7 @@ curl -X DELETE "$OS/_plugins/_ism/policies/mes-log-exec-keep"
 |---|---|
 | 索引划分、读 / 写别名、`{env}` 大小写 | `docs/04` §5.2.1 |
 | 行文档字段清单（22 个） | `docs/04` §5.3.1 |
-| 块文档字段清单（35 个） | `docs/04` §5.3.2 |
+| 块文档字段清单（33 个） | `docs/04` §5.3.2 |
 | 保留策略三档 | `docs/04` §5.2.5 |
 | 模板全文与取值理由 | `docs/09-OpenSearch索引模板.md` |
 

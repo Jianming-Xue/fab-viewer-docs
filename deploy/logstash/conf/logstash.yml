@@ -32,8 +32,8 @@ pipeline.ordered: false         # 不要求保序：行文档写一次不再改�
 pipeline.ecs_compatibility: disabled
 
 # ---- 队列 ----
-# 持久化队列：Logstash 重启不丢事件。行文档按 LOG_LINE_ID 幂等（_id），
-# 重放同一批不会产生重复行（04 §3.2.2）；纯文本行例外，它每次派生的 SORT_KEY 不同
+# 持久化队列：Logstash 重启不丢事件。行文档按行身份串幂等（_id，04 §3.2.2），
+# 重放同一批不会产生重复行；纯文本行例外，它每次派生的 LOG_TIME（=采集时刻）不同
 queue.type: persisted
 queue.max_bytes: 8gb
 queue.checkpoint.writes: 1024

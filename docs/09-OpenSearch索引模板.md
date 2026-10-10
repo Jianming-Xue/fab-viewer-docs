@@ -48,8 +48,6 @@
       "dynamic": "strict",
       "properties": {
         "@timestamp":      { "type": "date" },
-        "LOG_LINE_ID":     { "type": "keyword" },
-        "SORT_KEY":        { "type": "keyword" },
         "system.name":     { "type": "keyword" },
         "ENV":             { "type": "keyword" },
         "HOSTIP":          { "type": "keyword" },
@@ -80,7 +78,7 @@
 
 - **`LOG_RAW` 既不建索引也不建 `doc_values`。** 它只在 `_source` 里供还原用，检索不到（04 §5.3.1 的 `index: false`），省一份正排。
 - **`LOG_TIME` 只认日志格式**（`yyyy/MM/dd HH:mm:ss.SSS`）加 `epoch_millis` 兜底。写进来一个 ISO 串会直接报错 —— 这是有意的，落库格式只有一种（04 §3.2.1）。
-- **`SORT_KEY` 是 `keyword`，不能建成 `text`**，否则 `range` 失效（04 §3.2.2 的四个前提之一）。
+- **`LOG_TIME` 是 `date` 且只认日志格式**：区间粗筛、翻页排序都打它（`SORT_KEY` 已退役，04 §3.2.2）；行 `_id` 不占模板字段（构造见 04 §3.2.2，搜索结果 hit 自带）。
 - **`SERVER_NUMBER` 用 `keyword` 而不是整数**：编号是标识、不是度量，只做等值筛选不做范围；用整数反而会在遇到非数字编号时**写入失败**（`dynamic: strict` 下直接报错）。
 - **策略不写在模板里。** 它靠 ISM 策略自带的 `ism_template` 按索引模式自动挂（§一）—— 3.x 已弃用 `plugins.index_state_management.policy_id`，写进去可能让索引创建被 unknown setting 直接拒掉。
 
@@ -90,7 +88,7 @@
 
 | 字段 | 类型 | 子字段 |
 |---|---|---|
-| `REOPEN_LOG` | nested | `PREV_END_SORT_KEY` / `FIRST_SORT_KEY`（keyword）、`GAP_MS`（long）、`REOPENED_AT`（date，墙钟） |
+| `REOPEN_LOG` | nested | `PREV_END_TIME` / `FIRST_TIME`（date，日志格式）、`GAP_MS`（long）、`REOPENED_AT`（date，墙钟） |
 | `COST_BREAKDOWN` | nested | `ITEM` / `GROUP`（keyword）、`COUNT`（integer）、`SUM_MS` / `MAX_MS`（long）、`FIRST_BEGIN_TS` / `LAST_END_TS`（date，日志格式） |
 | `INNER_RULES` | nested | `NAME`（keyword）、`START_TIME` / `END_TIME`（date，日志格式）。一次内部 Rule 调用一条，按 `START_TIME` 升序；**`NAME` 与块 `RULENAME` 同名的整对放弃**（04 §3.2.3） |
 | `HANG_LIST` | nested | `START_LINE_ID` / `END_LINE_ID`（keyword）、`START_LINE_LOG` / `END_LINE_LOG`（keyword，`index: false` + `doc_values: false` —— 同 `LOG_RAW` 先例，纯展示不检索，省一份正排）、`HANG_REASON`（keyword）、`HANG_COST_MS`（long）、`START_TIME` / `END_TIME`（date，日志格式）。一处 Server Hang 一条、按 `START_TIME` 升序、时差 > 0 才记（判定与配置见模块 5 `Server Hang Reason Config`、`06` §2.2 / §4.7） |
@@ -134,5 +132,5 @@
 
 两条**没做**，留到压测或部署阶段：
 
-- **`index.sort.field: ["SORT_KEY"]`**（行索引按位置键预排序，省掉每次查询的排序开销、提升区间扫描）。它对写入有成本、且**建索引后不可改**，压测后再定。
+- **`index.sort.field: ["LOG_TIME"]`**（行索引按时间预排序，省掉每次查询的排序开销、提升区间扫描）。它对写入有成本、且**建索引后不可改**，压测后再定。
 - **冷阶段的节点分配**（低配节点 / 可搜索快照）：需要集群先定义节点属性，属部署侧。

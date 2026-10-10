@@ -21,9 +21,7 @@
         "SERVER_NUMBER":    { "type": "keyword" },
         "system.name":      { "type": "keyword" },
         "REQUEST_TYPE":     { "type": "keyword" },
-        "START_SORT_KEY":   { "type": "keyword" },
         "ORDER_BY":         { "type": "long" },
-        "END_SORT_KEY":     { "type": "keyword" },
         "START_TIME":       { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
         "END_TIME":         { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
         "LAST_LINE_TIME":   { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
@@ -32,8 +30,8 @@
         "REOPEN_LOG": {
           "type": "nested",
           "properties": {
-            "PREV_END_SORT_KEY": { "type": "keyword" },
-            "FIRST_SORT_KEY":    { "type": "keyword" },
+            "PREV_END_TIME": { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+            "FIRST_TIME":    { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
             "GAP_MS":            { "type": "long" },
             "REOPENED_AT":       { "type": "date", "format": "strict_date_optional_time||epoch_millis" }
           }

@@ -270,7 +270,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 | 数据来源 | 数量 = page 出参 `hangCount`（`HANG_LIST` 长度，§5.3-9）；弹框内容 = 10 号接口 `rule_info/hang_list`（§5.3-10） |
 | 本期 | Hang **未落库**：列照出现，按钮**恒置灰**（按 `≤ 0` 渲染）、**点不开**；落库后再启用 |
 
-> **落库形态已定（2026-10-09）**：块文档嵌套数组 `HANG_LIST`，每条 **8 项** —— Start / End 两行的 `LOG_LINE_ID` + 完整原文、Hang Reason、耗时、起止时间。判定与配置归模块 5 **Server Hang Reason Config**（`模块5-系统管理/01`），运行在派生服务。落库后启用：行内按钮按「数量 > 0 红 / ≤ 0 灰」判断，弹框内容见下（弹框加 Hang Reason 列**推后**，先做后端）。
+> **落库形态已定（2026-10-09）**：块文档嵌套数组 `HANG_LIST`，每条 **8 项** —— Start / End 两行的行 ID + 完整原文、Hang Reason、耗时、起止时间。判定与配置归模块 5 **Server Hang Reason Config**（`模块5-系统管理/01`），运行在派生服务。落库后启用：行内按钮按「数量 > 0 红 / ≤ 0 灰」判断，弹框内容见下（弹框加 Hang Reason 列**推后**，先做后端）。
 
 #### Server Hang 弹框
 
@@ -583,8 +583,8 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
     "startLineLog": "<开始行完整原文>",
     "endLineLog": "<结束行完整原文>",
     "hangReason": "<Hang Reason，弹框加列推后，字段先带上>",
-    "startLineId": "<开始行 LOG_LINE_ID，不出列，跳原文锚备用>",
-    "endLineId": "<结束行 LOG_LINE_ID，同上>"
+    "startLineId": "<开始行身份串，不出列，跳原文锚备用>",
+    "endLineId": "<结束行身份串，同上>"
   }
 ]
 ```
