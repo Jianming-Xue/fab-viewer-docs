@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>原始日志下载</title>
+<style>
+  /* ============================================================
+     框架样式（固定，勿改）
+     ============================================================ */
+  * { box-sizing: border-box; }
+  :root{
+    --accent:#e5484d;
+    --front:#2563eb;
+    --back:#d97706;
+    --ink:#1a1d21;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --bg:#f4f5f7;
+    --note-bg:#fdf6d8;
+    --note-line:#e8dcae;
+    --note-ink:#4a3f1e;
+    /* 布局钩子：内容区最大宽度。页面可在「页面功能自身样式」区块里按需覆盖
+       （宽表格、多列表单必须放宽），默认值不变以保持既有页面视觉。 */
+    --stage-max:760px;
+  }
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--ink);
+    background:radial-gradient(1200px 600px at 50% -10%,#fff 0%,transparent 60%),var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* 原型内容区 */
+  .stage{
+    max-width:var(--stage-max);
+    margin:48px auto;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:48px;
+    box-shadow:0 1px 2px rgba(16,24,40,.04),0 12px 32px -8px rgba(16,24,40,.10);
+  }
+
+  /* 热区框选：与 .anno / #lines 一样用视口坐标系（position:fixed），
+     这样无论页面滚到哪里，红框都不会漂移 */
+  .hotspot{
+    position:fixed;
+    border:3px solid transparent;
+    border-radius:8px;
+    transition:border-color .14s,box-shadow .14s,opacity .14s;
+    pointer-events:none;
+    opacity:0;
+    z-index:2147483000;   /* 压过所有业务弹窗 */
+  }
+  .hotspot.active{
+    border-color:var(--accent);
+    box-shadow:0 0 0 4px rgba(229,72,77,.12),0 0 24px -4px rgba(229,72,77,.40);
+    opacity:1;
+  }
+
+  /* 引线层 */
+  #lines{
+    position:fixed; inset:0;
+    pointer-events:none;
+    z-index:2147483001;
+    overflow:visible;
+  }
+
+  /* 标注框：文档黄底 */
+  .anno{
+    position:fixed;
+    z-index:2147483002;
+    width:250px;
+    background:var(--note-bg);
+    border:1px solid var(--note-line);
+    border-radius:12px; overflow:hidden;
+    box-shadow:
+      0 1px 2px rgba(120,100,30,.10),
+      0 16px 40px -12px rgba(120,100,30,.35);
+    opacity:0; transform:translateY(6px) scale(.98);
+    transition:opacity .16s ease,transform .16s ease;
+    pointer-events:none;
+  }
+  .anno.show{opacity:1; transform:translateY(0) scale(1);}
+  .anno .head{
+    display:flex; align-items:center; gap:8px;
+    padding:12px 16px;
+    background:linear-gradient(180deg,#fef9e2,#fbf1c9);
+    border-bottom:1px solid var(--note-line);
+  }
+  .anno .dot{
+    width:8px;height:8px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 0 4px rgba(229,72,77,.16);flex:0 0 auto;
+  }
+  .anno h4{margin:0;font-size:13px;font-weight:700;color:#5a4a12;}
+  .anno .body{padding:10px 14px 14px;}
+  .anno .item{
+    display:flex;gap:8px;font-size:12.5px;line-height:1.55;padding:4px 0;
+    color:var(--note-ink);
+  }
+  .anno .item+.item{border-top:1px dashed rgba(180,160,90,.35);}
+  .anno .tag{
+    flex:0 0 auto;height:18px;padding:0 6px;border-radius:5px;
+    font-size:10.5px;font-weight:700;line-height:18px;margin-top:1px;
+  }
+  .anno .item.front .tag{color:#1d4ed8;background:rgba(37,99,235,.16);}
+  .anno .item.back .tag{color:#9a5b00;background:rgba(217,119,6,.20);}
+  .anno .item.front .txt{color:#3f3a1e;}
+  .anno .item.back  .txt{color:#5a4a12;}
+
+  /* 浮动开关 */
+  #toggle{
+    position:fixed; top:20px; right:20px;
+    z-index:2147483003;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:9px 16px; font-size:13px; font-weight:600; color:var(--ink);
+    background:rgba(255,255,255,.88); backdrop-filter:blur(10px);
+    border:1px solid var(--line); border-radius:999px; cursor:pointer;
+    box-shadow:0 6px 18px -8px rgba(16,24,40,.25);
+    transition:box-shadow .15s,transform .12s;
+  }
+  #toggle:hover{box-shadow:0 10px 24px -8px rgba(16,24,40,.35);}
+  #toggle:active{transform:translateY(1px);}
+  #toggle .led{
+    width:8px;height:8px;border-radius:50%;background:#cbd5e1;
+    box-shadow:0 0 0 3px rgba(148,163,184,.18);
+    transition:background .15s,box-shadow .15s;
+  }
+  #toggle.on .led{
+    background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.20);
+  }
+
+  /* ============================================================
+     以下为页面功能自身样式（AI 生成时填充）
+     ============================================================ */
+  :root{
+    --stage-max:1180px;
+    /* 页面自有令牌（05-视觉与交互规范） */
+    --p:#2f7d5a; --p-hover:#3a9169; --p-bg:#eaf4ef;
+    --err:#ff4d4f; --err-bg:#fff1f0; --warn:#faad14;
+    --t1:rgba(0,0,0,.88); --t2:rgba(0,0,0,.65); --t3:rgba(0,0,0,.45);
+    --bd:#d9d9d9; --split:rgba(0,0,0,.06); --fill:#fafafa;
+    --r:6px; --r-sm:4px; --r-lg:8px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  .page-head{margin:0 0 20px;}
+  [hidden]{display:none!important;}
+  .crumb{font-size:12px;color:var(--t3);margin-bottom:6px;}
+  .page-head h1{margin:0 0 6px;font-size:20px;font-weight:600;}
+  .page-head .sub{margin:0;font-size:12.5px;color:var(--t2);}
+  .card{border:1px solid var(--bd);border-radius:var(--r-lg);background:#fff;margin:0 0 16px;}
+  .card-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--split);}
+  .card-head h2{margin:0;font-size:15px;font-weight:600;}
+  .card-head .hint{margin-left:auto;font-size:12px;color:var(--t3);}
+
+  .filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 16px;padding:14px 16px;}
+  .field{display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .field>label{display:flex;align-items:center;gap:4px;font-size:12.5px;line-height:16px;color:var(--t2);white-space:nowrap;}
+  .field .req{color:var(--err);font-weight:700;}
+  .field .tip{font-size:11.5px;color:var(--t3);font-weight:400;overflow:hidden;text-overflow:ellipsis;}
+  .input{font:inherit;font-size:13px;height:32px;padding:0 10px;width:100%;min-width:0;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);}
+  .input::placeholder{color:var(--t3);}
+  .input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 2px rgba(47,125,90,.12);}
+  .input.invalid{border-color:var(--err);box-shadow:0 0 0 2px rgba(255,77,79,.12);}
+  .field .err{min-height:13px;font-size:11px;line-height:13px;color:var(--err);visibility:hidden;}
+  .field.invalid .err{visibility:visible;}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 16px;font:inherit;font-size:13px;
+    color:var(--t1);background:#fff;border:1px solid var(--bd);border-radius:var(--r);cursor:pointer;white-space:nowrap;}
+  .btn:hover{border-color:var(--p);color:var(--p);}
+  .btn.primary{color:#fff;background:var(--p);border-color:var(--p);}
+  .btn.primary:hover{background:var(--p-hover);border-color:var(--p-hover);color:#fff;}
+  .btn:disabled{color:var(--t3);background:var(--fill);border-color:var(--bd);cursor:not-allowed;}
+  .btn:disabled:hover{color:var(--t3);border-color:var(--bd);}
+  .btn.primary:disabled{color:#fff;background:var(--p);border-color:var(--p);opacity:.45;}
+  .btn.primary:disabled:hover{background:var(--p);border-color:var(--p);}
+  .actions{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--split);}
+  .actions .spacer{flex:1;}
+
+  .table-wrap{position:relative;overflow:auto;border-bottom:1px solid var(--split);}
+  table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;}
+  table.grid th,table.grid td{height:40px;padding:0 12px;text-align:left;white-space:nowrap;
+    border-bottom:1px solid var(--split);background:transparent;}
+  table.grid th{position:sticky;top:0;z-index:3;background:var(--fill);font-size:12.5px;font-weight:600;
+    color:var(--t2);border-bottom:1px solid var(--bd);}
+  table.grid tbody tr:hover td{background:var(--fill);}
+  table.grid tbody tr.checked td{background:var(--p-bg);}
+  .sel-col{width:40px;padding:0;text-align:center;}
+  table.grid thead td{background:var(--fill);}
+  thead .sel-col{position:sticky;top:0;left:0;z-index:5;}
+  .row-chk{width:14px;height:14px;accent-color:var(--p);cursor:pointer;vertical-align:middle;}
+  .file-name{font-family:var(--mono);font-size:12.5px;}
+  .table-overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;
+    gap:10px;font-size:13px;color:var(--t2);background:rgba(255,255,255,.72);}
+  .spinner{width:16px;height:16px;border-radius:50%;border:2px solid rgba(47,125,90,.25);
+    border-top-color:var(--p);animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:56px 16px;font-size:13px;color:var(--t3);}
+  .empty .illu{width:72px;height:48px;border:1px dashed var(--bd);border-radius:var(--r);background:var(--fill);}
+
+  .pager{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:12.5px;color:var(--t2);}
+  .pager .spacer{flex:1;}
+  .pg-btn{min-width:28px;height:28px;padding:0 8px;font:inherit;font-size:12.5px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);cursor:pointer;}
+  .pg-btn.active{color:var(--p);background:var(--p-bg);border-color:var(--p);}
+  .pg-btn:disabled{color:var(--t3);background:var(--fill);cursor:not-allowed;}
+  .page-size{height:28px;padding:0 6px;font:inherit;font-size:12.5px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);}
+
+  .toast{position:fixed;top:16px;left:50%;z-index:11000;padding:9px 16px;font-size:13px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);opacity:0;pointer-events:none;
+    transform:translate(-50%,-12px);box-shadow:0 8px 24px -8px rgba(0,0,0,.3);
+    transition:opacity .18s,transform .18s;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  .toast.warn{color:#874d00;background:#fffbe6;border-color:var(--warn);}
+</style>
+</head>
+<body>
+
+<button id="toggle"><span class="led"></span>标注已关闭</button>
+
+<div class="stage" id="stage">
+  <div class="page-head">
+  <div class="crumb">日志检索与分析 · 模块 1 · 功能 3</div>
+  <h1>原始日志下载</h1>
+  <p class="sub">按条件搜出日志文件（不是块、不是行），列表多选后整文件下载（文件级还原）；一个文件一行，聚合键 = ENV + HOSTIP + LOG_FINGERPRINT</p>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>查询条件</h2><span class="hint">5 个条件 · 控件与候选接口照搬功能 1</span></div>
+  <div class="filters">
+  <div class="field" data-field="envSelect">
+    <label for="envSelect">Environment</label>
+    <select class="input" id="envSelect"><option value="">不限制</option><option>PROD</option><option>PIRUN</option></select>
+  </div>
+  <div class="field" data-field="hostIpSelect">
+    <label for="hostIpSelect">Host IP</label>
+    <select class="input" id="hostIpSelect"><option value="">不限制</option><option>10.18.100.1</option><option>10.18.100.2</option><option>10.18.100.3</option></select>
+  </div>
+  <div class="field" data-field="serverCategorySelect">
+    <label for="serverCategorySelect">Server Category</label>
+    <select class="input" id="serverCategorySelect"><option value="">不限制</option><option>FAB</option><option>LIST</option><option>QUERY</option><option>IDE</option><option>XSITE</option></select>
+  </div>
+  <div class="field" data-field="startTimeInput">
+    <label for="startTimeInput">开始时间 <span class="req">*</span></label>
+    <input class="input" id="startTimeInput" type="text" value="2026-09-14 10:00" placeholder="YYYY-MM-DD HH:mm">
+    <span class="err"></span>
+  </div>
+  <div class="field" data-field="endTimeInput">
+    <label for="endTimeInput">结束时间 <span class="req">*</span> <span class="tip">（须晚于或等于开始时间）</span></label>
+    <input class="input" id="endTimeInput" type="text" value="2026-09-14 11:00" placeholder="YYYY-MM-DD HH:mm">
+    <span class="err"></span>
+  </div>
+  </div>
+  <div class="actions">
+    <span class="spacer"></span>
+    <button class="btn primary" id="btnSearch">Search</button>
+    <button class="btn" id="btnReset">重置</button>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>文件列表</h2>
+    <span class="hint">一个文件一行 · 多选（复选框）· 6 列</span>
+  </div>
+  <div class="table-wrap">
+    <table class="grid" id="fileTable">
+      <thead><tr>
+        <td class="sel-col"><input type="checkbox" class="row-chk" id="chkAll"></td>
+        <th data-col="env">Environment</th>
+        <th data-col="hostIp">Host IP</th>
+        <th data-col="serverCategory">Server Category</th>
+        <th data-col="startTime">Start Time</th>
+        <th data-col="endTime">End Time</th>
+        <th data-col="fileName">File Name</th>
+      </tr></thead>
+      <tbody id="fileTableBody">
+<tr data-row="1"><td class="sel-col"><input type="checkbox" class="row-chk" id="file-1" data-file="DT_PRD_MBX.FABsrv.log.1"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.20.30.40</td><td data-col="serverCategory">FAB</td><td data-col="startTime">2026-09-14 10:30:00.000</td><td data-col="endTime">2026-09-14 10:41:18.320</td><td data-col="fileName" class="file-name">DT_PRD_MBX.FABsrv.log.1</td></tr>
+<tr data-row="2"><td class="sel-col"><input type="checkbox" class="row-chk" id="file-2" data-file="DT_PRD_MBX.FABsrv.log"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.20.30.40</td><td data-col="serverCategory">FAB</td><td data-col="startTime">2026-09-14 10:43:00.000</td><td data-col="endTime">2026-09-14 11:02:44.900</td><td data-col="fileName" class="file-name">DT_PRD_MBX.FABsrv.log</td></tr>
+<tr data-row="3"><td class="sel-col"><input type="checkbox" class="row-chk" id="file-3" data-file="DT_PRD_MBX.QUERYsrv.log.2"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.20.30.41</td><td data-col="serverCategory">QUERY</td><td data-col="startTime">2026-09-14 10:32:10.100</td><td data-col="endTime">2026-09-14 10:39:05.040</td><td data-col="fileName" class="file-name">DT_PRD_MBX.QUERYsrv.log.2</td></tr>
+<tr data-row="4"><td class="sel-col"><input type="checkbox" class="row-chk" id="file-4" data-file="DT_PRD_MBX.FABsrv.log.7"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverCategory">FAB</td><td data-col="startTime">2026-09-14 10:15:33.200</td><td data-col="endTime">2026-09-14 10:58:02.880</td><td data-col="fileName" class="file-name">DT_PRD_MBX.FABsrv.log.7</td></tr>
+<tr data-row="5"><td class="sel-col"><input type="checkbox" class="row-chk" id="file-5" data-file="DT_PRD_MBX.LISTsrv.log"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverCategory">LIST</td><td data-col="startTime">2026-09-14 10:20:41.500</td><td data-col="endTime">2026-09-14 10:49:17.060</td><td data-col="fileName" class="file-name">DT_PRD_MBX.LISTsrv.log</td></tr>
+<tr data-row="6"><td class="sel-col"><input type="checkbox" class="row-chk" id="file-6" data-file="DT_PRD_MBX.IDEsrv.log.1"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverCategory">IDE</td><td data-col="startTime">2026-09-14 10:28:09.700</td><td data-col="endTime">2026-09-14 11:01:51.130</td><td data-col="fileName" class="file-name">DT_PRD_MBX.IDEsrv.log.1</td></tr>
+      </tbody>
+    </table>
+    <div class="table-overlay" id="tableOverlay" hidden><span class="spinner"></span><span>加载中…</span></div>
+    <div class="empty" id="emptyState" hidden><div class="illu"></div><div>暂无数据 —— 填写条件后点 Search 开始检索</div></div>
+  </div>
+  <div class="pager" id="pager">
+    <span id="pagerTotal">共 6 条</span>
+    <span class="spacer"></span>
+    <select class="page-size"><option>20</option><option>50</option><option>100</option></select>
+    <span>条 / 页</span>
+    <button class="pg-btn" disabled>‹</button>
+    <button class="pg-btn active">1</button>
+    <button class="pg-btn">›</button>
+  </div>
+  <div class="actions">
+    <span id="selCount"></span>
+    <span class="spacer"></span>
+    <button class="btn primary" id="btnDownload" disabled>Download</button>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var DEF = { start: '2026-09-14 10:00', end: '2026-09-14 11:00' };
+  var TIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
+
+  var toastEl = $('toast'), toastTimer = null;
+  function toast(msg, kind) {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast show' + (kind ? ' ' + kind : '');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.className = 'toast'; }, 2800);
+  }
+  function setErr(id, msg) {
+    var box = document.querySelector('[data-field="' + id + '"]');
+    if (!box) return;
+    box.classList.toggle('invalid', !!msg);
+    var el = $(id);
+    if (el) el.classList.toggle('invalid', !!msg);
+    var slot = box.querySelector('.err');
+    if (slot && msg) slot.textContent = msg;
+  }
+  function parseTime(t) {
+    if (!TIME_RE.test(t || '')) return null;
+    var d = new Date(t.replace(' ', 'T') + ':00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function fmtTime(d) {
+    var z = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' +
+      z(d.getHours()) + ':' + z(d.getMinutes());
+  }
+  function shiftTime(t, minutes) {
+    var d = parseTime(t) || new Date(2026, 8, 14, 11, 0, 0);
+    d.setMinutes(d.getMinutes() + minutes);
+    return fmtTime(d);
+  }
+
+  /* 时间：即时校验（同 01 §2.2） */
+  function checkTime() {
+    var s = $('startTimeInput').value.trim(), e = $('endTimeInput').value.trim();
+    if (!TIME_RE.test(s) || !TIME_RE.test(e)) {
+      setErr('startTimeInput', '时间格式应为 YYYY-MM-DD HH:mm（精确到分钟）');
+      return false;
+    }
+    var a = parseTime(s), b = parseTime(e);
+    if (a > b) { setErr('endTimeInput', '开始时间必须早于或等于结束时间'); return false; }
+    if (b - a > 86400000) { setErr('endTimeInput', '起止跨度不能超过 1 天'); return false; }
+    setErr('startTimeInput', '');
+    setErr('endTimeInput', '');
+    return true;
+  }
+  ['startTimeInput', 'endTimeInput'].forEach(function (id) {
+    $(id).addEventListener('input', checkTime);
+  });
+  $('startTimeInput').addEventListener('blur', function () {
+    if (!this.value.trim()) { this.value = shiftTime($('endTimeInput').value, -60); checkTime(); }
+  });
+  $('endTimeInput').addEventListener('blur', function () {
+    if (!this.value.trim()) { this.value = shiftTime($('startTimeInput').value, 60); checkTime(); }
+  });
+
+  /* 联动：Environment 变更 → 重取 Host IP 候选并清空已选（同 01 §2.7） */
+  $('envSelect').addEventListener('change', function () {
+    var had = !!$('hostIpSelect').value;
+    $('hostIpSelect').value = '';
+    toast('已按 Environment 重取 Host IP 候选' + (had ? '，原已选值已清空' : ''));
+  });
+
+  /* 多选（复选框）：跨页保留；Download 需 ≥ 1 行选中 */
+  function syncDownload() {
+    var n = document.querySelectorAll('#fileTableBody .row-chk:checked').length;
+    $('btnDownload').disabled = n === 0;
+    $('selCount').textContent = n ? '已选 ' + n + ' 个文件' : '';
+  }
+  $('fileTableBody').addEventListener('change', function (ev) {
+    var chk = ev.target;
+    if (chk.classList && chk.classList.contains('row-chk')) {
+      chk.closest('tr').classList.toggle('checked', chk.checked);
+      syncDownload();
+    }
+  });
+  /* 表头全选（演示：当前页全选 / 全不选） */
+  $('chkAll').addEventListener('change', function () {
+    var chks = document.querySelectorAll('#fileTableBody .row-chk');
+    for (var i = 0; i < chks.length; i++) {
+      chks[i].checked = this.checked;
+      chks[i].closest('tr').classList.toggle('checked', this.checked);
+    }
+    syncDownload();
+  });
+
+  /* Search：校验通过后查第 1 页 */
+  $('btnSearch').addEventListener('click', function () {
+    if (!checkTime()) { toast('条件不合法，已拦住本次检索', 'warn'); return; }
+    document.querySelectorAll('#fileTableBody .row-chk').forEach(function (c) {
+      c.checked = false;
+      c.closest('tr').classList.remove('checked');
+    });
+    $('chkAll').checked = false;
+    syncDownload();
+    $('tableOverlay').hidden = false;
+    setTimeout(function () {
+      $('tableOverlay').hidden = true;
+      toast('已按当前条件查询第 1 页（共 6 条文件）—— 重新 Search 清空已选');
+    }, 700);
+  });
+
+  /* 重置：条件回默认、列表清空、不自动查询 */
+  $('btnReset').addEventListener('click', function () {
+    ['envSelect', 'hostIpSelect', 'serverCategorySelect'].forEach(function (id) { $(id).value = ''; });
+    $('startTimeInput').value = DEF.start;
+    $('endTimeInput').value = DEF.end;
+    setErr('startTimeInput', '');
+    setErr('endTimeInput', '');
+    document.querySelectorAll('#fileTableBody .row-chk').forEach(function (c) {
+      c.checked = false;
+      c.closest('tr').classList.remove('checked');
+    });
+    $('chkAll').checked = false;
+    syncDownload();
+    $('fileTable').hidden = true;
+    $('emptyState').hidden = false;
+    $('pagerTotal').textContent = '共 0 条';
+    $('btnDownload').disabled = true;
+    toast('条件已恢复默认，列表回到未查询态（不自动查询）');
+  });
+
+  /* Download：选中行的文件 id 数组 → 整文件还原打包 zip */
+  $('btnDownload').addEventListener('click', function () {
+    var picked = document.querySelectorAll('#fileTableBody .row-chk:checked');
+    if (!picked.length) return;
+    var parts = [];
+    if ($('envSelect').value) parts.push($('envSelect').value);
+    if ($('serverCategorySelect').value) parts.push($('serverCategorySelect').value);
+    var zip = parts.join('_') + (parts.length ? '_' : '') + '2609141000-09141100.zip';
+    toast('已下载 ' + picked.length + ' 个文件（全部原始日志，文件级还原）→ ' + zip);
+  });
+
+  syncDownload();
+})();
+
+</script>
+  <!-- 机器可读规格清单：AI / 开发者照此实现真实页面；人类标注由它派生，二者不会漂移 -->
+  <script type="application/json" id="prototype-spec">
+{
+  "schema": "annotated-prototype/spec@1",
+  "title": "原始日志下载",
+  "summary": "两段式整页：上 = 查询条件区（5 个条件：Environment / Host IP / Server Category / 起止时间，只有时间必填），下 = 文件列表（一个文件一行，聚合键 ENV + HOSTIP + LOG_FINGERPRINT；多选复选框、跨页保留）+ Download 按钮（每个选中文件的全部原始日志按 LOG_OFFSET 拼回文件形态，打包 zip：三级目录 + 防撞名命名）。接口口径依 03 文档 §六。",
+  "regions": [
+    {
+      "id": "search",
+      "label": "查询条件区",
+      "role": "search",
+      "desc": "5 个条件，每行 5 个；无 Server Number、无折叠区；Search 与重置在栅格后"
+    },
+    {
+      "id": "list",
+      "label": "文件列表区",
+      "role": "table",
+      "desc": "6 列；行粒度 = 文件；多选；分页同 01：默认 20 条、档位 20 / 50 / 100、始终显示、共 N 条"
+    },
+    {
+      "id": "actions",
+      "label": "底部操作区",
+      "role": "actions",
+      "desc": "Download（唯一按钮，已选 ≥ 1 行才可用）"
+    }
+  ],
+  "apis": [
+    {
+      "id": "envList",
+      "method": "GET",
+      "path": "/api/v1/env/list",
+      "desc": "Environment 候选（沿用 01 §5.3 第 1 条）"
+    },
+    {
+      "id": "ipAddressList",
+      "method": "GET",
+      "path": "/api/v1/ipaddress/list",
+      "desc": "Host IP 候选（沿用 01 §5.3 第 2 条；入参 environment 可缺省）"
+    },
+    {
+      "id": "serverCategoryList",
+      "method": "GET",
+      "path": "/api/v1/server_category/list",
+      "desc": "Server Category 候选（沿用 01 §5.3 第 3 条）"
+    },
+    {
+      "id": "rawLogPage",
+      "method": "GET",
+      "path": "/api/v1/raw_log/page",
+      "desc": "文件分页查询（条件走 URL 参数）"
+    },
+    {
+      "id": "rawLogDownload",
+      "method": "POST",
+      "path": "/api/v1/raw_log/download",
+      "desc": "整文件还原打包 zip 下载"
+    }
+  ],
+  "controls": [
+    {
+      "selector": "#envSelect",
+      "kind": "select",
+      "label": "Environment",
+      "region": "查询条件区",
+      "param": "env",
+      "options": [
+        "PROD",
+        "PIRUN"
+      ],
+      "placeholder": "不限制",
+      "rules": [
+        "非必填；不选 = 不过滤",
+        "等值过滤行文档字段 ENV"
+      ],
+      "on": {
+        "load": [
+          "进页面加载候选值"
+        ],
+        "change": [
+          "重取 Host IP 候选值",
+          "清空已选的 Host IP"
+        ]
+      },
+      "apis": [
+        "envList"
+      ],
+      "apiNotes": [
+        "出参：`data.env` = 字符串数组",
+        "入参：URL 参数 `env`"
+      ]
+    },
+    {
+      "selector": "#hostIpSelect",
+      "kind": "select",
+      "label": "Host IP",
+      "region": "查询条件区",
+      "param": "hostIp",
+      "options": [
+        "10.18.100.1",
+        "10.18.100.2",
+        "10.18.100.3"
+      ],
+      "placeholder": "不限制",
+      "rules": [
+        "非必填；不选 = 不过滤",
+        "等值过滤行文档字段 HOSTIP",
+        "Environment 变化时重取候选并清空已选值"
+      ],
+      "on": {
+        "load": [
+          "进页面调候选接口（不带参）",
+          "Environment 选值后再调一次并带上 `environment` 参数"
+        ]
+      },
+      "apis": [
+        "ipAddressList"
+      ],
+      "apiNotes": [
+        "入参：`environment`（可缺省）；出参：`data.ipaddress` = 字符串数组",
+        "入参：URL 参数 `hostIp`"
+      ]
+    },
+    {
+      "selector": "#serverCategorySelect",
+      "kind": "select",
+      "label": "Server Category",
+      "region": "查询条件区",
+      "param": "serverCategory",
+      "options": [
+        "FAB",
+        "LIST",
+        "QUERY",
+        "IDE",
+        "XSITE"
+      ],
+      "placeholder": "不限制",
+      "rules": [
+        "非必填；不选 = 不过滤",
+        "等值过滤行文档字段 SERVER_CATEGORY"
+      ],
+      "apis": [
+        "serverCategoryList"
+      ],
+      "apiNotes": [
+        "出参：`data.serverCategory` = 字符串数组",
+        "入参：URL 参数 `serverCategory`"
+      ]
+    },
+    {
+      "selector": "#startTimeInput",
+      "kind": "input",
+      "label": "开始时间",
+      "region": "查询条件区",
+      "required": true,
+      "param": "startTime",
+      "format": "页面上 YYYY-MM-DD HH:mm；入参 yyyyMMddHHmm",
+      "rules": [
+        "区间下界：开始时间 ≤ LOG_TIME ≤ 结束时间（闭区间）—— 打的是行文档字段 LOG_TIME",
+        "即时校验：开始 ≤ 结束（同一分钟判合法）且差值 ≤ 1 天；不合法标红 + 错误文案，点 Search 被拦住",
+        "清空后自动补为「结束时间 − 1 小时」"
+      ],
+      "notes": [
+        "进页面默认值 = 当前时刻 − 1 小时；选择器精确到分钟"
+      ],
+      "apiNotes": [
+        "入参：URL 参数 `startTime`，格式 `yyyyMMddHHmm`"
+      ]
+    },
+    {
+      "selector": "#endTimeInput",
+      "kind": "input",
+      "label": "结束时间",
+      "region": "查询条件区",
+      "required": true,
+      "param": "endTime",
+      "format": "页面上 YYYY-MM-DD HH:mm；入参 yyyyMMddHHmm",
+      "rules": [
+        "区间上界（闭区间，打 LOG_TIME）",
+        "即时校验口径与开始时间一致；清空后自动补为「开始时间 + 1 小时」"
+      ],
+      "notes": [
+        "进页面默认值 = 当前时刻"
+      ],
+      "apiNotes": [
+        "入参：URL 参数 `endTime`，格式 `yyyyMMddHHmm`"
+      ]
+    },
+    {
+      "selector": "#btnSearch",
+      "kind": "button",
+      "label": "Search",
+      "region": "查询条件区",
+      "rules": [
+        "调接口前对条件做前置校验，不合法不发请求",
+        "重新 Search 会清空已选文件（与翻页保留相反）"
+      ],
+      "on": {
+        "click": [
+          "查第 1 页：pageIndex 传 1、pageSize 传 20"
+        ]
+      },
+      "apis": [
+        "rawLogPage"
+      ],
+      "apiNotes": [
+        "入参：URL 参数 pageIndex / pageSize + 五个可选条件（env、hostIp、serverCategory 等值；startTime / endTime 打 LOG_TIME）",
+        "出参：统一响应包 `data` = totalPage / total / pageIndex / pageSize / contents[]"
+      ]
+    },
+    {
+      "selector": "#btnReset",
+      "kind": "button",
+      "label": "重置",
+      "region": "查询条件区",
+      "rules": [
+        "条件区恢复进页面默认值（下拉清空；开始 = 当前时刻 − 1 小时、结束 = 当前时刻）",
+        "结果列表清空回到未查询态；已选文件一并清空"
+      ],
+      "on": {
+        "click": [
+          "不自动查询"
+        ]
+      },
+      "apiNotes": [
+        "不调接口，纯前端复位"
+      ]
+    },
+    {
+      "selector": "#fileTable",
+      "kind": "table",
+      "label": "文件列表",
+      "region": "文件列表区",
+      "rules": [
+        "行粒度：一个文件一行 —— 搜索窗口内有命中行的文件才进列表；同一文件跨页稳定（聚合键不变）",
+        "聚合键 = ENV + HOSTIP + LOG_FINGERPRINT（一个指纹 = 一个物理文件，永不复用）",
+        "Start Time / End Time = 该文件中命中搜索条件那些行的 LOG_TIME 最小 / 最大值（不是该文件全部行的时间范围）",
+        "File Name = 行文档 LOG_FILE 原值（含滚动序号，如 DT_PRD_MBX.FABsrv.log.1）",
+        "行选择多选（复选框，与功能 1 / 2 的单选不同）；跨页保留；重新 Search / 重置一律清空",
+        "空结果时 Download 不可用；加载中列表显示动画、Download 置灰"
+      ],
+      "apis": [
+        "rawLogPage"
+      ],
+      "apiNotes": [
+        "行数据 = 出参 `data.contents[]`：env、hostIp、serverCategory、startTime、endTime、fileName",
+        "出参 `id` = 文件 id（base64url(ENV|HOSTIP|LOG_FINGERPRINT 完整 64 hex)），对客户端不透明、不出列、同一文件恒定；两个文件代 = 两个指纹 = 两个 id，列表天然两行"
+      ]
+    },
+    {
+      "selector": "#chkAll",
+      "kind": "checkbox",
+      "label": "表头全选框",
+      "region": "文件列表区",
+      "rules": [
+        "勾选 = 选中当前页全部行；取消 = 清空当前页全部行的选中",
+        "作用范围 = 当前页；跨页已选不受影响"
+      ],
+      "apiNotes": [
+        "不调接口（纯前端行为）"
+      ]
+    },
+    {
+      "selector": "#pager",
+      "kind": "pager",
+      "label": "分页组件",
+      "region": "文件列表区",
+      "rules": [
+        "始终显示（只有一页时也显示）",
+        "默认每页 20 条，档位 20、50、100",
+        "总条数显示「共 N 条」，取自出参 total",
+        "翻页保留已选文件"
+      ],
+      "on": {
+        "change": [
+          "翻页请求目标页：pageIndex 传目标页"
+        ]
+      },
+      "apis": [
+        "rawLogPage"
+      ],
+      "apiNotes": [
+        "出参 `data.totalPage` 给页码数量"
+      ]
+    },
+    {
+      "selector": "#btnDownload",
+      "kind": "button",
+      "label": "Download",
+      "region": "底部操作区",
+      "dependsOn": [
+        "已选中 ≥ 1 行（空列表 / 未选中不可用）"
+      ],
+      "rules": [
+        "入参：选中行的文件 id 数组（page 出参 contents[].id，不出列），至少 1 个",
+        "下载什么：每个选中文件的全部原始日志 —— 该指纹在行索引里的全部行（不只命中行）；搜索窗口只负责把文件找出来",
+        "后端：逐个 id 解码 → 四 term 查行索引 → 堆内按 LOG_OFFSET 升序拼回 → 每 id 一个 .log → 全部打包 zip（文件级还原）",
+        "单个 id 解码失败 / 查无行 ⇒ 整单失败返回错误（不部分下载）",
+        "单次上限不设（后端流式生成 zip）"
+      ],
+      "apis": [
+        "rawLogDownload"
+      ],
+      "apiNotes": [
+        "入参：`{\"ids\": [\"\u003c文件 id>\", \"...\"]}`；出参是 .zip 文件本身，直接下载不走统一响应包",
+        ".log 命名 = 环境-类别-文件首行时间戳（还原后全部行的最早行，yyyyMMddHHmmss）；同目录撞名追加 .1、.2（不覆盖）",
+        "zip 内三级目录：环境 → Host IP → Server Category",
+        "zip 名 = 本次搜索条件拼接：填了值的条件按表单顺序用 _ 串起（环境 → Host IP → Server Category → 时间），未选不拼；时间为开始-结束一段（yyMMddHHmm）"
+      ]
+    }
+  ],
+  "table": {
+    "selector": "#fileTable",
+    "dataApi": "rawLogPage",
+    "columns": [
+      {
+        "key": "env",
+        "label": "Environment",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "hostIp",
+        "label": "Host IP",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "serverCategory",
+        "label": "Server Category",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "startTime",
+        "label": "Start Time",
+        "align": "left",
+        "format": "datetime-ms",
+        "note": "该文件命中行的最早 LOG_TIME"
+      },
+      {
+        "key": "endTime",
+        "label": "End Time",
+        "align": "left",
+        "format": "datetime-ms",
+        "note": "该文件命中行的最晚 LOG_TIME"
+      },
+      {
+        "key": "fileName",
+        "label": "File Name",
+        "align": "left",
+        "format": "text",
+        "note": "行文档 LOG_FILE 原值"
+      }
+    ],
+    "pagination": {
+      "api": "rawLogPage",
+      "pageParam": "pageIndex",
+      "pageSize": 20,
+      "serverSide": true,
+      "totalField": "total"
+    },
+    "rowSelection": {
+      "mode": "multi",
+      "requiredBy": [
+        "#btnDownload"
+      ],
+      "clearedOn": [
+        "重新 Search",
+        "点重置"
+      ]
+    }
+  },
+  "mock": [
+    "所有接口路径、方法、入参与出参依 03 文档 §六；原型不真实发请求，数据全为本地模拟",
+    "进页面即呈现「正常态」数据（真实页面进页面是未查询态，点 Search 后才有结果；点重置可看到未查询态）",
+    "文件列表 6 行为本地模拟（Start Time / End Time 为命中行时间范围样例）；总条数 6、分页档位为静态演示",
+    "候选值（Environment、Host IP、Server Category）为本地静态数组",
+    "Download 只弹轻提示（zip 名按当前条件拼出演示），不产生真实文件下载"
+  ],
+  "openQuestions": []
+}
+  </script>
+
+</div>
+
+<svg id="lines"></svg>
+<div class="anno" id="annoBox"></div>
+
+<script>
+/* ============================================================
+   热区配置（AI 生成时填充）
+   ============================================================ */
+const hotspots = [
+    {
+    id: "env-select",
+    selector: "#envSelect",
+    title: "Environment｜下拉框",
+    items: [
+      { type: "front", text: "非必填；不选 = 不过滤" },
+      { type: "front", text: "等值过滤行文档字段 ENV" },
+      { type: "front", text: "进入页面：进页面加载候选值" },
+      { type: "front", text: "选项变化：重取 Host IP 候选值" },
+      { type: "front", text: "选项变化：清空已选的 Host IP" },
+      { type: "back", text: "GET /api/v1/env/list —— Environment 候选（沿用 01 §5.3 第 1 条）" },
+      { type: "back", text: "值作为查询参数 `env` 随请求提交" },
+      { type: "back", text: "出参：`data.env` = 字符串数组" },
+      { type: "back", text: "入参：URL 参数 `env`" }
+    ],
+  },
+  {
+    id: "host-ip-select",
+    selector: "#hostIpSelect",
+    title: "Host IP｜下拉框",
+    items: [
+      { type: "front", text: "非必填；不选 = 不过滤" },
+      { type: "front", text: "等值过滤行文档字段 HOSTIP" },
+      { type: "front", text: "Environment 变化时重取候选并清空已选值" },
+      { type: "front", text: "进入页面：进页面调候选接口（不带参）" },
+      { type: "front", text: "进入页面：Environment 选值后再调一次并带上 `environment` 参数" },
+      { type: "back", text: "GET /api/v1/ipaddress/list —— Host IP 候选（沿用 01 §5.3 第 2 条；入参 environment 可缺省）" },
+      { type: "back", text: "值作为查询参数 `hostIp` 随请求提交" },
+      { type: "back", text: "入参：`environment`（可缺省）；出参：`data.ipaddress` = 字符串数组" },
+      { type: "back", text: "入参：URL 参数 `hostIp`" }
+    ],
+  },
+  {
+    id: "server-category-select",
+    selector: "#serverCategorySelect",
+    title: "Server Category｜下拉框",
+    items: [
+      { type: "front", text: "非必填；不选 = 不过滤" },
+      { type: "front", text: "等值过滤行文档字段 SERVER_CATEGORY" },
+      { type: "back", text: "GET /api/v1/server_category/list —— Server Category 候选（沿用 01 §5.3 第 3 条）" },
+      { type: "back", text: "值作为查询参数 `serverCategory` 随请求提交" },
+      { type: "back", text: "出参：`data.serverCategory` = 字符串数组" },
+      { type: "back", text: "入参：URL 参数 `serverCategory`" }
+    ],
+  },
+  {
+    id: "start-time-input",
+    selector: "#startTimeInput",
+    title: "开始时间｜输入框",
+    items: [
+      { type: "front", text: "必填" },
+      { type: "front", text: "区间下界：开始时间 ≤ LOG_TIME ≤ 结束时间（闭区间）—— 打的是行文档字段 LOG_TIME" },
+      { type: "front", text: "即时校验：开始 ≤ 结束（同一分钟判合法）且差值 ≤ 1 天；不合法标红 + 错误文案，点 Search 被拦住" },
+      { type: "front", text: "清空后自动补为「结束时间 − 1 小时」" },
+      { type: "front", text: "进页面默认值 = 当前时刻 − 1 小时；选择器精确到分钟" },
+      { type: "back", text: "值作为查询参数 `startTime` 随请求提交" },
+      { type: "back", text: "入参：URL 参数 `startTime`，格式 `yyyyMMddHHmm`" }
+    ],
+  },
+  {
+    id: "end-time-input",
+    selector: "#endTimeInput",
+    title: "结束时间｜输入框",
+    items: [
+      { type: "front", text: "必填" },
+      { type: "front", text: "区间上界（闭区间，打 LOG_TIME）" },
+      { type: "front", text: "即时校验口径与开始时间一致；清空后自动补为「开始时间 + 1 小时」" },
+      { type: "front", text: "进页面默认值 = 当前时刻" },
+      { type: "back", text: "值作为查询参数 `endTime` 随请求提交" },
+      { type: "back", text: "入参：URL 参数 `endTime`，格式 `yyyyMMddHHmm`" }
+    ],
+  },
+  {
+    id: "btn-search",
+    selector: "#btnSearch",
+    title: "Search｜按钮",
+    items: [
+      { type: "front", text: "调接口前对条件做前置校验，不合法不发请求" },
+      { type: "front", text: "重新 Search 会清空已选文件（与翻页保留相反）" },
+      { type: "front", text: "点击：查第 1 页：pageIndex 传 1、pageSize 传 20" },
+      { type: "back", text: "GET /api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
+      { type: "back", text: "入参：URL 参数 pageIndex / pageSize + 五个可选条件（env、hostIp、serverCategory 等值；startTime / endTime 打 LOG_TIME）" },
+      { type: "back", text: "出参：统一响应包 `data` = totalPage / total / pageIndex / pageSize / contents[]" }
+    ],
+  },
+  {
+    id: "btn-reset",
+    selector: "#btnReset",
+    title: "重置｜按钮",
+    items: [
+      { type: "front", text: "条件区恢复进页面默认值（下拉清空；开始 = 当前时刻 − 1 小时、结束 = 当前时刻）" },
+      { type: "front", text: "结果列表清空回到未查询态；已选文件一并清空" },
+      { type: "front", text: "点击：不自动查询" },
+      { type: "back", text: "不调接口，纯前端复位" }
+    ],
+  },
+  {
+    id: "file-table",
+    selector: "#fileTable",
+    title: "文件列表｜表格",
+    items: [
+      { type: "front", text: "行粒度：一个文件一行 —— 搜索窗口内有命中行的文件才进列表；同一文件跨页稳定（聚合键不变）" },
+      { type: "front", text: "聚合键 = ENV + HOSTIP + LOG_FINGERPRINT（一个指纹 = 一个物理文件，永不复用）" },
+      { type: "front", text: "Start Time / End Time = 该文件中命中搜索条件那些行的 LOG_TIME 最小 / 最大值（不是该文件全部行的时间范围）" },
+      { type: "front", text: "File Name = 行文档 LOG_FILE 原值（含滚动序号，如 DT_PRD_MBX.FABsrv.log.1）" },
+      { type: "front", text: "行选择多选（复选框，与功能 1 / 2 的单选不同）；跨页保留；重新 Search / 重置一律清空" },
+      { type: "front", text: "空结果时 Download 不可用；加载中列表显示动画、Download 置灰" },
+      { type: "back", text: "GET /api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
+      { type: "back", text: "行数据 = 出参 `data.contents[]`：env、hostIp、serverCategory、startTime、endTime、fileName" },
+      { type: "back", text: "出参 `id` = 文件 id（base64url(ENV|HOSTIP|LOG_FINGERPRINT 完整 64 hex)），对客户端不透明、不出列、同一文件恒定；两个文件代 = 两个指纹 = 两个 id，列表天然两行" }
+    ],
+  },
+  {
+    id: "chk-all",
+    selector: "#chkAll",
+    title: "表头全选框｜复选框",
+    items: [
+      { type: "front", text: "勾选 = 选中当前页全部行；取消 = 清空当前页全部行的选中" },
+      { type: "front", text: "作用范围 = 当前页；跨页已选不受影响" },
+      { type: "back", text: "不调接口（纯前端行为）" }
+    ],
+  },
+  {
+    id: "pager",
+    selector: "#pager",
+    title: "分页组件｜分页控件",
+    items: [
+      { type: "front", text: "始终显示（只有一页时也显示）" },
+      { type: "front", text: "默认每页 20 条，档位 20、50、100" },
+      { type: "front", text: "总条数显示「共 N 条」，取自出参 total" },
+      { type: "front", text: "翻页保留已选文件" },
+      { type: "front", text: "选项变化：翻页请求目标页：pageIndex 传目标页" },
+      { type: "back", text: "GET /api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
+      { type: "back", text: "出参 `data.totalPage` 给页码数量" }
+    ],
+  },
+  {
+    id: "btn-download",
+    selector: "#btnDownload",
+    title: "Download｜按钮",
+    items: [
+      { type: "front", text: "入参：选中行的文件 id 数组（page 出参 contents[].id，不出列），至少 1 个" },
+      { type: "front", text: "下载什么：每个选中文件的全部原始日志 —— 该指纹在行索引里的全部行（不只命中行）；搜索窗口只负责把文件找出来" },
+      { type: "front", text: "后端：逐个 id 解码 → 四 term 查行索引 → 堆内按 LOG_OFFSET 升序拼回 → 每 id 一个 .log → 全部打包 zip（文件级还原）" },
+      { type: "front", text: "单个 id 解码失败 / 查无行 ⇒ 整单失败返回错误（不部分下载）" },
+      { type: "front", text: "单次上限不设（后端流式生成 zip）" },
+      { type: "front", text: "前置条件：已选中 ≥ 1 行（空列表 / 未选中不可用）" },
+      { type: "back", text: "POST /api/v1/raw_log/download —— 整文件还原打包 zip 下载" },
+      { type: "back", text: "入参：`{\"ids\": [\"<文件 id>\", \"...\"]}`；出参是 .zip 文件本身，直接下载不走统一响应包" },
+      { type: "back", text: ".log 命名 = 环境-类别-文件首行时间戳（还原后全部行的最早行，yyyyMMddHHmmss）；同目录撞名追加 .1、.2（不覆盖）" },
+      { type: "back", text: "zip 内三级目录：环境 → Host IP → Server Category" },
+      { type: "back", text: "zip 名 = 本次搜索条件拼接：填了值的条件按表单顺序用 _ 串起（环境 → Host IP → Server Category → 时间），未选不拼；时间为开始-结束一段（yyMMddHHmm）" }
+    ],
+  },
+];
+
+const annoBox = document.getElementById('annoBox');
+const svg = document.getElementById('lines');
+const toggle = document.getElementById('toggle');
+
+let enabled = false;
+const hotspotEls = {};
+let hovered = null;
+let frameNo = 0;
+
+/* 悬停判定不依赖 DOM 事件的目标元素，而是「指针坐标 + 矩形包含 + 遮挡校验」。
+   这样延迟注入的元素、被 innerHTML 换掉的元素、父层 pointer-events:none 的
+   控件、禁用态控件都能命中；被弹层遮住的控件则不会被误命中。
+   且指针不动时页面滚动 / 布局变化（展开折叠面板等）也会实时重判。 */
+const pointer = { x: -1, y: -1, active: false };
+
+/* ============================================================
+   1. 建热区元素
+   ============================================================ */
+hotspots.forEach(h => {
+  const el = document.createElement('div');
+  el.className = 'hotspot';
+  document.body.appendChild(el);
+  hotspotEls[h.id] = el;
+  h._el = el;
+});
+
+/* ============================================================
+   2. 目标解析：只缓存「仍挂在文档里」的引用，失效就按 selector 重查
+   ============================================================ */
+const ro = new ResizeObserver(() => repositionAll());
+
+function targetOf(h){
+  if (h._target && h._target.isConnected) return h._target;
+  h._target = null;
+  const missAt = typeof h._missAt === 'number' ? h._missAt : -999;
+  if (frameNo - missAt < 12) return null;   // 未命中时限频重试，避免每帧 querySelector
+  h._missAt = frameNo;
+  const t = document.querySelector(h.selector);
+  if (t) { h._target = t; ro.observe(t); }
+  return h._target;
+}
+
+function depthOf(el){
+  let d = 0, p = el;
+  while ((p = p.parentElement)) d++;
+  return d;
+}
+
+/* 指针下方的热区：先按矩形圈定候选，再用 elementFromPoint 排除被遮挡的，
+   最后对嵌套热区取最内层 */
+function pickAt(x, y){
+  const top = document.elementFromPoint(x, y);
+  let best = null, bestDepth = -1;
+
+  for (let i = 0; i < hotspots.length; i++){
+    const h = hotspots[i];
+    const t = targetOf(h);
+    if (!t) continue;
+    const r = t.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    if (top && !(t.contains(top) || top.contains(t))) continue;
+    const d = depthOf(t);
+    if (d > bestDepth) { best = h; bestDepth = d; }
+  }
+  return best;
+}
+
+/* ============================================================
+   3. 统一重定位入口
+   ============================================================ */
+function repositionAll(){
+  hotspots.forEach(h => {
+    const t = targetOf(h);
+    const el = h._el;
+    if (!t) {
+      el.style.opacity = '0';
+      el._hidden = true;
+      return;
+    }
+    const r = t.getBoundingClientRect();
+
+    if (r.width === 0 && r.height === 0) {
+      el.style.opacity = '0';
+      el._hidden = true;
+      return;
+    }
+    el._hidden = false;
+    /* 目标重新可见时必须回清行内 opacity：
+       行内样式优先级高于 .hotspot.active{opacity:1}，不回清红框会永久不可见 */
+    if (el.style.opacity === '0') el.style.opacity = '';
+
+    el.style.left   = (r.left - 4) + 'px';
+    el.style.top    = (r.top  - 4) + 'px';
+    el.style.width  = (r.width  + 8) + 'px';
+    el.style.height = (r.height + 8) + 'px';
+  });
+
+  if (annoBox._current) {
+    const target = annoBox._current._target;
+    if (!target || !target.isConnected) { hide(); return; }
+    const r = target.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) { hide(); return; }
+    positionAnno(annoBox._current);
+    drawLine(annoBox._current);
+  }
+}
+
+/* ============================================================
+   4. 事件驱动
+   ============================================================ */
+window.addEventListener('resize', repositionAll);
+window.addEventListener('scroll', repositionAll, true);
+
+let _moPending = false;
+const mo = new MutationObserver(() => {
+  hotspots.forEach(h => { if (!h._target) h._missAt = -999; });   // DOM 变了，允许立刻重查
+  if (_moPending) return;
+  _moPending = true;
+  requestAnimationFrame(() => {
+    _moPending = false;
+    repositionAll();
+  });
+});
+mo.observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['class', 'style', 'hidden', 'open']
+});
+
+document.addEventListener('pointermove', e => {
+  pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true;
+}, true);
+document.documentElement.addEventListener('mouseleave', () => { pointer.active = false; });
+document.addEventListener('pointercancel', () => { pointer.active = false; }, true);
+window.addEventListener('blur', () => { pointer.active = false; });
+
+/* body 上的 transform / filter / contain 会把叠加层的包含块从视口改到 body，
+   坐标系随之变化；这里一次性告警，避免静默错位 */
+(function warnContainingBlock(){
+  const keys = ['transform', 'filter', 'perspective', 'contain', 'willChange'];
+  const hit = keys.filter(k => {
+    const v = getComputedStyle(document.body)[k];
+    return v && v !== 'none' && v !== 'auto' && v !== 'normal';
+  });
+  if (hit.length) console.warn('标注框架告警：body 上的 ' + hit.join(' / ') + ' 会成为叠加层的包含块，标注可能错位');
+})();
+
+/* ============================================================
+   5. 逐帧重定位 + 悬停重判（兜底：动画、过渡、指针不动时的滚动与布局变化）
+   ============================================================ */
+let _lastKey = '';
+function tick(){
+  frameNo++;
+
+  /* 跑满约 2 秒仍未命中的 selector 一次性告警：
+     延迟注入的元素会在这里之前被解析到，所以告警留下的就是真拼错的 selector */
+  if (frameNo === 120) {
+    hotspots.forEach(h => {
+      if (!h._target) console.warn('热区 selector 未命中：', h.selector);
+    });
+  }
+
+  let key = '';
+  for (let i = 0; i < hotspots.length; i++){
+    const t = targetOf(hotspots[i]);
+    if (!t) { key += '-|'; continue; }
+    const r = t.getBoundingClientRect();
+    key += Math.round(r.left) + ',' + Math.round(r.top) + ','
+         + Math.round(r.width) + ',' + Math.round(r.height) + '|';
+  }
+  if (key !== _lastKey) {
+    _lastKey = key;
+    repositionAll();
+  }
+
+  reconcileHover();
+  requestAnimationFrame(tick);
+}
+
+function reconcileHover(){
+  if (!enabled) return;
+  const h = pointer.active ? pickAt(pointer.x, pointer.y) : null;
+  if (h === hovered) return;
+  hovered = h;
+  if (h) show(h, h._el);
+  else hide();
+}
+
+requestAnimationFrame(tick);
+
+/* ============================================================
+   6. 显示 / 隐藏
+   ============================================================ */
+function show(h, el){
+  Object.values(hotspotEls).forEach(e => e.classList.remove('active'));
+  if (el.style.opacity === '0') el.style.opacity = '';
+  el.classList.add('active');
+
+  annoBox.innerHTML =
+    `<div class="head"><span class="dot"></span><h4>${h.title || ''}</h4></div>
+     <div class="body">` +
+     (h.items || []).map(it =>
+       `<div class="item ${it.type}">` +
+          `<span class="tag">${it.type==='back'?'后端':'前端'}</span>` +
+          `<span class="txt">${it.text || ''}</span>` +
+        `</div>`).join('') +
+     `</div>`;
+
+  annoBox.classList.add('show');
+  annoBox._current = h;
+
+  positionAnno(h);
+  requestAnimationFrame(() => drawLine(h));
+}
+
+function hide(){
+  hovered = null;
+  annoBox.classList.remove('show');
+  Object.values(hotspotEls).forEach(e => e.classList.remove('active'));
+  svg.innerHTML = '';
+  annoBox._current = null;
+}
+
+/* ============================================================
+   7. 标注框定位（自动避让视口）
+   ============================================================ */
+function positionAnno(h){
+  const r = h._el.getBoundingClientRect();
+  const gap = 28, pad = 16;
+  const w = annoBox.offsetWidth;
+  const ht = annoBox.offsetHeight;
+
+  let x, y, side;
+  if (r.right + gap + w <= innerWidth - pad) {
+    side = 'right';
+    x = r.right + gap;
+    y = r.top + r.height/2 - ht/2;
+  } else if (r.left - gap - w >= pad) {
+    side = 'left';
+    x = r.left - gap - w;
+    y = r.top + r.height/2 - ht/2;
+  } else {
+    side = 'bottom';
+    x = r.left + r.width/2 - w/2;
+    y = r.bottom + gap;
+  }
+
+  x = Math.max(pad, Math.min(x, innerWidth  - w  - pad));
+  y = Math.max(pad, Math.min(y, innerHeight - ht - pad));
+
+  annoBox.style.left = x + 'px';
+  annoBox.style.top  = y + 'px';
+  annoBox._rect = { x, y, w, h: ht, side };
+}
+
+/* ============================================================
+   8. 引线绘制
+   ============================================================ */
+function drawLine(h){
+  const r = h._el.getBoundingClientRect();
+  const a = annoBox._rect;
+  if (!a) return;
+  const ns = 'http://www.w3.org/2000/svg';
+
+  let p1, p2;
+  if (a.side === 'right') {
+    p1 = { x: r.right, y: r.top + r.height/2 };
+    p2 = { x: a.x,     y: a.y + a.h/2 };
+  } else if (a.side === 'left') {
+    p1 = { x: r.left,    y: r.top + r.height/2 };
+    p2 = { x: a.x + a.w, y: a.y + a.h/2 };
+  } else {
+    p1 = { x: r.left + r.width/2, y: r.bottom };
+    p2 = { x: a.x + a.w/2,        y: a.y };
+  }
+
+  let d;
+  if (a.side === 'bottom') {
+    const midY = (p1.y + p2.y) / 2;
+    d = `M ${p1.x} ${p1.y} L ${p1.x} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`;
+  } else {
+    const midX = (p1.x + p2.x) / 2;
+    d = `M ${p1.x} ${p1.y} L ${midX} ${p1.y} L ${midX} ${p2.y} L ${p2.x} ${p2.y}`;
+  }
+
+  const defs = document.createElementNS(ns,'defs');
+  defs.innerHTML = `<linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#e5484d" stop-opacity="0.35"/>
+    <stop offset="100%" stop-color="#e5484d" stop-opacity="1"/></linearGradient>`;
+
+  const path = document.createElementNS(ns,'path');
+  path.setAttribute('d', d);
+  path.setAttribute('stroke','url(#lg)');
+  path.setAttribute('stroke-width','1.75');
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke-linejoin','round');
+  path.setAttribute('stroke-linecap','round');
+
+  const halo = document.createElementNS(ns,'circle');
+  halo.setAttribute('cx',p1.x); halo.setAttribute('cy',p1.y); halo.setAttribute('r','8');
+  halo.setAttribute('fill','rgba(229,72,77,.15)');
+
+  const dot = document.createElementNS(ns,'circle');
+  dot.setAttribute('cx',p1.x); dot.setAttribute('cy',p1.y); dot.setAttribute('r','4');
+  dot.setAttribute('fill','#e5484d'); dot.setAttribute('stroke','#fff'); dot.setAttribute('stroke-width','1.5');
+
+  const dot2 = document.createElementNS(ns,'circle');
+  dot2.setAttribute('cx',p2.x); dot2.setAttribute('cy',p2.y); dot2.setAttribute('r','3');
+  dot2.setAttribute('fill','#e5484d');
+
+  svg.innerHTML = '';
+  [defs,path,halo,dot,dot2].forEach(n => svg.appendChild(n));
+
+  if (!h._drawn) {
+    const len = path.getTotalLength();
+    path.style.strokeDasharray = len;
+    path.style.strokeDashoffset = len;
+    path.getBoundingClientRect();
+    path.style.transition = 'stroke-dashoffset .28s ease';
+    path.style.strokeDashoffset = 0;
+    h._drawn = true;
+  }
+}
+
+/* ============================================================
+   9. 开关
+   ============================================================ */
+toggle.addEventListener('click', () => {
+  enabled = !enabled;
+  toggle.classList.toggle('on', enabled);
+  toggle.lastChild.textContent = enabled ? '标注已开启' : '标注已关闭';
+  if (!enabled) hide();
+});
+</script>
+</body>
+</html>

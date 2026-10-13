@@ -241,6 +241,8 @@
   .row-radio{width:14px;height:14px;accent-color:var(--p);cursor:pointer;vertical-align:middle;}
   .hang-btn{font:inherit;font-size:12px;height:24px;padding:0 8px;border-radius:var(--r-sm);
     color:var(--t3);background:var(--fill);border:1px solid var(--bd);cursor:not-allowed;}
+  .hang-btn.hot{color:#fff;background:var(--err);border-color:var(--err);cursor:pointer;}
+  .hang-btn.hot:hover{background:#ff7875;border-color:#ff7875;}
   .table-overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;
     gap:10px;font-size:13px;color:var(--t2);background:rgba(255,255,255,.72);}
   .spinner{width:16px;height:16px;border-radius:50%;border:2px solid rgba(47,125,90,.25);
@@ -305,6 +307,11 @@
   .log-note{padding:6px 16px;font-family:inherit;font-size:12px;color:var(--t3);text-align:center;}
   .modal-foot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--split);}
   .modal-foot .spacer{flex:1;}
+  /* Server Hang 弹框：日志列换行显示，不横向滚动 */
+  .hang-wrap{flex:1;min-height:220px;max-height:60vh;overflow:auto;border-bottom:1px solid var(--split);}
+  .hang-wrap table.grid td{white-space:normal;vertical-align:top;height:auto;padding:8px 12px;}
+  .hang-wrap .log-cell{font-family:var(--mono);font-size:12px;line-height:18px;overflow-wrap:anywhere;
+    min-width:220px;max-width:420px;}
   .toast{position:fixed;top:16px;left:50%;z-index:11000;padding:9px 16px;font-size:13px;color:var(--t1);
     background:#fff;border:1px solid var(--bd);border-radius:var(--r);opacity:0;pointer-events:none;
     transform:translate(-50%,-12px);box-shadow:0 8px 24px -8px rgba(0,0,0,.3);
@@ -402,7 +409,7 @@
   </div>
   <div class="field" data-field="userIdInput">
     <label for="userIdInput">User ID</label>
-    <input class="input" id="userIdInput" type="text" value="" placeholder="本期置灰" disabled>
+    <input class="input" id="userIdInput" type="text" value="" placeholder="EAP">
   </div>
   <div class="field" data-field="errorCodeInput">
     <label for="errorCodeInput">Error Code</label>
@@ -432,26 +439,26 @@
     <table class="grid" id="ruleTable">
       <thead><tr><td class="sel-col sticky-left"></td><th data-col="env">Environment</th><th data-col="hostIp">Host IP</th><th data-col="serverId">Server ID</th><th data-col="ruleName">Rule Name</th><th data-col="requestType">Request Type</th><th data-col="startTime">Start Time</th><th data-col="endTime">End Time</th><th data-col="ruleResult">Rule Result</th><th data-col="errorCode">Error Code</th><th data-col="eqpId">EqpID</th><th data-col="lotId">Lot ID</th><th data-col="carrierId">Carrier ID</th><th data-col="userId">User ID</th><th data-col="tid">TID</th><th data-col="totalCostSec" class="num">Total Cost Time</th><th data-col="itemCostSec" class="num">Item Cost Summary</th><th data-col="unaccountedSec" class="num">UnAccounted Cost</th><th data-col="serverHang" class="sticky-right">Server Hang</th></tr></thead>
       <tbody id="ruleTableBody">
-<tr data-row="1"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-1"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:58:00.000</td><td data-col="endTime">2026-09-22 09:58:01.200</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId"></td><td data-col="tid">20260922095800.000-0001</td><td data-col="totalCostSec" class="num">1.200</td><td data-col="itemCostSec" class="num">0.820</td><td data-col="unaccountedSec" class="num">0.380</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="2"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-2"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:56:23.000</td><td data-col="endTime">2026-09-22 09:56:32.119</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId"></td><td data-col="tid">20260922095707.137-0002</td><td data-col="totalCostSec" class="num">9.119</td><td data-col="itemCostSec" class="num">8.602</td><td data-col="unaccountedSec" class="num">0.517</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="3"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-3"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:54:46.000</td><td data-col="endTime">2026-09-22 09:55:03.038</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId"></td><td data-col="tid">20260922095614.274-0003</td><td data-col="totalCostSec" class="num">17.038</td><td data-col="itemCostSec" class="num">16.384</td><td data-col="unaccountedSec" class="num">0.654</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="4"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-4"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:53:09.000</td><td data-col="endTime">2026-09-22 09:53:33.957</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId"></td><td data-col="tid">20260922095521.411-0004</td><td data-col="totalCostSec" class="num">24.957</td><td data-col="itemCostSec" class="num">24.166</td><td data-col="unaccountedSec" class="num">0.791</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="5"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-5"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:51:32.000</td><td data-col="endTime">2026-09-22 09:52:04.876</td><td data-col="ruleResult" class="cell-error">CANCELRULE</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId"></td><td data-col="tid">20260922095428.548-0005</td><td data-col="totalCostSec" class="num">32.876</td><td data-col="itemCostSec" class="num">31.948</td><td data-col="unaccountedSec" class="num">0.928</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="6"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-6"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:49:55.000</td><td data-col="endTime">2026-09-22 09:50:35.795</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId"></td><td data-col="tid">20260922095335.685-0006</td><td data-col="totalCostSec" class="num">40.795</td><td data-col="itemCostSec" class="num">39.730</td><td data-col="unaccountedSec" class="num">1.065</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="7"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-7"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:48:18.000</td><td data-col="endTime">2026-09-22 09:49:06.714</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId"></td><td data-col="tid">20260922095242.822-0007</td><td data-col="totalCostSec" class="num">48.714</td><td data-col="itemCostSec" class="num">47.512</td><td data-col="unaccountedSec" class="num">1.202</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="8"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-8"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:46:41.000</td><td data-col="endTime">2026-09-22 09:47:37.633</td><td data-col="ruleResult">RETRY</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId"></td><td data-col="tid">20260922095149.959-0008</td><td data-col="totalCostSec" class="num">56.633</td><td data-col="itemCostSec" class="num">56.194</td><td data-col="unaccountedSec" class="num">0.439</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="9"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-9"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:45:04.000</td><td data-col="endTime">2026-09-22 09:46:08.552</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId"></td><td data-col="tid">20260922095056.096-0009</td><td data-col="totalCostSec" class="num">64.552</td><td data-col="itemCostSec" class="num">63.976</td><td data-col="unaccountedSec" class="num">0.576</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="10"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-10"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:43:27.000</td><td data-col="endTime">2026-09-22 09:44:39.471</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId"></td><td data-col="tid">20260922094903.233-0010</td><td data-col="totalCostSec" class="num">72.471</td><td data-col="itemCostSec" class="num">71.758</td><td data-col="unaccountedSec" class="num">0.713</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="11"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-11"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:41:50.000</td><td data-col="endTime">2026-09-22 09:43:10.390</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId"></td><td data-col="tid">20260922094810.370-0011</td><td data-col="totalCostSec" class="num">80.390</td><td data-col="itemCostSec" class="num">79.540</td><td data-col="unaccountedSec" class="num">0.850</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="12"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-12"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:40:13.000</td><td data-col="endTime">2026-09-22 09:41:41.309</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId"></td><td data-col="tid">20260922094717.507-0012</td><td data-col="totalCostSec" class="num">88.309</td><td data-col="itemCostSec" class="num">87.322</td><td data-col="unaccountedSec" class="num">0.987</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="13"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-13"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:38:36.000</td><td data-col="endTime">2026-09-22 09:40:12.228</td><td data-col="ruleResult" class="cell-error">CANCELRULE</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId"></td><td data-col="tid">20260922094624.644-0013</td><td data-col="totalCostSec" class="num">96.228</td><td data-col="itemCostSec" class="num">95.104</td><td data-col="unaccountedSec" class="num">1.124</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="14"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-14"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:36:59.000</td><td data-col="endTime">2026-09-22 09:38:43.147</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId"></td><td data-col="tid">20260922094531.781-0014</td><td data-col="totalCostSec" class="num">104.147</td><td data-col="itemCostSec" class="num">102.886</td><td data-col="unaccountedSec" class="num">1.261</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="15"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-15"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:35:22.000</td><td data-col="endTime">2026-09-22 09:37:14.066</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId"></td><td data-col="tid">20260922094438.918-0015</td><td data-col="totalCostSec" class="num">112.066</td><td data-col="itemCostSec" class="num">111.568</td><td data-col="unaccountedSec" class="num">0.498</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="16"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-16"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:33:45.000</td><td data-col="endTime">2026-09-22 09:35:44.985</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId"></td><td data-col="tid">20260922094345.055-0016</td><td data-col="totalCostSec" class="num">119.985</td><td data-col="itemCostSec" class="num">119.350</td><td data-col="unaccountedSec" class="num">0.635</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="17"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-17"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:32:08.000</td><td data-col="endTime">2026-09-22 09:34:15.904</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId"></td><td data-col="tid">20260922094252.192-0017</td><td data-col="totalCostSec" class="num">127.904</td><td data-col="itemCostSec" class="num">127.132</td><td data-col="unaccountedSec" class="num">0.772</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="18"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-18"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:30:31.000</td><td data-col="endTime">2026-09-22 09:32:46.823</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId"></td><td data-col="tid">20260922094159.329-0018</td><td data-col="totalCostSec" class="num">135.823</td><td data-col="itemCostSec" class="num">134.914</td><td data-col="unaccountedSec" class="num">0.909</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="19"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-19"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:28:54.000</td><td data-col="endTime">2026-09-22 09:31:17.742</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId"></td><td data-col="tid">20260922094006.466-0019</td><td data-col="totalCostSec" class="num">143.742</td><td data-col="itemCostSec" class="num">142.696</td><td data-col="unaccountedSec" class="num">1.046</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
-<tr data-row="20"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-20"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:27:17.000</td><td data-col="endTime">2026-09-22 09:29:48.661</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId"></td><td data-col="tid">20260922093913.603-0020</td><td data-col="totalCostSec" class="num">151.661</td><td data-col="itemCostSec" class="num">150.478</td><td data-col="unaccountedSec" class="num">1.183</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" disabled>Hang (0)</button></td></tr>
+<tr data-row="1"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-1"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:58:00.000</td><td data-col="endTime">2026-09-22 09:58:01.200</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId">EAP</td><td data-col="tid">20260922095800.000-0001</td><td data-col="totalCostSec" class="num">1.200</td><td data-col="itemCostSec" class="num">0.820</td><td data-col="unaccountedSec" class="num">0.380</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="2"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-2"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:56:23.000</td><td data-col="endTime">2026-09-22 09:56:32.119</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId">OP01<span class="badge">+1</span></td><td data-col="tid">20260922095707.137-0002</td><td data-col="totalCostSec" class="num">9.119</td><td data-col="itemCostSec" class="num">8.602</td><td data-col="unaccountedSec" class="num">0.517</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="3"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-3"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:54:46.000</td><td data-col="endTime">2026-09-22 09:55:03.038</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId">EAP</td><td data-col="tid">20260922095614.274-0003</td><td data-col="totalCostSec" class="num">17.038</td><td data-col="itemCostSec" class="num">16.384</td><td data-col="unaccountedSec" class="num">0.654</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="4"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-4"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:53:09.000</td><td data-col="endTime">2026-09-22 09:53:33.957</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId">MCS</td><td data-col="tid">20260922095521.411-0004</td><td data-col="totalCostSec" class="num">24.957</td><td data-col="itemCostSec" class="num">24.166</td><td data-col="unaccountedSec" class="num">0.791</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn hot" type="button" data-hang-row="4">Hang (3)</button></td></tr>
+<tr data-row="5"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-5"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:51:32.000</td><td data-col="endTime">2026-09-22 09:52:04.876</td><td data-col="ruleResult" class="cell-error">CANCELRULE</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId">EAP<span class="badge">+1</span></td><td data-col="tid">20260922095428.548-0005</td><td data-col="totalCostSec" class="num">32.876</td><td data-col="itemCostSec" class="num">31.948</td><td data-col="unaccountedSec" class="num">0.928</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="6"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-6"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:49:55.000</td><td data-col="endTime">2026-09-22 09:50:35.795</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId">EAP</td><td data-col="tid">20260922095335.685-0006</td><td data-col="totalCostSec" class="num">40.795</td><td data-col="itemCostSec" class="num">39.730</td><td data-col="unaccountedSec" class="num">1.065</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="7"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-7"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:48:18.000</td><td data-col="endTime">2026-09-22 09:49:06.714</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId">OP01<span class="badge">+1</span></td><td data-col="tid">20260922095242.822-0007</td><td data-col="totalCostSec" class="num">48.714</td><td data-col="itemCostSec" class="num">47.512</td><td data-col="unaccountedSec" class="num">1.202</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="8"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-8"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:46:41.000</td><td data-col="endTime">2026-09-22 09:47:37.633</td><td data-col="ruleResult">RETRY</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId">EAP</td><td data-col="tid">20260922095149.959-0008</td><td data-col="totalCostSec" class="num">56.633</td><td data-col="itemCostSec" class="num">56.194</td><td data-col="unaccountedSec" class="num">0.439</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="9"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-9"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:45:04.000</td><td data-col="endTime">2026-09-22 09:46:08.552</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId">MCS</td><td data-col="tid">20260922095056.096-0009</td><td data-col="totalCostSec" class="num">64.552</td><td data-col="itemCostSec" class="num">63.976</td><td data-col="unaccountedSec" class="num">0.576</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="10"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-10"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:43:27.000</td><td data-col="endTime">2026-09-22 09:44:39.471</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId">EAP<span class="badge">+1</span></td><td data-col="tid">20260922094903.233-0010</td><td data-col="totalCostSec" class="num">72.471</td><td data-col="itemCostSec" class="num">71.758</td><td data-col="unaccountedSec" class="num">0.713</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="11"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-11"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:41:50.000</td><td data-col="endTime">2026-09-22 09:43:10.390</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId">EAP</td><td data-col="tid">20260922094810.370-0011</td><td data-col="totalCostSec" class="num">80.390</td><td data-col="itemCostSec" class="num">79.540</td><td data-col="unaccountedSec" class="num">0.850</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn hot" type="button" data-hang-row="11">Hang (2)</button></td></tr>
+<tr data-row="12"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-12"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:40:13.000</td><td data-col="endTime">2026-09-22 09:41:41.309</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId">OP01<span class="badge">+1</span></td><td data-col="tid">20260922094717.507-0012</td><td data-col="totalCostSec" class="num">88.309</td><td data-col="itemCostSec" class="num">87.322</td><td data-col="unaccountedSec" class="num">0.987</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="13"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-13"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:38:36.000</td><td data-col="endTime">2026-09-22 09:40:12.228</td><td data-col="ruleResult" class="cell-error">CANCELRULE</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId">EAP</td><td data-col="tid">20260922094624.644-0013</td><td data-col="totalCostSec" class="num">96.228</td><td data-col="itemCostSec" class="num">95.104</td><td data-col="unaccountedSec" class="num">1.124</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="14"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-14"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:36:59.000</td><td data-col="endTime">2026-09-22 09:38:43.147</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId">MCS</td><td data-col="tid">20260922094531.781-0014</td><td data-col="totalCostSec" class="num">104.147</td><td data-col="itemCostSec" class="num">102.886</td><td data-col="unaccountedSec" class="num">1.261</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="15"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-15"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">LISTsrv.3</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:35:22.000</td><td data-col="endTime">2026-09-22 09:37:14.066</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId">EAP<span class="badge">+1</span></td><td data-col="tid">20260922094438.918-0015</td><td data-col="totalCostSec" class="num">112.066</td><td data-col="itemCostSec" class="num">111.568</td><td data-col="unaccountedSec" class="num">0.498</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="16"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-16"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">QUERYsrv.7</td><td data-col="ruleName">POST</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:33:45.000</td><td data-col="endTime">2026-09-22 09:35:44.985</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL01<span class="badge">+1</span></td><td data-col="lotId">A031178</td><td data-col="carrierId">C1200317</td><td data-col="userId">EAP</td><td data-col="tid">20260922094345.055-0016</td><td data-col="totalCostSec" class="num">119.985</td><td data-col="itemCostSec" class="num">119.350</td><td data-col="unaccountedSec" class="num">0.635</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="17"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-17"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">IDEsrv.2</td><td data-col="ruleName">LOT_TRACK_IN</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:32:08.000</td><td data-col="endTime">2026-09-22 09:34:15.904</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E1024</td><td data-col="eqpId">ATNC100</td><td data-col="lotId">A031179<span class="badge">+1</span></td><td data-col="carrierId">C1200318</td><td data-col="userId">OP01<span class="badge">+1</span></td><td data-col="tid">20260922094252.192-0017</td><td data-col="totalCostSec" class="num">127.904</td><td data-col="itemCostSec" class="num">127.132</td><td data-col="unaccountedSec" class="num">0.772</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="18"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-18"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.3</td><td data-col="serverId">XSITEsrv.1</td><td data-col="ruleName">CARRIER_MOVE</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:30:31.000</td><td data-col="endTime">2026-09-22 09:32:46.823</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATTAL07</td><td data-col="lotId">A031181</td><td data-col="carrierId">C1200319</td><td data-col="userId">EAP</td><td data-col="tid">20260922094159.329-0018</td><td data-col="totalCostSec" class="num">135.823</td><td data-col="itemCostSec" class="num">134.914</td><td data-col="unaccountedSec" class="num">0.909</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn hot" type="button" data-hang-row="18">Hang (3)</button></td></tr>
+<tr data-row="19"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-19"></td><td data-col="env">PROD</td><td data-col="hostIp">10.18.100.1</td><td data-col="serverId">FABsrv.25</td><td data-col="ruleName">TXN_PORTER_JOB</td><td data-col="requestType"><span class="tag txn">TXN</span></td><td data-col="startTime">2026-09-22 09:28:54.000</td><td data-col="endTime">2026-09-22 09:31:17.742</td><td data-col="ruleResult">PASS</td><td data-col="errorCode">E2201<span class="badge">+1</span></td><td data-col="eqpId">ATTAL08<span class="badge">+1</span></td><td data-col="lotId">A031182</td><td data-col="carrierId">C1200320</td><td data-col="userId">MCS</td><td data-col="tid">20260922094006.466-0019</td><td data-col="totalCostSec" class="num">143.742</td><td data-col="itemCostSec" class="num">142.696</td><td data-col="unaccountedSec" class="num">1.046</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
+<tr data-row="20"><td class="sel-col sticky-left"><input type="radio" class="row-radio" name="rowSel" id="row-20"></td><td data-col="env">PIRUN</td><td data-col="hostIp">10.18.100.2</td><td data-col="serverId">FABsrv.10</td><td data-col="ruleName">RECIPE_VERIFY</td><td data-col="requestType"><span class="tag rule">Rule</span></td><td data-col="startTime">2026-09-22 09:27:17.000</td><td data-col="endTime">2026-09-22 09:29:48.661</td><td data-col="ruleResult">PASS</td><td data-col="errorCode"></td><td data-col="eqpId">ATNC200</td><td data-col="lotId">A031183</td><td data-col="carrierId"></td><td data-col="userId">EAP<span class="badge">+1</span></td><td data-col="tid">20260922093913.603-0020</td><td data-col="totalCostSec" class="num">151.661</td><td data-col="itemCostSec" class="num">150.478</td><td data-col="unaccountedSec" class="num">1.183</td><td data-col="serverHang" class="cell-hang sticky-right"><button class="hang-btn" type="button" disabled>Hang (0)</button></td></tr>
       </tbody>
     </table>
     <div class="table-overlay" id="tableOverlay" hidden><span class="spinner"></span><span>加载中…</span></div>
@@ -538,6 +545,19 @@
     <button class="btn primary" id="btnFullDownload" type="button" hidden>全量下载</button>
     <button class="btn" id="btnCauseAnalysis" type="button" disabled>成因分析</button>
     <button class="btn" id="btnCloseDetail" type="button">退出</button>
+  </div>
+</div>
+
+<div class="mask" id="hangMask"></div>
+<div class="modal" id="hangModal" role="dialog" aria-hidden="true">
+  <div class="modal-head">
+    <h3>Server Hang List</h3>
+    <span class="modal-sub" id="hangModalSub"></span>
+  </div>
+  <div class="hang-wrap" id="hangTableBox"></div>
+  <div class="modal-foot">
+    <span class="spacer"></span>
+    <button class="btn" id="btnHangClose" type="button">关闭</button>
   </div>
 </div>
 
@@ -686,14 +706,14 @@
     $(pair[0]).addEventListener('input', function () { checkStar(pair[0], pair[1]); });
   });
 
-  /* 即时校验：Min / Max Cost Time（单位秒，发请求时 × 1000） */
+  /* 即时校验：Min / Max Cost Time（单位秒，入参原样传秒，换算由后端做） */
   function checkCost() {
     var ok = true;
     var min = $('minCostInput').value.trim(), max = $('maxCostInput').value.trim();
-    var form = /^\d{1,3}(\.\d{1,2})?$/;
-    if (!form.test(min) || Number(min) > 999.99) { setErr('minCostInput', '取值 0 ~ 999.99（秒，最多 2 位小数）'); ok = false; }
+    var form = /^\d{1,5}(\.\d{1,2})?$/;
+    if (!form.test(min) || Number(min) > 99999.99) { setErr('minCostInput', '取值 0 ~ 99999.99（秒，最多 2 位小数）'); ok = false; }
     else setErr('minCostInput', '');
-    if (!form.test(max) || Number(max) > 999.99) { setErr('maxCostInput', '取值 0 ~ 999.99（秒，最多 2 位小数）'); ok = false; }
+    if (!form.test(max) || Number(max) > 99999.99) { setErr('maxCostInput', '取值 0 ~ 99999.99（秒，最多 2 位小数）'); ok = false; }
     else setErr('maxCostInput', '');
     if (ok && Number(min) > Number(max)) { setErr('maxCostInput', 'Max Cost Time 不能小于 Min Cost Time'); ok = false; }
     return ok;
@@ -746,6 +766,8 @@
     syncActions();
   }
   tbody.addEventListener('click', function (ev) {
+    var hangBtn = ev.target.closest ? ev.target.closest('.hang-btn.hot') : null;
+    if (hangBtn) { openHang(Number(hangBtn.getAttribute('data-hang-row'))); return; }
     var tr = ev.target.closest ? ev.target.closest('tr') : null;
     if (!tr) return;
     setSelection(tr.classList.contains('selected') ? null : tr);
@@ -775,7 +797,7 @@
 
   $('btnReset').addEventListener('click', function () {
     ['envSelect', 'serverCategorySelect', 'serverNumberInput', 'ruleNameInput', 'tidInput',
-      'eqpInput', 'carrierInput', 'lotInput'].forEach(function (id) { $(id).value = ''; });
+      'eqpInput', 'carrierInput', 'lotInput', 'userIdInput'].forEach(function (id) { $(id).value = ''; });
     $('startTimeInput').value = DEF.start;
     $('endTimeInput').value = DEF.end;
     $('minCostInput').value = DEF.min;
@@ -1000,6 +1022,63 @@
     toast('已下载该块全部日志 → RuleLog_FABsrv.1_20260922100012.log');
   });
 
+  /* Server Hang 弹框：内容 = 10 号接口出参（本地模拟），按开始行时间正序；只有「关闭」 */
+  var HANG_SAMPLE = [
+    { start: 'FWLockMgr:acquire lock object CARRIER key="C1200317" timeout=30000ms',
+      end: 'FWLockMgr:lock object CARRIER acquired key="C1200317"', cost: 31250 },
+    { start: 'FWLockMgr:acquire lock object EQP key="ATTAL01" timeout=30000ms',
+      end: 'FWLockMgr:lock object EQP acquired key="ATTAL01"', cost: 45380 },
+    { start: 'FwTxnSender:wait ack subject="FWCarrierMove" target=MCS timeout=60000ms',
+      end: 'FwTxnSender:ack received subject="FWCarrierMove"', cost: 60120 },
+  ];
+  function hangCountOf(rowIdx) { var i = rowIdx - 1; return i % 7 === 3 ? 2 + (i % 2) : 0; }
+  function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function logStamp(d) {
+    var z = function (n) { return (n < 10 ? '0' : '') + n; };
+    var cs = ('0' + Math.floor(d.getMilliseconds() / 10)).slice(-2);
+    return z(d.getMonth() + 1) + '/' + z(d.getDate()) + '/' + String(d.getFullYear()).slice(-2) + ' ' +
+      z(d.getHours()) + ':' + z(d.getMinutes()) + ':' + z(d.getSeconds()) + '.' + cs;
+  }
+  function openHang(rowIdx) {
+    var tr = document.querySelector('tr[data-row="' + rowIdx + '"]');
+    var txt = function (col) {
+      var td = tr.querySelector('td[data-col="' + col + '"]');
+      return td ? td.textContent : '';
+    };
+    var base = new Date(String(txt('startTime')).replace(' ', 'T'));
+    if (isNaN(base.getTime())) base = new Date(2026, 8, 22, 9, 58, 0);
+    var server = txt('serverId');
+    var rows = '';
+    for (var k = 0; k < hangCountOf(rowIdx); k++) {
+      var s = HANG_SAMPLE[k];
+      var t0 = new Date(base.getTime() + 1500 + k * 60000);
+      var t1 = new Date(t0.getTime() + s.cost);
+      rows += '<tr>' +
+        '<td>' + logStamp(t0) + '</td>' +
+        '<td>' + logStamp(t1) + '</td>' +
+        '<td class="num">' + (s.cost / 1000).toFixed(3) + '</td>' +
+        '<td class="log-cell">' + escHtml(logStamp(t0) + ' ' + server + ':' + s.start) + '</td>' +
+        '<td class="log-cell">' + escHtml(logStamp(t1) + ' ' + server + ':' + s.end) + '</td>' +
+        '</tr>';
+    }
+    $('hangTableBox').innerHTML = '<table class="grid" id="hangTable"><thead><tr>' +
+      '<th>开始行</th><th>结束行</th><th class="num">耗时</th><th>开始行日志</th><th>结束行日志</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+    $('hangModalSub').textContent = txt('ruleName') + ' · ' + txt('startTime') + ' · Hang × ' + hangCountOf(rowIdx);
+    $('hangModal').classList.add('open');
+    $('hangMask').classList.add('open');
+    $('hangModal').setAttribute('aria-hidden', 'false');
+  }
+  function closeHang() {
+    $('hangModal').classList.remove('open');
+    $('hangMask').classList.remove('open');
+    $('hangModal').setAttribute('aria-hidden', 'true');
+  }
+  $('btnHangClose').addEventListener('click', closeHang);
+  $('hangMask').addEventListener('click', closeHang);
+
   /* 进页面：折叠区按上次状态还原；Host IP 候选与是否收起无关，照旧先取 */
   setFold(store(FOLD_KEY) === '1');
   syncServer();
@@ -1013,7 +1092,7 @@
 {
   "schema": "annotated-prototype/spec@1",
   "title": "MES Rule 信息检索",
-  "summary": "三段式整页：上 = 查询条件区（12 项平铺 + 4 项折叠 + 1 个排序开关，装进 POST 的 parameters），中 = 结果列表（分页 + 列设置抽屉，列值一律取当前页出参），下 = 针对列表中选中行的操作按钮（Export、Rule Log、Full Log、可选列），另含 Rule Info Detail 弹窗（游标式按需加载）。接口口径依 01 文档 §5。",
+  "summary": "三段式整页：上 = 查询条件区（12 项平铺 + 4 项折叠 + 1 个排序开关，装进 POST 的 parameters），中 = 结果列表（分页 + 列设置抽屉，列值一律取当前页出参；末列 Server Hang 行内按钮），下 = 针对列表中选中行的操作按钮（Export、Rule Log、Full Log、可选列），另含 Rule Info Detail 弹窗（游标式按需加载）与 Server Hang 弹框。接口口径依 01 文档 §5。",
   "regions": [
     {
       "id": "search",
@@ -1044,6 +1123,12 @@
       "label": "Rule Info Detail 弹窗",
       "role": "detail",
       "desc": "全局搜索行 + 日志行滚动区（游标式按需加载）+ 底部全量下载、成因分析、退出"
+    },
+    {
+      "id": "hang",
+      "label": "Server Hang 弹框",
+      "role": "modal",
+      "desc": "该块全部 Server Hang List：开始行、结束行、耗时、开始行日志、结束行日志；按开始行时间正序；只有「关闭」"
     }
   ],
   "apis": [
@@ -1100,6 +1185,12 @@
       "method": "POST",
       "path": "/api/v1/rule_info/full_log",
       "desc": "按块涉及的全部文件还原、打包 zip 下载"
+    },
+    {
+      "id": "ruleInfoHangList",
+      "method": "GET",
+      "path": "/api/v1/rule_info/hang_list",
+      "desc": "Server Hang 弹框明细（该块全部 Hang，不分页）"
     }
   ],
   "controls": [
@@ -1329,7 +1420,7 @@
       "region": "查询条件区",
       "required": true,
       "param": "minCost",
-      "format": "0 ~ 999.99（秒，小数点后最多 2 位）",
+      "format": "0 ~ 99999.99（秒，小数点后最多 2 位）",
       "rules": [
         "单位秒；入参原样传秒，不做 ×1000 换算 —— 换算由后端做",
         "过滤：Min ≤ TOTAL_COST_MS ≤ Max（后端把秒换算成毫秒后与 TOTAL_COST_MS 比）",
@@ -1340,7 +1431,7 @@
         "进页面默认值 0"
       ],
       "apiNotes": [
-        "入参：`parameters.minCost`，原样传秒（值域 0 ~ 999.99）"
+        "入参：`parameters.minCost`，原样传秒（值域 0 ~ 99999.99）"
       ]
     },
     {
@@ -1350,7 +1441,7 @@
       "region": "查询条件区",
       "required": true,
       "param": "maxCost",
-      "format": "0 ~ 999.99（秒，小数点后最多 2 位）",
+      "format": "0 ~ 99999.99（秒，小数点后最多 2 位）",
       "rules": [
         "单位秒；入参原样传秒，不做 ×1000 换算 —— 换算由后端做",
         "即时校验：Max \u003c Min 判不合法",
@@ -1360,7 +1451,7 @@
         "进页面默认值 999"
       ],
       "apiNotes": [
-        "入参：`parameters.maxCost`，原样传秒（值域 0 ~ 999.99）"
+        "入参：`parameters.maxCost`，原样传秒（值域 0 ~ 99999.99）"
       ]
     },
     {
@@ -1424,7 +1515,7 @@
       "label": "重置",
       "region": "查询条件区",
       "rules": [
-        "条件区恢复进页面默认值：下拉与输入类清空；开始时间 = 当前时刻 − 1 小时、结束时间 = 当前时刻；Min 与 Max Cost Time = 0 与 999；Desc Time 关闭；User ID 维持置灰",
+        "条件区恢复进页面默认值：下拉与输入类清空；开始时间 = 当前时刻 − 1 小时、结束时间 = 当前时刻；Min 与 Max Cost Time = 0 与 999；Desc Time 关闭",
         "结果列表清空回到未查询态，Export、Rule Log、Full Log 三个按钮都不可用"
       ],
       "on": {
@@ -1468,14 +1559,15 @@
       "kind": "input",
       "label": "User ID",
       "region": "查询条件区",
-      "param": "userID",
-      "placeholder": "本期置灰",
-      "notes": [
-        "本期置灰、不可输入 —— 块文档未落 USERID 字段",
-        "结果列表的 User ID 列同样恒为空"
+      "param": "userId",
+      "placeholder": "EAP",
+      "rules": [
+        "单项值；精确比对（等值），命中块侧多值字段中任一即算",
+        "星号当普通字符处理，不做前缀语义、不拦",
+        "留空 = 不过滤"
       ],
       "apiNotes": [
-        "入参：`parameters.userID` 本期恒空"
+        "入参：`parameters.userId`，精确等值"
       ]
     },
     {
@@ -1568,14 +1660,38 @@
       "rules": [
         "按钮带数量，如 Hang (3)",
         "数量 > 0：按钮红色、可点击，打开 Server Hang 弹框；数量 ≤ 0：按钮置灰、不可点击",
-        "本期 Hang 未落库：按钮恒置灰、点不开；落库后按上一条启用"
+        "本期 Hang 未落库：按钮按「数量 ≤ 0」渲染（恒置灰、点不开）；落库后启用"
       ],
       "notes": [
         "列位置：列表最后一列，永远最后",
-        "落库后弹框内容 = 该块全部 Server Hang List，列按序为开始行、结束行、耗时、开始行日志、结束行日志；耗时按秒 3 位小数；开始行与结束行取该行的日志时间；按开始行时间正序；只有「关闭」一个按钮"
+        "数量 = page 出参 `contents[].hangCount`（HANG_LIST 长度）；列表不带 HANG_LIST 本体"
+      ],
+      "apis": [
+        "ruleInfoHangList"
       ],
       "apiNotes": [
-        "出参 `contents[]` 里没有 Server Hang 相关字段（该功能未落库），所以按钮本期恒置灰"
+        "点击打开弹框时调 GET /api/v1/rule_info/hang_list，入参 `id` = 该行的块 id（page 出参 `contents[].id`）",
+        "原型按落库后实态演示：部分行 hangCount > 0（红色可点开弹框）、其余行演示置灰态；本期未落库前线上恒置灰"
+      ]
+    },
+    {
+      "selector": "#hangModal",
+      "kind": "modal",
+      "label": "Server Hang 弹框",
+      "region": "Server Hang 弹框",
+      "rules": [
+        "列（按序）：开始行、结束行、耗时、开始行日志、结束行日志",
+        "开始行 / 结束行 = 该行的日志时间；开始行日志 / 结束行日志 = 该行的日志原文",
+        "耗时按秒、3 位小数；列表按开始行时间正序",
+        "按钮只有「关闭」一个",
+        "Hang Reason 列推后（接口已带回 hangReason 字段，弹框暂不展示）"
+      ],
+      "apis": [
+        "ruleInfoHangList"
+      ],
+      "apiNotes": [
+        "出参条目字段：startTime、endTime、hangCostMs、startLineLog、endLineLog、hangReason（推后不出列）、startLineId / endLineId（不出列，跳原文锚备用）",
+        "一个块内条数有限，不分页；按 startTime 升序原样输出"
       ]
     },
     {
@@ -1614,7 +1730,7 @@
         "ruleInfoDetail"
       ],
       "apiNotes": [
-        "入参：`id` = 该行的块 `_id`；首次调用 `lastInode` 与 `lastOffset` 留空",
+        "入参：`id` = 该行的块 `_id`；首次调用 `lastFingerprint` 与 `lastOffset` 留空",
         "失败时轻提示错误信息"
       ]
     },
@@ -1745,7 +1861,7 @@
       "region": "Rule Info Detail 弹窗",
       "rules": [
         "结构自上而下：全局搜索行、日志行滚动区、底部按钮（全量下载、成因分析、退出）",
-        "关闭后再打开，从头重新加载（`lastInode` 与 `lastOffset` 重新置空）",
+        "关闭后再打开，从头重新加载（`lastFingerprint` 与 `lastOffset` 重新置空）",
         "日志按原文一行一条显示，不做加工",
         "全局搜索只过滤已加载到前端的那部分日志行"
       ],
@@ -1755,7 +1871,7 @@
         ]
       },
       "apiNotes": [
-        "打开弹窗触发一次日志接口：入参 `id` = 该行块 _id，`lastInode` 与 `lastOffset` 留空"
+        "打开弹窗触发一次日志接口：入参 `id` = 该行块 _id，`lastFingerprint` 与 `lastOffset` 留空"
       ]
     },
     {
@@ -1779,10 +1895,10 @@
       "label": "日志行滚动区",
       "region": "Rule Info Detail 弹窗",
       "rules": [
-        "首次入参：`id` = 块 _id，`lastInode` 与 `lastOffset` 留空",
+        "首次入参：`id` = 块 _id，`lastFingerprint` 与 `lastOffset` 留空",
         "返回：`data.raw` = 本次日志原文（多行以换行符拼接成一个字符串），`data.finished` = 是否搜索完毕",
         "每批条数由后端定，前端不传",
-        "滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastInode` = 上次返回的 `inode`、`lastOffset` = 上次返回的 `offset`",
+        "滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastFingerprint` = 上次返回的 `fingerprint`、`lastOffset` = 上次返回的 `offset`",
         "新日志追加到最底部；加载中显示加载效果；全部取完后最底部显示「搜索完毕」",
         "日志原文一条一行；超过显示区宽度时自动换行，不横向滚动、不截断"
       ],
@@ -1790,7 +1906,8 @@
         "ruleInfoDetail"
       ],
       "apiNotes": [
-        "出参 `data.inode` 与 `data.offset` 是下一批的游标，原样回传给 `lastInode` 与 `lastOffset`"
+        "出参 `data.fingerprint` 与 `data.offset` 是下一批的游标，原样回传给 `lastFingerprint` 与 `lastOffset`",
+        "日志还原按 `LOG_FINGERPRINT` + `LOG_OFFSET` 两级排序（04 §5.2.4），游标用 (fingerprint, offset) 这一对"
       ]
     },
     {
@@ -1921,8 +2038,8 @@
         "key": "userId",
         "label": "User ID",
         "align": "left",
-        "format": "text",
-        "note": "块文档无对应字段，值恒为空"
+        "format": "multi",
+        "note": "USERID 多值：显示首值 + 角标"
       },
       {
         "key": "tid",
@@ -1984,10 +2101,10 @@
     "日志行示例取自真实块日志：格式为 MM/DD/YY HH:mm:ss.SS 加空格加 Server 名加冒号加日志原文；首行是原文样例，其余行按同一格式续写",
     "Export、Full Log、全量下载只弹轻提示，不产生真实文件下载",
     "列设置会真的增删列表列（静态列显隐 + EXEC_STATUS 与动态耗时列注入）；动态耗时列的取值由确定性算法模拟，真实页面取当前页出参 `costBreakDown[]` 里命中那条的 `summary`",
-    "Server Hang 本期未落库：行内按钮恒置灰、弹框在本原型中不出现（落库后的弹框内容见 Server Hang 行内按钮的标注）"
+    "Server Hang 原型按落库后实态演示：部分行 hangCount > 0（红色可点开弹框）、其余行演示置灰态；本期未落库前线上按钮恒置灰",
+    "Server Hang 弹框内容为本地模拟（耗时、开始/结束行时间由确定性算法生成）；真实数据来自 GET /api/v1/rule_info/hang_list 出参"
   ],
   "openQuestions": [
-    "Server Hang 落库的字段命名与形态未定（Server Hang Time 是单值还是多值、Hang Info 是否嵌套数组）→ 落库前按钮恒置灰、弹框不可打开",
     "Export 的导出接口文档未给出，当前按「前端生成 Excel」实现",
     "弹窗「成因分析」为后续 AI 分析预留，接口未定",
     "01 文档与 05 文档 §4.8 对时间区间口径不一致：01 为「开始 ≤ 结束、同分钟判合法」，05 为「开始 \u003c 结束、同分钟不合法」；本原型依 01"
@@ -2162,7 +2279,7 @@ const hotspots = [
       { type: "front", text: "清空后自动补 0" },
       { type: "front", text: "进页面默认值 0" },
       { type: "back", text: "值作为查询参数 `minCost` 随请求提交" },
-      { type: "back", text: "入参：`parameters.minCost`，原样传秒（值域 0 ~ 999.99）" }
+      { type: "back", text: "入参：`parameters.minCost`，原样传秒（值域 0 ~ 99999.99）" }
     ],
   },
   {
@@ -2176,7 +2293,7 @@ const hotspots = [
       { type: "front", text: "清空后自动补 999" },
       { type: "front", text: "进页面默认值 999" },
       { type: "back", text: "值作为查询参数 `maxCost` 随请求提交" },
-      { type: "back", text: "入参：`parameters.maxCost`，原样传秒（值域 0 ~ 999.99）" }
+      { type: "back", text: "入参：`parameters.maxCost`，原样传秒（值域 0 ~ 99999.99）" }
     ],
   },
   {
@@ -2223,7 +2340,7 @@ const hotspots = [
     selector: "#btnReset",
     title: "重置｜按钮",
     items: [
-      { type: "front", text: "条件区恢复进页面默认值：下拉与输入类清空；开始时间 = 当前时刻 − 1 小时、结束时间 = 当前时刻；Min 与 Max Cost Time = 0 与 999；Desc Time 关闭；User ID 维持置灰" },
+      { type: "front", text: "条件区恢复进页面默认值：下拉与输入类清空；开始时间 = 当前时刻 − 1 小时、结束时间 = 当前时刻；Min 与 Max Cost Time = 0 与 999；Desc Time 关闭" },
       { type: "front", text: "结果列表清空回到未查询态，Export、Rule Log、Full Log 三个按钮都不可用" },
       { type: "front", text: "点击：清空列表选中行" },
       { type: "front", text: "点击：不自动查询" },
@@ -2251,10 +2368,11 @@ const hotspots = [
     selector: "#userIdInput",
     title: "User ID｜输入框",
     items: [
-      { type: "front", text: "本期置灰、不可输入 —— 块文档未落 USERID 字段" },
-      { type: "front", text: "结果列表的 User ID 列同样恒为空" },
-      { type: "back", text: "值作为查询参数 `userID` 随请求提交" },
-      { type: "back", text: "入参：`parameters.userID` 本期恒空" }
+      { type: "front", text: "单项值；精确比对（等值），命中块侧多值字段中任一即算" },
+      { type: "front", text: "星号当普通字符处理，不做前缀语义、不拦" },
+      { type: "front", text: "留空 = 不过滤" },
+      { type: "back", text: "值作为查询参数 `userId` 随请求提交" },
+      { type: "back", text: "入参：`parameters.userId`，精确等值" }
     ],
   },
   {
@@ -2318,10 +2436,27 @@ const hotspots = [
     items: [
       { type: "front", text: "按钮带数量，如 Hang (3)" },
       { type: "front", text: "数量 > 0：按钮红色、可点击，打开 Server Hang 弹框；数量 ≤ 0：按钮置灰、不可点击" },
-      { type: "front", text: "本期 Hang 未落库：按钮恒置灰、点不开；落库后按上一条启用" },
+      { type: "front", text: "本期 Hang 未落库：按钮按「数量 ≤ 0」渲染（恒置灰、点不开）；落库后启用" },
       { type: "front", text: "列位置：列表最后一列，永远最后" },
-      { type: "front", text: "落库后弹框内容 = 该块全部 Server Hang List，列按序为开始行、结束行、耗时、开始行日志、结束行日志；耗时按秒 3 位小数；开始行与结束行取该行的日志时间；按开始行时间正序；只有「关闭」一个按钮" },
-      { type: "back", text: "出参 `contents[]` 里没有 Server Hang 相关字段（该功能未落库），所以按钮本期恒置灰" }
+      { type: "front", text: "数量 = page 出参 `contents[].hangCount`（HANG_LIST 长度）；列表不带 HANG_LIST 本体" },
+      { type: "back", text: "GET /api/v1/rule_info/hang_list —— Server Hang 弹框明细（该块全部 Hang，不分页）" },
+      { type: "back", text: "点击打开弹框时调 GET /api/v1/rule_info/hang_list，入参 `id` = 该行的块 id（page 出参 `contents[].id`）" },
+      { type: "back", text: "原型按落库后实态演示：部分行 hangCount > 0（红色可点开弹框）、其余行演示置灰态；本期未落库前线上恒置灰" }
+    ],
+  },
+  {
+    id: "hang-modal",
+    selector: "#hangModal",
+    title: "Server Hang 弹框｜弹窗",
+    items: [
+      { type: "front", text: "列（按序）：开始行、结束行、耗时、开始行日志、结束行日志" },
+      { type: "front", text: "开始行 / 结束行 = 该行的日志时间；开始行日志 / 结束行日志 = 该行的日志原文" },
+      { type: "front", text: "耗时按秒、3 位小数；列表按开始行时间正序" },
+      { type: "front", text: "按钮只有「关闭」一个" },
+      { type: "front", text: "Hang Reason 列推后（接口已带回 hangReason 字段，弹框暂不展示）" },
+      { type: "back", text: "GET /api/v1/rule_info/hang_list —— Server Hang 弹框明细（该块全部 Hang，不分页）" },
+      { type: "back", text: "出参条目字段：startTime、endTime、hangCostMs、startLineLog、endLineLog、hangReason（推后不出列）、startLineId / endLineId（不出列，跳原文锚备用）" },
+      { type: "back", text: "一个块内条数有限，不分页；按 startTime 升序原样输出" }
     ],
   },
   {
@@ -2346,7 +2481,7 @@ const hotspots = [
       { type: "front", text: "点击：用该行的块 _id 拉取日志，打开 Rule Info Detail 弹窗" },
       { type: "front", text: "前置条件：列表已选中一行" },
       { type: "back", text: "GET /api/v1/rule_info/detail —— Rule Info Detail 日志按游标分页" },
-      { type: "back", text: "入参：`id` = 该行的块 `_id`；首次调用 `lastInode` 与 `lastOffset` 留空" },
+      { type: "back", text: "入参：`id` = 该行的块 `_id`；首次调用 `lastFingerprint` 与 `lastOffset` 留空" },
       { type: "back", text: "失败时轻提示错误信息" }
     ],
   },
@@ -2432,11 +2567,11 @@ const hotspots = [
     title: "Rule Info Detail 弹窗｜弹窗",
     items: [
       { type: "front", text: "结构自上而下：全局搜索行、日志行滚动区、底部按钮（全量下载、成因分析、退出）" },
-      { type: "front", text: "关闭后再打开，从头重新加载（`lastInode` 与 `lastOffset` 重新置空）" },
+      { type: "front", text: "关闭后再打开，从头重新加载（`lastFingerprint` 与 `lastOffset` 重新置空）" },
       { type: "front", text: "日志按原文一行一条显示，不做加工" },
       { type: "front", text: "全局搜索只过滤已加载到前端的那部分日志行" },
       { type: "front", text: "进入页面：打开弹窗即按 `id` 拉第一批日志" },
-      { type: "back", text: "打开弹窗触发一次日志接口：入参 `id` = 该行块 _id，`lastInode` 与 `lastOffset` 留空" }
+      { type: "back", text: "打开弹窗触发一次日志接口：入参 `id` = 该行块 _id，`lastFingerprint` 与 `lastOffset` 留空" }
     ],
   },
   {
@@ -2454,14 +2589,15 @@ const hotspots = [
     selector: "#detailLogList",
     title: "日志行滚动区｜控件",
     items: [
-      { type: "front", text: "首次入参：`id` = 块 _id，`lastInode` 与 `lastOffset` 留空" },
+      { type: "front", text: "首次入参：`id` = 块 _id，`lastFingerprint` 与 `lastOffset` 留空" },
       { type: "front", text: "返回：`data.raw` = 本次日志原文（多行以换行符拼接成一个字符串），`data.finished` = 是否搜索完毕" },
       { type: "front", text: "每批条数由后端定，前端不传" },
-      { type: "front", text: "滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastInode` = 上次返回的 `inode`、`lastOffset` = 上次返回的 `offset`" },
+      { type: "front", text: "滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastFingerprint` = 上次返回的 `fingerprint`、`lastOffset` = 上次返回的 `offset`" },
       { type: "front", text: "新日志追加到最底部；加载中显示加载效果；全部取完后最底部显示「搜索完毕」" },
       { type: "front", text: "日志原文一条一行；超过显示区宽度时自动换行，不横向滚动、不截断" },
       { type: "back", text: "GET /api/v1/rule_info/detail —— Rule Info Detail 日志按游标分页" },
-      { type: "back", text: "出参 `data.inode` 与 `data.offset` 是下一批的游标，原样回传给 `lastInode` 与 `lastOffset`" }
+      { type: "back", text: "出参 `data.fingerprint` 与 `data.offset` 是下一批的游标，原样回传给 `lastFingerprint` 与 `lastOffset`" },
+      { type: "back", text: "日志还原按 `LOG_FINGERPRINT` + `LOG_OFFSET` 两级排序（04 §5.2.4），游标用 (fingerprint, offset) 这一对" }
     ],
   },
   {

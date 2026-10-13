@@ -33,3 +33,7 @@
 /docs/模块5-系统管理/*
 !/docs/模块5-系统管理/01-Server Hang Reason Config.md
 !/docs/模块5-系统管理/02-System Misc.md
+!/docs/模块1-日志检索与分析/prototype/MES-Rule实效分析-annotated-prototype.html
+!/docs/模块1-日志检索与分析/prototype/原始日志下载-annotated-prototype.html
+!/docs/模块1-日志检索与分析/prototype/build-02.mjs
+!/docs/模块1-日志检索与分析/prototype/build-03.mjs

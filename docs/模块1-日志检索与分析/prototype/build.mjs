@@ -3,13 +3,13 @@
  *
  * 设计依据：docs/模块1-日志检索与分析/01-MES Rule信息检索.md
  * 视觉令牌：docs/05-视觉与交互规范.md（AntD 5 语汇 · 高级绿 #2F7D5A · 圆角 6px）
- * 生成框架：~/.config/mimocode/skills/annotated-prototype（只替换 4 个占位符）
+ * 生成框架：~/.claude/skills/annotated-prototype（只替换 4 个占位符）
  *
  * 用法：node build.mjs
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildPrototype, writePrototype } from '/Users/xuejianming/.config/mimocode/skills/annotated-prototype/tests/lib/build.mjs';
+import { buildPrototype, writePrototype } from '/Users/xuejianming/.claude/skills/annotated-prototype/tests/lib/build.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(HERE, 'MES-Rule信息检索-annotated-prototype.html');
@@ -31,7 +31,7 @@ const COLUMNS = [
   { key: 'eqpId', label: 'EqpID', align: 'left', format: 'multi' },
   { key: 'lotId', label: 'Lot ID', align: 'left', format: 'multi' },
   { key: 'carrierId', label: 'Carrier ID', align: 'left', format: 'multi' },
-  { key: 'userId', label: 'User ID', align: 'left', format: 'text', note: '块文档无对应字段，值恒为空' },
+  { key: 'userId', label: 'User ID', align: 'left', format: 'multi', note: 'USERID 多值：显示首值 + 角标' },
   { key: 'tid', label: 'TID', align: 'left', format: 'multi' },
   { key: 'totalCostSec', label: 'Total Cost Time', align: 'right', format: 'duration-s' },
   { key: 'itemCostSec', label: 'Item Cost Summary', align: 'right', format: 'duration-s' },
@@ -46,11 +46,11 @@ const CALL_SYS = ['MCS', 'R2R', 'RMS', 'SPC', 'RTD'];
 const HOST_IPS = ['10.18.100.1', '10.18.100.2', '10.18.100.3'];
 
 const ROW_SEED = [
-  { env: 'PIRUN', hostIp: '10.18.100.1', ruleName: 'POST', requestType: 'Rule', eqp: ['ATTAL01', 'ATTAL02'], lot: ['A031178'], carrier: ['C1200317'], errCode: [] },
-  { env: 'PIRUN', hostIp: '10.18.100.2', ruleName: 'LOT_TRACK_IN', requestType: 'Rule', eqp: ['ATNC100'], lot: ['A031179', 'A031180'], carrier: ['C1200318'], errCode: ['E1024'] },
-  { env: 'PROD', hostIp: '10.18.100.3', ruleName: 'CARRIER_MOVE', requestType: 'Rule', eqp: ['ATTAL07'], lot: ['A031181'], carrier: ['C1200319'], errCode: [] },
-  { env: 'PROD', hostIp: '10.18.100.1', ruleName: 'TXN_PORTER_JOB', requestType: 'TXN', eqp: ['ATTAL08', 'ATTAL09'], lot: ['A031182'], carrier: ['C1200320'], errCode: ['E2201', 'E2202'] },
-  { env: 'PIRUN', hostIp: '10.18.100.2', ruleName: 'RECIPE_VERIFY', requestType: 'Rule', eqp: ['ATNC200'], lot: ['A031183'], carrier: [], errCode: [] },
+  { env: 'PIRUN', hostIp: '10.18.100.1', ruleName: 'POST', requestType: 'Rule', eqp: ['ATTAL01', 'ATTAL02'], lot: ['A031178'], carrier: ['C1200317'], errCode: [], user: ['EAP'] },
+  { env: 'PIRUN', hostIp: '10.18.100.2', ruleName: 'LOT_TRACK_IN', requestType: 'Rule', eqp: ['ATNC100'], lot: ['A031179', 'A031180'], carrier: ['C1200318'], errCode: ['E1024'], user: ['OP01', 'OP02'] },
+  { env: 'PROD', hostIp: '10.18.100.3', ruleName: 'CARRIER_MOVE', requestType: 'Rule', eqp: ['ATTAL07'], lot: ['A031181'], carrier: ['C1200319'], errCode: [], user: ['EAP'] },
+  { env: 'PROD', hostIp: '10.18.100.1', ruleName: 'TXN_PORTER_JOB', requestType: 'TXN', eqp: ['ATTAL08', 'ATTAL09'], lot: ['A031182'], carrier: ['C1200320'], errCode: ['E2201', 'E2202'], user: ['MCS'] },
+  { env: 'PIRUN', hostIp: '10.18.100.2', ruleName: 'RECIPE_VERIFY', requestType: 'Rule', eqp: ['ATNC200'], lot: ['A031183'], carrier: [], errCode: [], user: ['EAP', 'OP03'] },
 ];
 const SERVER_IDS = ['FABsrv.25', 'FABsrv.10', 'LISTsrv.3', 'QUERYsrv.7', 'IDEsrv.2', 'XSITEsrv.1'];
 
@@ -72,11 +72,13 @@ const ROWS = Array.from({ length: 20 }, (_, i) => {
     ruleResult: i === 4 || i === 12 ? 'CANCELRULE' : i === 7 ? 'RETRY' : 'PASS',
     startTime: stamp(t0),
     endTime: stamp(t1),
-    userId: '',
+    userId: seed.user,
     tid: `2026092209${pad(58 - i % 30)}${pad((i * 7) % 60)}.${pad((i * 137) % 1000, 3)}-${pad(i + 1, 4)}`,
     totalMs,
     itemMs,
     unaccountedMs: totalMs - itemMs,
+    /* hangCount = page 出参 HANG_LIST 长度；演示用：3 行 > 0（红、可点开弹框），其余 = 0（置灰） */
+    hangCount: i % 7 === 3 ? 2 + (i % 2) : 0,
   };
 });
 
@@ -188,6 +190,8 @@ const STYLES = `
   .row-radio{width:14px;height:14px;accent-color:var(--p);cursor:pointer;vertical-align:middle;}
   .hang-btn{font:inherit;font-size:12px;height:24px;padding:0 8px;border-radius:var(--r-sm);
     color:var(--t3);background:var(--fill);border:1px solid var(--bd);cursor:not-allowed;}
+  .hang-btn.hot{color:#fff;background:var(--err);border-color:var(--err);cursor:pointer;}
+  .hang-btn.hot:hover{background:#ff7875;border-color:#ff7875;}
   .table-overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;
     gap:10px;font-size:13px;color:var(--t2);background:rgba(255,255,255,.72);}
   .spinner{width:16px;height:16px;border-radius:50%;border:2px solid rgba(47,125,90,.25);
@@ -252,6 +256,11 @@ const STYLES = `
   .log-note{padding:6px 16px;font-family:inherit;font-size:12px;color:var(--t3);text-align:center;}
   .modal-foot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--split);}
   .modal-foot .spacer{flex:1;}
+  /* Server Hang 弹框：日志列换行显示，不横向滚动 */
+  .hang-wrap{flex:1;min-height:220px;max-height:60vh;overflow:auto;border-bottom:1px solid var(--split);}
+  .hang-wrap table.grid td{white-space:normal;vertical-align:top;height:auto;padding:8px 12px;}
+  .hang-wrap .log-cell{font-family:var(--mono);font-size:12px;line-height:18px;overflow-wrap:anywhere;
+    min-width:220px;max-width:420px;}
   .toast{position:fixed;top:16px;left:50%;z-index:11000;padding:9px 16px;font-size:13px;color:var(--t1);
     background:#fff;border:1px solid var(--bd);border-radius:var(--r);opacity:0;pointer-events:none;
     transform:translate(-50%,-12px);box-shadow:0 8px 24px -8px rgba(0,0,0,.3);
@@ -294,7 +303,10 @@ const cell = (col, r) => {
     case 'totalCostSec': return sec(r.totalMs);
     case 'itemCostSec': return sec(r.itemMs);
     case 'unaccountedSec': return sec(r.unaccountedMs);
-    case 'serverHang': return '<button class="hang-btn" disabled>Hang (0)</button>';
+    case 'userId': return multi(r.userId);
+    case 'serverHang': return r.hangCount > 0
+      ? `<button class="hang-btn hot" type="button" data-hang-row="${r.idx}">Hang (${r.hangCount})</button>`
+      : '<button class="hang-btn" type="button" disabled>Hang (0)</button>';
     default: return r[col.key];
   }
 };
@@ -461,14 +473,14 @@ const PAGE_SCRIPT = `
     $(pair[0]).addEventListener('input', function () { checkStar(pair[0], pair[1]); });
   });
 
-  /* 即时校验：Min / Max Cost Time（单位秒，发请求时 × 1000） */
+  /* 即时校验：Min / Max Cost Time（单位秒，入参原样传秒，换算由后端做） */
   function checkCost() {
     var ok = true;
     var min = $('minCostInput').value.trim(), max = $('maxCostInput').value.trim();
-    var form = /^\\d{1,3}(\\.\\d{1,2})?$/;
-    if (!form.test(min) || Number(min) > 999.99) { setErr('minCostInput', '取值 0 ~ 999.99（秒，最多 2 位小数）'); ok = false; }
+    var form = /^\\d{1,5}(\\.\\d{1,2})?$/;
+    if (!form.test(min) || Number(min) > 99999.99) { setErr('minCostInput', '取值 0 ~ 99999.99（秒，最多 2 位小数）'); ok = false; }
     else setErr('minCostInput', '');
-    if (!form.test(max) || Number(max) > 999.99) { setErr('maxCostInput', '取值 0 ~ 999.99（秒，最多 2 位小数）'); ok = false; }
+    if (!form.test(max) || Number(max) > 99999.99) { setErr('maxCostInput', '取值 0 ~ 99999.99（秒，最多 2 位小数）'); ok = false; }
     else setErr('maxCostInput', '');
     if (ok && Number(min) > Number(max)) { setErr('maxCostInput', 'Max Cost Time 不能小于 Min Cost Time'); ok = false; }
     return ok;
@@ -521,6 +533,8 @@ const PAGE_SCRIPT = `
     syncActions();
   }
   tbody.addEventListener('click', function (ev) {
+    var hangBtn = ev.target.closest ? ev.target.closest('.hang-btn.hot') : null;
+    if (hangBtn) { openHang(Number(hangBtn.getAttribute('data-hang-row'))); return; }
     var tr = ev.target.closest ? ev.target.closest('tr') : null;
     if (!tr) return;
     setSelection(tr.classList.contains('selected') ? null : tr);
@@ -550,7 +564,7 @@ const PAGE_SCRIPT = `
 
   $('btnReset').addEventListener('click', function () {
     ['envSelect', 'serverCategorySelect', 'serverNumberInput', 'ruleNameInput', 'tidInput',
-      'eqpInput', 'carrierInput', 'lotInput'].forEach(function (id) { $(id).value = ''; });
+      'eqpInput', 'carrierInput', 'lotInput', 'userIdInput'].forEach(function (id) { $(id).value = ''; });
     $('startTimeInput').value = DEF.start;
     $('endTimeInput').value = DEF.end;
     $('minCostInput').value = DEF.min;
@@ -775,6 +789,63 @@ const PAGE_SCRIPT = `
     toast('已下载该块全部日志 → RuleLog_FABsrv.1_20260922100012.log');
   });
 
+  /* Server Hang 弹框：内容 = 10 号接口出参（本地模拟），按开始行时间正序；只有「关闭」 */
+  var HANG_SAMPLE = [
+    { start: 'FWLockMgr:acquire lock object CARRIER key="C1200317" timeout=30000ms',
+      end: 'FWLockMgr:lock object CARRIER acquired key="C1200317"', cost: 31250 },
+    { start: 'FWLockMgr:acquire lock object EQP key="ATTAL01" timeout=30000ms',
+      end: 'FWLockMgr:lock object EQP acquired key="ATTAL01"', cost: 45380 },
+    { start: 'FwTxnSender:wait ack subject="FWCarrierMove" target=MCS timeout=60000ms',
+      end: 'FwTxnSender:ack received subject="FWCarrierMove"', cost: 60120 },
+  ];
+  function hangCountOf(rowIdx) { var i = rowIdx - 1; return i % 7 === 3 ? 2 + (i % 2) : 0; }
+  function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function logStamp(d) {
+    var z = function (n) { return (n < 10 ? '0' : '') + n; };
+    var cs = ('0' + Math.floor(d.getMilliseconds() / 10)).slice(-2);
+    return z(d.getMonth() + 1) + '/' + z(d.getDate()) + '/' + String(d.getFullYear()).slice(-2) + ' ' +
+      z(d.getHours()) + ':' + z(d.getMinutes()) + ':' + z(d.getSeconds()) + '.' + cs;
+  }
+  function openHang(rowIdx) {
+    var tr = document.querySelector('tr[data-row="' + rowIdx + '"]');
+    var txt = function (col) {
+      var td = tr.querySelector('td[data-col="' + col + '"]');
+      return td ? td.textContent : '';
+    };
+    var base = new Date(String(txt('startTime')).replace(' ', 'T'));
+    if (isNaN(base.getTime())) base = new Date(2026, 8, 22, 9, 58, 0);
+    var server = txt('serverId');
+    var rows = '';
+    for (var k = 0; k < hangCountOf(rowIdx); k++) {
+      var s = HANG_SAMPLE[k];
+      var t0 = new Date(base.getTime() + 1500 + k * 60000);
+      var t1 = new Date(t0.getTime() + s.cost);
+      rows += '<tr>' +
+        '<td>' + logStamp(t0) + '</td>' +
+        '<td>' + logStamp(t1) + '</td>' +
+        '<td class="num">' + (s.cost / 1000).toFixed(3) + '</td>' +
+        '<td class="log-cell">' + escHtml(logStamp(t0) + ' ' + server + ':' + s.start) + '</td>' +
+        '<td class="log-cell">' + escHtml(logStamp(t1) + ' ' + server + ':' + s.end) + '</td>' +
+        '</tr>';
+    }
+    $('hangTableBox').innerHTML = '<table class="grid" id="hangTable"><thead><tr>' +
+      '<th>开始行</th><th>结束行</th><th class="num">耗时</th><th>开始行日志</th><th>结束行日志</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+    $('hangModalSub').textContent = txt('ruleName') + ' · ' + txt('startTime') + ' · Hang × ' + hangCountOf(rowIdx);
+    $('hangModal').classList.add('open');
+    $('hangMask').classList.add('open');
+    $('hangModal').setAttribute('aria-hidden', 'false');
+  }
+  function closeHang() {
+    $('hangModal').classList.remove('open');
+    $('hangMask').classList.remove('open');
+    $('hangModal').setAttribute('aria-hidden', 'true');
+  }
+  $('btnHangClose').addEventListener('click', closeHang);
+  $('hangMask').addEventListener('click', closeHang);
+
   /* 进页面：折叠区按上次状态还原；Host IP 候选与是否收起无关，照旧先取 */
   setFold(store(FOLD_KEY) === '1');
   syncServer();
@@ -823,7 +894,7 @@ ${field('maxCostInput', 'Max Cost Time', input('maxCostInput', '999', '999'), { 
 
   <div class="filters fold" id="foldPanel" hidden>
 ${field('hostIpSelect', 'Host IP', select('hostIpSelect', HOST_IPS))}
-${field('userIdInput', 'User ID', '<input class="input" id="userIdInput" type="text" value="" placeholder="本期置灰" disabled>')}
+${field('userIdInput', 'User ID', input('userIdInput', '', 'EAP'))}
 ${field('errorCodeInput', 'Error Code', input('errorCodeInput', '', 'E1024'), { err: true })}
 ${field('ruleResultSelect', 'Rule Result', select('ruleResultSelect', ['PASS', 'CANCELRULE']))}
   </div>
@@ -929,6 +1000,19 @@ ${chips(CALL_SYS)}
   </div>
 </div>
 
+<div class="mask" id="hangMask"></div>
+<div class="modal" id="hangModal" role="dialog" aria-hidden="true">
+  <div class="modal-head">
+    <h3>Server Hang List</h3>
+    <span class="modal-sub" id="hangModalSub"></span>
+  </div>
+  <div class="hang-wrap" id="hangTableBox"></div>
+  <div class="modal-foot">
+    <span class="spacer"></span>
+    <button class="btn" id="btnHangClose" type="button">关闭</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -949,14 +1033,15 @@ const spec = {
   schema: SKILL,
   title: 'MES Rule 信息检索',
   summary: '三段式整页：上 = 查询条件区（12 项平铺 + 4 项折叠 + 1 个排序开关，装进 POST 的 parameters），' +
-    '中 = 结果列表（分页 + 列设置抽屉，列值一律取当前页出参），下 = 针对列表中选中行的操作按钮（Export、Rule Log、Full Log、可选列），' +
-    '另含 Rule Info Detail 弹窗（游标式按需加载）。接口口径依 01 文档 §5。',
+    '中 = 结果列表（分页 + 列设置抽屉，列值一律取当前页出参；末列 Server Hang 行内按钮），下 = 针对列表中选中行的操作按钮（Export、Rule Log、Full Log、可选列），' +
+    '另含 Rule Info Detail 弹窗（游标式按需加载）与 Server Hang 弹框。接口口径依 01 文档 §5。',
   regions: [
     { id: 'search', label: '查询条件区', role: 'search', desc: '平铺 12 项 + 排序开关共 13 格，每行 5 个 → 5 / 5 / 3；折叠区 4 项默认收起；末尾一行放折叠开关与 Search、重置' },
     { id: 'list', label: '结果列表区', role: 'table', desc: '分页列表 + 分页组件；默认每页 20 条（档位 20、50、100），总条数取出参 total' },
     { id: 'actions', label: '底部操作区', role: 'actions', desc: 'Export、Rule Log、Full Log、可选列' },
     { id: 'drawer', label: '列设置抽屉', role: 'drawer', desc: '可隐藏三列与 EXEC_STATUS 的显隐、Lock Object 与 Call Sys 两个多选；确认后按当前页出参就地重渲染列' },
     { id: 'detail', label: 'Rule Info Detail 弹窗', role: 'detail', desc: '全局搜索行 + 日志行滚动区（游标式按需加载）+ 底部全量下载、成因分析、退出' },
+    { id: 'hang', label: 'Server Hang 弹框', role: 'modal', desc: '该块全部 Server Hang List：开始行、结束行、耗时、开始行日志、结束行日志；按开始行时间正序；只有「关闭」' },
   ],
   apis: [
     { id: 'envList', method: 'GET', path: '/api/v1/env/list', desc: 'Environment 候选' },
@@ -968,6 +1053,7 @@ const spec = {
     { id: 'ruleInfoPage', method: 'POST', path: '/api/v1/rule_info/page', desc: '结果分页查询' },
     { id: 'ruleInfoDetail', method: 'GET', path: '/api/v1/rule_info/detail', desc: 'Rule Info Detail 日志按游标分页' },
     { id: 'ruleInfoFullLog', method: 'POST', path: '/api/v1/rule_info/full_log', desc: '按块涉及的全部文件还原、打包 zip 下载' },
+    { id: 'ruleInfoHangList', method: 'GET', path: '/api/v1/rule_info/hang_list', desc: 'Server Hang 弹框明细（该块全部 Hang，不分页）' },
   ],
   controls: [
     {
@@ -1065,7 +1151,7 @@ const spec = {
     },
     {
       selector: '#minCostInput', kind: 'input', label: 'Min Cost Time', region: '查询条件区',
-      required: true, param: 'minCost', format: '0 ~ 999.99（秒，小数点后最多 2 位）',
+      required: true, param: 'minCost', format: '0 ~ 99999.99（秒，小数点后最多 2 位）',
       rules: [
         '单位秒；入参原样传秒，不做 ×1000 换算 —— 换算由后端做',
         '过滤：Min ≤ TOTAL_COST_MS ≤ Max（后端把秒换算成毫秒后与 TOTAL_COST_MS 比）',
@@ -1073,18 +1159,18 @@ const spec = {
         '清空后自动补 0',
       ],
       notes: ['进页面默认值 0'],
-      apiNotes: ['入参：`parameters.minCost`，原样传秒（值域 0 ~ 999.99）'],
+      apiNotes: ['入参：`parameters.minCost`，原样传秒（值域 0 ~ 99999.99）'],
     },
     {
       selector: '#maxCostInput', kind: 'input', label: 'Max Cost Time', region: '查询条件区',
-      required: true, param: 'maxCost', format: '0 ~ 999.99（秒，小数点后最多 2 位）',
+      required: true, param: 'maxCost', format: '0 ~ 99999.99（秒，小数点后最多 2 位）',
       rules: [
         '单位秒；入参原样传秒，不做 ×1000 换算 —— 换算由后端做',
         '即时校验：Max < Min 判不合法',
         '清空后自动补 999',
       ],
       notes: ['进页面默认值 999'],
-      apiNotes: ['入参：`parameters.maxCost`，原样传秒（值域 0 ~ 999.99）'],
+      apiNotes: ['入参：`parameters.maxCost`，原样传秒（值域 0 ~ 99999.99）'],
     },
     {
       selector: '#descTimeToggle', kind: 'toggle', label: '排序开关 Desc Time', region: '查询条件区',
@@ -1118,7 +1204,7 @@ const spec = {
     {
       selector: '#btnReset', kind: 'button', label: '重置', region: '查询条件区',
       rules: [
-        '条件区恢复进页面默认值：下拉与输入类清空；开始时间 = 当前时刻 − 1 小时、结束时间 = 当前时刻；Min 与 Max Cost Time = 0 与 999；Desc Time 关闭；User ID 维持置灰',
+        '条件区恢复进页面默认值：下拉与输入类清空；开始时间 = 当前时刻 − 1 小时、结束时间 = 当前时刻；Min 与 Max Cost Time = 0 与 999；Desc Time 关闭',
         '结果列表清空回到未查询态，Export、Rule Log、Full Log 三个按钮都不可用',
       ],
       on: { click: ['清空列表选中行', '不自动查询'] },
@@ -1137,9 +1223,9 @@ const spec = {
     },
     {
       selector: '#userIdInput', kind: 'input', label: 'User ID', region: '查询条件区',
-      param: 'userID', placeholder: '本期置灰',
-      notes: ['本期置灰、不可输入 —— 块文档未落 USERID 字段', '结果列表的 User ID 列同样恒为空'],
-      apiNotes: ['入参：`parameters.userID` 本期恒空'],
+      param: 'userId', placeholder: 'EAP',
+      rules: ['单项值；精确比对（等值），命中块侧多值字段中任一即算', '星号当普通字符处理，不做前缀语义、不拦', '留空 = 不过滤'],
+      apiNotes: ['入参：`parameters.userId`，精确等值'],
     },
     {
       selector: '#errorCodeInput', kind: 'input', label: 'Error Code', region: '查询条件区',
@@ -1184,10 +1270,29 @@ const spec = {
       rules: [
         '按钮带数量，如 Hang (3)',
         '数量 > 0：按钮红色、可点击，打开 Server Hang 弹框；数量 ≤ 0：按钮置灰、不可点击',
-        '本期 Hang 未落库：按钮恒置灰、点不开；落库后按上一条启用',
+        '本期 Hang 未落库：按钮按「数量 ≤ 0」渲染（恒置灰、点不开）；落库后启用',
       ],
-      notes: ['列位置：列表最后一列，永远最后', '落库后弹框内容 = 该块全部 Server Hang List，列按序为开始行、结束行、耗时、开始行日志、结束行日志；耗时按秒 3 位小数；开始行与结束行取该行的日志时间；按开始行时间正序；只有「关闭」一个按钮'],
-      apiNotes: ['出参 `contents[]` 里没有 Server Hang 相关字段（该功能未落库），所以按钮本期恒置灰'],
+      notes: ['列位置：列表最后一列，永远最后', '数量 = page 出参 `contents[].hangCount`（HANG_LIST 长度）；列表不带 HANG_LIST 本体'],
+      apis: ['ruleInfoHangList'],
+      apiNotes: [
+        '点击打开弹框时调 GET /api/v1/rule_info/hang_list，入参 `id` = 该行的块 id（page 出参 `contents[].id`）',
+        '原型按落库后实态演示：部分行 hangCount > 0（红色可点开弹框）、其余行演示置灰态；本期未落库前线上恒置灰',
+      ],
+    },
+    {
+      selector: '#hangModal', kind: 'modal', label: 'Server Hang 弹框', region: 'Server Hang 弹框',
+      rules: [
+        '列（按序）：开始行、结束行、耗时、开始行日志、结束行日志',
+        '开始行 / 结束行 = 该行的日志时间；开始行日志 / 结束行日志 = 该行的日志原文',
+        '耗时按秒、3 位小数；列表按开始行时间正序',
+        '按钮只有「关闭」一个',
+        'Hang Reason 列推后（接口已带回 hangReason 字段，弹框暂不展示）',
+      ],
+      apis: ['ruleInfoHangList'],
+      apiNotes: [
+        '出参条目字段：startTime、endTime、hangCostMs、startLineLog、endLineLog、hangReason（推后不出列）、startLineId / endLineId（不出列，跳原文锚备用）',
+        '一个块内条数有限，不分页；按 startTime 升序原样输出',
+      ],
     },
     {
       selector: '#btnExport', kind: 'button', label: 'Export', region: '底部操作区',
@@ -1206,7 +1311,7 @@ const spec = {
       rules: ['选中一行时可用；取消选中则不可用'],
       on: { click: ['用该行的块 _id 拉取日志，打开 Rule Info Detail 弹窗'] },
       apis: ['ruleInfoDetail'],
-      apiNotes: ['入参：`id` = 该行的块 `_id`；首次调用 `lastInode` 与 `lastOffset` 留空', '失败时轻提示错误信息'],
+      apiNotes: ['入参：`id` = 该行的块 `_id`；首次调用 `lastFingerprint` 与 `lastOffset` 留空', '失败时轻提示错误信息'],
     },
     {
       selector: '#btnFullLog', kind: 'button', label: 'Full Log', region: '底部操作区',
@@ -1274,12 +1379,12 @@ const spec = {
       selector: '#detailModal', kind: 'modal', label: 'Rule Info Detail 弹窗', region: 'Rule Info Detail 弹窗',
       rules: [
         '结构自上而下：全局搜索行、日志行滚动区、底部按钮（全量下载、成因分析、退出）',
-        '关闭后再打开，从头重新加载（`lastInode` 与 `lastOffset` 重新置空）',
+        '关闭后再打开，从头重新加载（`lastFingerprint` 与 `lastOffset` 重新置空）',
         '日志按原文一行一条显示，不做加工',
         '全局搜索只过滤已加载到前端的那部分日志行',
       ],
       on: { load: ['打开弹窗即按 `id` 拉第一批日志'] },
-      apiNotes: ['打开弹窗触发一次日志接口：入参 `id` = 该行块 _id，`lastInode` 与 `lastOffset` 留空'],
+      apiNotes: ['打开弹窗触发一次日志接口：入参 `id` = 该行块 _id，`lastFingerprint` 与 `lastOffset` 留空'],
     },
     {
       selector: '#detailSearch', kind: 'input', label: '全局搜索行', region: 'Rule Info Detail 弹窗',
@@ -1290,15 +1395,18 @@ const spec = {
     {
       selector: '#detailLogList', kind: 'other', label: '日志行滚动区', region: 'Rule Info Detail 弹窗',
       rules: [
-        '首次入参：`id` = 块 _id，`lastInode` 与 `lastOffset` 留空',
+        '首次入参：`id` = 块 _id，`lastFingerprint` 与 `lastOffset` 留空',
         '返回：`data.raw` = 本次日志原文（多行以换行符拼接成一个字符串），`data.finished` = 是否搜索完毕',
         '每批条数由后端定，前端不传',
-        '滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastInode` = 上次返回的 `inode`、`lastOffset` = 上次返回的 `offset`',
+        '滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastFingerprint` = 上次返回的 `fingerprint`、`lastOffset` = 上次返回的 `offset`',
         '新日志追加到最底部；加载中显示加载效果；全部取完后最底部显示「搜索完毕」',
         '日志原文一条一行；超过显示区宽度时自动换行，不横向滚动、不截断',
       ],
       apis: ['ruleInfoDetail'],
-      apiNotes: ['出参 `data.inode` 与 `data.offset` 是下一批的游标，原样回传给 `lastInode` 与 `lastOffset`'],
+      apiNotes: [
+        '出参 `data.fingerprint` 与 `data.offset` 是下一批的游标，原样回传给 `lastFingerprint` 与 `lastOffset`',
+        '日志还原按 `LOG_FINGERPRINT` + `LOG_OFFSET` 两级排序（04 §5.2.4），游标用 (fingerprint, offset) 这一对',
+      ],
     },
     {
       selector: '#btnFullDownload', kind: 'button', label: '全量下载', region: 'Rule Info Detail 弹窗',
@@ -1334,10 +1442,10 @@ const spec = {
     '日志行示例取自真实块日志：格式为 MM/DD/YY HH:mm:ss.SS 加空格加 Server 名加冒号加日志原文；首行是原文样例，其余行按同一格式续写',
     'Export、Full Log、全量下载只弹轻提示，不产生真实文件下载',
     '列设置会真的增删列表列（静态列显隐 + EXEC_STATUS 与动态耗时列注入）；动态耗时列的取值由确定性算法模拟，真实页面取当前页出参 `costBreakDown[]` 里命中那条的 `summary`',
-    'Server Hang 本期未落库：行内按钮恒置灰、弹框在本原型中不出现（落库后的弹框内容见 Server Hang 行内按钮的标注）',
+    'Server Hang 原型按落库后实态演示：部分行 hangCount > 0（红色可点开弹框）、其余行演示置灰态；本期未落库前线上按钮恒置灰',
+    'Server Hang 弹框内容为本地模拟（耗时、开始/结束行时间由确定性算法生成）；真实数据来自 GET /api/v1/rule_info/hang_list 出参',
   ],
   openQuestions: [
-    'Server Hang 落库的字段命名与形态未定（Server Hang Time 是单值还是多值、Hang Info 是否嵌套数组）→ 落库前按钮恒置灰、弹框不可打开',
     'Export 的导出接口文档未给出，当前按「前端生成 Excel」实现',
     '弹窗「成因分析」为后续 AI 分析预留，接口未定',
     '01 文档与 05 文档 §4.8 对时间区间口径不一致：01 为「开始 ≤ 结束、同分钟判合法」，05 为「开始 < 结束、同分钟不合法」；本原型依 01',
