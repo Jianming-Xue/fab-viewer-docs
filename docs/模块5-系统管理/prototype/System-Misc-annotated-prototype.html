@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>System Misc · 全局配置</title>
+<style>
+  /* ============================================================
+     框架样式（固定，勿改）
+     ============================================================ */
+  * { box-sizing: border-box; }
+  :root{
+    --accent:#e5484d;
+    --front:#2563eb;
+    --back:#d97706;
+    --ink:#1a1d21;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --bg:#f4f5f7;
+    --note-bg:#fdf6d8;
+    --note-line:#e8dcae;
+    --note-ink:#4a3f1e;
+    /* 布局钩子：内容区最大宽度。页面可在「页面功能自身样式」区块里按需覆盖
+       （宽表格、多列表单必须放宽），默认值不变以保持既有页面视觉。 */
+    --stage-max:760px;
+  }
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--ink);
+    background:radial-gradient(1200px 600px at 50% -10%,#fff 0%,transparent 60%),var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* 原型内容区 */
+  .stage{
+    max-width:var(--stage-max);
+    margin:48px auto;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:48px;
+    box-shadow:0 1px 2px rgba(16,24,40,.04),0 12px 32px -8px rgba(16,24,40,.10);
+  }
+
+  /* 热区框选：与 .anno / #lines 一样用视口坐标系（position:fixed），
+     这样无论页面滚到哪里，红框都不会漂移 */
+  .hotspot{
+    position:fixed;
+    border:3px solid transparent;
+    border-radius:8px;
+    transition:border-color .14s,box-shadow .14s,opacity .14s;
+    pointer-events:none;
+    opacity:0;
+    z-index:2147483000;   /* 压过所有业务弹窗 */
+  }
+  .hotspot.active{
+    border-color:var(--accent);
+    box-shadow:0 0 0 4px rgba(229,72,77,.12),0 0 24px -4px rgba(229,72,77,.40);
+    opacity:1;
+  }
+
+  /* 引线层 */
+  #lines{
+    position:fixed; inset:0;
+    pointer-events:none;
+    z-index:2147483001;
+    overflow:visible;
+  }
+
+  /* 标注框：文档黄底 */
+  .anno{
+    position:fixed;
+    z-index:2147483002;
+    width:250px;
+    background:var(--note-bg);
+    border:1px solid var(--note-line);
+    border-radius:12px; overflow:hidden;
+    box-shadow:
+      0 1px 2px rgba(120,100,30,.10),
+      0 16px 40px -12px rgba(120,100,30,.35);
+    opacity:0; transform:translateY(6px) scale(.98);
+    transition:opacity .16s ease,transform .16s ease;
+    pointer-events:none;
+  }
+  .anno.show{opacity:1; transform:translateY(0) scale(1);}
+  .anno .head{
+    display:flex; align-items:center; gap:8px;
+    padding:12px 16px;
+    background:linear-gradient(180deg,#fef9e2,#fbf1c9);
+    border-bottom:1px solid var(--note-line);
+  }
+  .anno .dot{
+    width:8px;height:8px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 0 4px rgba(229,72,77,.16);flex:0 0 auto;
+  }
+  .anno h4{margin:0;font-size:13px;font-weight:700;color:#5a4a12;}
+  .anno .body{padding:10px 14px 14px;}
+  .anno .item{
+    display:flex;gap:8px;font-size:12.5px;line-height:1.55;padding:4px 0;
+    color:var(--note-ink);
+  }
+  .anno .item+.item{border-top:1px dashed rgba(180,160,90,.35);}
+  .anno .tag{
+    flex:0 0 auto;height:18px;padding:0 6px;border-radius:5px;
+    font-size:10.5px;font-weight:700;line-height:18px;margin-top:1px;
+  }
+  .anno .item.front .tag{color:#1d4ed8;background:rgba(37,99,235,.16);}
+  .anno .item.back .tag{color:#9a5b00;background:rgba(217,119,6,.20);}
+  .anno .item.front .txt{color:#3f3a1e;}
+  .anno .item.back  .txt{color:#5a4a12;}
+
+  /* 浮动开关 */
+  #toggle{
+    position:fixed; top:20px; right:20px;
+    z-index:2147483003;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:9px 16px; font-size:13px; font-weight:600; color:var(--ink);
+    background:rgba(255,255,255,.88); backdrop-filter:blur(10px);
+    border:1px solid var(--line); border-radius:999px; cursor:pointer;
+    box-shadow:0 6px 18px -8px rgba(16,24,40,.25);
+    transition:box-shadow .15s,transform .12s;
+  }
+  #toggle:hover{box-shadow:0 10px 24px -8px rgba(16,24,40,.35);}
+  #toggle:active{transform:translateY(1px);}
+  #toggle .led{
+    width:8px;height:8px;border-radius:50%;background:#cbd5e1;
+    box-shadow:0 0 0 3px rgba(148,163,184,.18);
+    transition:background .15s,box-shadow .15s;
+  }
+  #toggle.on .led{
+    background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.20);
+  }
+
+  /* ============================================================
+     以下为页面功能自身样式（AI 生成时填充）
+     ============================================================ */
+  :root{
+    --stage-max:1280px;
+    /* 页面自有令牌（05-视觉与交互规范） */
+    --p:#2f7d5a; --p-hover:#3a9169; --p-bg:#eaf4ef;
+    --err:#ff4d4f; --err-bg:#fff1f0; --warn:#faad14;
+    --t1:rgba(0,0,0,.88); --t2:rgba(0,0,0,.65); --t3:rgba(0,0,0,.45);
+    --bd:#d9d9d9; --split:rgba(0,0,0,.06); --fill:#fafafa;
+    --r:6px; --r-sm:4px; --r-lg:8px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  .page-head{margin:0 0 20px;}
+  [hidden]{display:none!important;}
+  .crumb{font-size:12px;color:var(--t3);margin-bottom:6px;}
+  .page-head h1{margin:0 0 6px;font-size:20px;font-weight:600;}
+  .page-head .sub{margin:0;font-size:12.5px;color:var(--t2);}
+
+  /* 左右布局：左 = Category 窄列表，右 = 原三区 */
+  .layout{display:grid;grid-template-columns:168px minmax(0,1fr);gap:16px;align-items:start;}
+  .cat-card{border:1px solid var(--bd);border-radius:var(--r-lg);background:#fff;overflow:hidden;}
+  .cat-head{padding:10px 12px;font-size:12.5px;font-weight:600;color:var(--t2);
+    background:var(--fill);border-bottom:1px solid var(--split);}
+  .cat-list{list-style:none;margin:0;padding:4px 0;}
+  .cat-list li{padding:7px 12px;font-size:13px;color:var(--t2);cursor:pointer;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:2px solid transparent;}
+  .cat-list li:hover{background:var(--fill);}
+  .cat-list li.active{color:var(--p);background:var(--p-bg);border-left-color:var(--p);font-weight:600;}
+  .cat-list li.all-item{border-bottom:1px solid var(--split);margin-bottom:4px;}
+
+  .card{border:1px solid var(--bd);border-radius:var(--r-lg);background:#fff;margin:0 0 16px;}
+  .card-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--split);}
+  .card-head h2{margin:0;font-size:15px;font-weight:600;}
+  .card-head .hint{margin-left:auto;font-size:12px;color:var(--t3);}
+
+  .filters{display:flex;gap:10px;padding:14px 16px;align-items:flex-start;}
+  .field{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;}
+  .field>label{display:flex;align-items:center;gap:4px;font-size:12.5px;line-height:16px;color:var(--t2);white-space:nowrap;}
+  .field .tip{font-size:11.5px;color:var(--t3);font-weight:400;}
+  .input{font:inherit;font-size:13px;height:32px;padding:0 10px;width:100%;min-width:0;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);}
+  .input::placeholder{color:var(--t3);}
+  .input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 2px rgba(47,125,90,.12);}
+  .input:disabled{background:var(--fill);color:var(--t3);cursor:not-allowed;}
+  .input.invalid{border-color:var(--err);box-shadow:0 0 0 2px rgba(255,77,79,.12);}
+  textarea.input{height:auto;min-height:64px;padding:6px 10px;resize:vertical;line-height:20px;}
+  .filters .btn{margin-top:22px;}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 16px;font:inherit;font-size:13px;
+    color:var(--t1);background:#fff;border:1px solid var(--bd);border-radius:var(--r);cursor:pointer;white-space:nowrap;}
+  .btn:hover{border-color:var(--p);color:var(--p);}
+  .btn.primary{color:#fff;background:var(--p);border-color:var(--p);}
+  .btn.primary:hover{background:var(--p-hover);border-color:var(--p-hover);color:#fff;}
+  .btn:disabled{color:var(--t3);background:var(--fill);border-color:var(--bd);cursor:not-allowed;}
+  .icon-btn{width:28px;height:28px;font:inherit;font-size:15px;line-height:1;color:var(--t2);
+    background:transparent;border:0;border-radius:var(--r);cursor:pointer;}
+  .icon-btn:hover{color:var(--p);background:var(--p-bg);}
+  .link-btn{font:inherit;font-size:12.5px;color:var(--p);background:transparent;border:0;padding:0 4px;cursor:pointer;}
+  .link-btn:hover{text-decoration:underline;}
+  .actions{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--split);}
+
+  .table-wrap{position:relative;overflow:auto;border-bottom:1px solid var(--split);}
+  table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;}
+  table.grid th,table.grid td{height:40px;padding:0 12px;text-align:left;white-space:nowrap;
+    border-bottom:1px solid var(--split);background:transparent;}
+  table.grid th{position:sticky;top:0;z-index:3;background:var(--fill);font-size:12.5px;font-weight:600;
+    color:var(--t2);border-bottom:1px solid var(--bd);}
+  table.grid tbody tr:hover td{background:var(--fill);}
+  table.grid td.sticky-right{background:#fff;}
+  table.grid tbody tr:hover td.sticky-right{background:var(--fill);}
+  .sticky-right{position:sticky;right:0;z-index:2;box-shadow:-1px 0 0 var(--split);}
+  thead .sticky-right{z-index:5;}
+  .mono-cell{font-family:var(--mono);font-size:12px;}
+  .value-cell{font-family:var(--mono);font-size:12px;color:var(--p);cursor:pointer;max-width:320px;
+    overflow:hidden;text-overflow:ellipsis;}
+  .value-cell:hover{text-decoration:underline;}
+  .desc-cell{max-width:260px;overflow:hidden;text-overflow:ellipsis;}
+  .placeholder-row td{color:var(--t3);font-style:italic;background:#fffbe6!important;}
+
+  .pager{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:12.5px;color:var(--t2);}
+  .pager .spacer{flex:1;}
+  .pg-btn{min-width:28px;height:28px;padding:0 8px;font:inherit;font-size:12.5px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);cursor:pointer;}
+  .pg-btn.active{color:var(--p);background:var(--p-bg);border-color:var(--p);}
+  .pg-btn:disabled{color:var(--t3);background:var(--fill);cursor:not-allowed;}
+
+  /* 三模式弹框 */
+  .mask{position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.45);display:none;}
+  .mask.open{display:block;}
+  .modal{position:fixed;top:50%;left:50%;z-index:10000;display:none;flex-direction:column;
+    width:min(720px,94vw);max-height:88vh;background:#fff;border-radius:var(--r-lg);overflow:hidden;
+    transform:translate(-50%,-50%);box-shadow:0 24px 70px -20px rgba(0,0,0,.5);}
+  .modal.open{display:flex;}
+  .modal-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--split);}
+  .modal-head h3{margin:0;font-size:15px;font-weight:600;}
+  .modal-head .hint{margin-left:auto;font-size:12px;color:var(--t3);}
+  .modal-body{flex:1;min-height:0;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
+  .dlg-field{display:flex;flex-direction:column;gap:4px;}
+  .dlg-field>label{font-size:12.5px;color:var(--t2);}
+  .dlg-field .req{color:var(--err);font-weight:700;}
+  .dlg-field .err{min-height:0;font-size:11px;line-height:13px;color:var(--err);visibility:hidden;}
+  .dlg-field.invalid .err{visibility:visible;}
+  .dlg-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+  /* Value 编辑器（Single / Multi） */
+  .ve{border:1px solid var(--bd);border-radius:var(--r);background:#fbfcfc;font-family:var(--mono);}
+  .ve-bar{display:flex;align-items:center;gap:16px;padding:8px 12px;border-bottom:1px solid var(--split);background:var(--fill);}
+  .ve-bar .seg{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--t2);font-family:inherit;cursor:pointer;}
+  .ve-bar .seg input{accent-color:var(--p);}
+  .ve-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;font-family:inherit;}
+  .ve-single-type{display:flex;align-items:center;gap:12px;font-size:12.5px;color:var(--t2);}
+  .ve-single-type label{display:flex;align-items:center;gap:4px;cursor:pointer;}
+  .ve-single-type input{accent-color:var(--p);}
+  .bool-pick{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--t2);}
+  .bool-pick label{display:flex;align-items:center;gap:4px;cursor:pointer;}
+  .bool-pick input{accent-color:var(--p);}
+  .ve input[type=text].ve-input{font:inherit;font-size:12.5px;height:30px;padding:0 8px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r-sm);width:100%;min-width:0;}
+  .ve input[type=text].ve-input:focus{outline:none;border-color:var(--p);}
+  .node{border:1px solid var(--bd);border-radius:var(--r-sm);background:#fff;padding:8px 10px;display:flex;flex-direction:column;gap:6px;}
+  .node-head{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--t2);}
+  .node-head .seg{display:flex;align-items:center;gap:3px;cursor:pointer;}
+  .node-head .seg input{accent-color:var(--p);}
+  .node-head .del{margin-left:auto;font-size:12px;color:var(--err);background:none;border:0;cursor:pointer;padding:0 4px;}
+  .map-vals{display:flex;flex-direction:column;gap:4px;padding-left:18px;}
+  .map-val{display:flex;align-items:center;gap:6px;}
+  .map-val .del{font-size:12px;color:var(--t3);background:none;border:0;cursor:pointer;padding:0 2px;}
+  .map-val .del:hover{color:var(--err);}
+  .add-mini{align-self:flex-start;font-size:12px;color:var(--p);background:none;border:0;cursor:pointer;padding:0 2px;}
+  .add-mini:hover{text-decoration:underline;}
+  .ve-foot{display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid var(--split);font-size:11.5px;color:var(--t3);}
+  .ve:disabled .ve-body{opacity:.6;}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--split);}
+
+  /* 删除确认弹框（复用 modal 样式，小号） */
+  .modal.small{width:min(440px,92vw);}
+  .modal-body.plain{font-size:13px;color:var(--t2);line-height:20px;}
+  .modal-body code{font-family:var(--mono);font-size:12px;color:var(--t1);}
+
+  .toast{position:fixed;top:16px;left:50%;z-index:11000;padding:9px 16px;font-size:13px;color:var(--t1);
+    background:#fff;border:1px solid var(--bd);border-radius:var(--r);opacity:0;pointer-events:none;
+    transform:translate(-50%,-12px);box-shadow:0 8px 24px -8px rgba(0,0,0,.3);
+    transition:opacity .18s,transform .18s;max-width:78vw;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  .toast.warn{color:#874d00;background:#fffbe6;border-color:var(--warn);}
+</style>
+</head>
+<body>
+
+<button id="toggle"><span class="led"></span>标注已关闭</button>
+
+<div class="stage" id="stage">
+  <div class="page-head">
+  <div class="crumb">系统管理 · 模块 5 · 功能 2</div>
+  <h1>System Misc · 全局配置</h1>
+  <p class="sub">维护全局使用的变量，一处配置、各处消费；候选值接口（env/list 等）的数据源；左侧 Category 窄列表精确过滤，右侧查询 / 列表 / 操作</p>
+</div>
+
+<div class="layout">
+  <nav class="cat-card" aria-label="Category 过滤">
+    <div class="cat-head">Category</div>
+    <ul class="cat-list" id="catList"></ul>
+  </nav>
+
+  <div>
+    <section class="card">
+      <div class="card-head">
+        <h2>查询条件</h2>
+        <span class="hint">Condition 对 item / description / value 三栏前后模糊</span>
+      </div>
+      <div class="filters">
+        <div class="field">
+          <label for="conditionInput">Condition <span class="tip">（item / description / value 三栏 contains，任一命中即返回）</span></label>
+          <input class="input" id="conditionInput" type="text" placeholder="如 PROD、lock、10.18">
+        </div>
+        <button class="btn primary" id="btnSearch" type="button">Search</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>配置列表</h2>
+        <span class="hint">每页 20 · 行键 = item</span>
+      </div>
+      <div class="table-wrap">
+        <table class="grid" id="miscTable">
+          <thead><tr>
+            <th data-col="item">Item</th>
+            <th data-col="description">Description</th>
+            <th data-col="category">Category</th>
+            <th data-col="value">Value</th>
+            <th data-col="updatedAt">Last Updated Time</th>
+            <th data-col="updatedBy">Last Updated User</th>
+            <th class="sticky-right">Action</th>
+          </tr></thead>
+          <tbody id="miscTableBody">
+<tr data-item="env_list" data-row='{&quot;item&quot;:&quot;env_list&quot;,&quot;description&quot;:&quot;环境名候选（01/02/03 Environment 下拉）&quot;,&quot;category&quot;:&quot;global&quot;,&quot;value&quot;:[&quot;PROD&quot;,&quot;PIRUN&quot;],&quot;updatedAt&quot;:&quot;2026-10-08 10:12:31&quot;,&quot;updatedBy&quot;:&quot;xuejm&quot;}'><td data-col="item" class="mono-cell">env_list</td><td data-col="description" class="desc-cell">环境名候选（01/02/03 Environment 下拉）</td><td data-col="category">global</td><td data-col="value"><span class="value-cell" title="点击查看完整 Value">[&quot;PROD&quot;,&quot;PIRUN&quot;]</span></td><td data-col="updatedAt">2026-10-08 10:12:31</td><td data-col="updatedBy">xuejm</td><td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td></tr>
+<tr data-item="ip_list" data-row='{&quot;item&quot;:&quot;ip_list&quot;,&quot;description&quot;:&quot;Host IP 候选，按环境取键（环境联动）&quot;,&quot;category&quot;:&quot;global&quot;,&quot;value&quot;:[{&quot;PROD&quot;:[&quot;10.18.100.1&quot;,&quot;10.18.100.2&quot;]},{&quot;PIRUN&quot;:[&quot;10.18.200.1&quot;]}],&quot;updatedAt&quot;:&quot;2026-10-08 10:15:02&quot;,&quot;updatedBy&quot;:&quot;xuejm&quot;}'><td data-col="item" class="mono-cell">ip_list</td><td data-col="description" class="desc-cell">Host IP 候选，按环境取键（环境联动）</td><td data-col="category">global</td><td data-col="value"><span class="value-cell" title="点击查看完整 Value">[{&quot;PROD&quot;:[&quot;10.18.100.1&quot;,&quot;10.18.100.2&quot;]},{&quot;PIRUN&quot;:[&quot;10.18.200.1&quot;]}]</span></td><td data-col="updatedAt">2026-10-08 10:15:02</td><td data-col="updatedBy">xuejm</td><td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td></tr>
+<tr data-item="server_category_list" data-row='{&quot;item&quot;:&quot;server_category_list&quot;,&quot;description&quot;:&quot;Server Category 候选&quot;,&quot;category&quot;:&quot;global&quot;,&quot;value&quot;:[&quot;LIST&quot;,&quot;QUERY&quot;,&quot;FAB&quot;,&quot;IDE&quot;,&quot;XSITE&quot;],&quot;updatedAt&quot;:&quot;2026-10-09 09:30:44&quot;,&quot;updatedBy&quot;:&quot;wangy&quot;}'><td data-col="item" class="mono-cell">server_category_list</td><td data-col="description" class="desc-cell">Server Category 候选</td><td data-col="category">global</td><td data-col="value"><span class="value-cell" title="点击查看完整 Value">[&quot;LIST&quot;,&quot;QUERY&quot;,&quot;FAB&quot;,&quot;IDE&quot;,&quot;XSITE&quot;]</span></td><td data-col="updatedAt">2026-10-09 09:30:44</td><td data-col="updatedBy">wangy</td><td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td></tr>
+<tr data-item="rule_result_list" data-row='{&quot;item&quot;:&quot;rule_result_list&quot;,&quot;description&quot;:&quot;Rule Result 候选（01 折叠区）&quot;,&quot;category&quot;:&quot;global&quot;,&quot;value&quot;:[&quot;PASS&quot;,&quot;CANCELRULE&quot;],&quot;updatedAt&quot;:&quot;2026-10-09 09:32:10&quot;,&quot;updatedBy&quot;:&quot;wangy&quot;}'><td data-col="item" class="mono-cell">rule_result_list</td><td data-col="description" class="desc-cell">Rule Result 候选（01 折叠区）</td><td data-col="category">global</td><td data-col="value"><span class="value-cell" title="点击查看完整 Value">[&quot;PASS&quot;,&quot;CANCELRULE&quot;]</span></td><td data-col="updatedAt">2026-10-09 09:32:10</td><td data-col="updatedBy">wangy</td><td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td></tr>
+<tr data-item="hang_scan_interval_sec" data-row='{&quot;item&quot;:&quot;hang_scan_interval_sec&quot;,&quot;description&quot;:&quot;派生层 Hang 扫描间隔（秒）&quot;,&quot;category&quot;:&quot;hang&quot;,&quot;value&quot;:[30],&quot;updatedAt&quot;:&quot;2026-10-10 14:02:55&quot;,&quot;updatedBy&quot;:&quot;xuejm&quot;}'><td data-col="item" class="mono-cell">hang_scan_interval_sec</td><td data-col="description" class="desc-cell">派生层 Hang 扫描间隔（秒）</td><td data-col="category">hang</td><td data-col="value"><span class="value-cell" title="点击查看完整 Value">[30]</span></td><td data-col="updatedAt">2026-10-10 14:02:55</td><td data-col="updatedBy">xuejm</td><td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td></tr>
+<tr data-item="hang_max_delay_sec" data-row='{&quot;item&quot;:&quot;hang_max_delay_sec&quot;,&quot;description&quot;:&quot;判定运行允许的最大延迟（秒）&quot;,&quot;category&quot;:&quot;hang&quot;,&quot;value&quot;:[120.5],&quot;updatedAt&quot;:&quot;2026-10-10 14:05:19&quot;,&quot;updatedBy&quot;:&quot;xuejm&quot;}'><td data-col="item" class="mono-cell">hang_max_delay_sec</td><td data-col="description" class="desc-cell">判定运行允许的最大延迟（秒）</td><td data-col="category">hang</td><td data-col="value"><span class="value-cell" title="点击查看完整 Value">[120.5]</span></td><td data-col="updatedAt">2026-10-10 14:05:19</td><td data-col="updatedBy">xuejm</td><td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td></tr>
+<tr data-item="notify_enabled" data-row='{&quot;item&quot;:&quot;notify_enabled&quot;,&quot;description&quot;:&quot;告警通知总开关&quot;,&quot;category&quot;:&quot;misc&quot;,&quot;value&quot;:[true],&quot;updatedAt&quot;:&quot;2026-10-11 08:44:03&quot;,&quot;updatedBy&quot;:&quot;liuh&quot;}'><td data-col="item" class="mono-cell">notify_enabled</td><td data-col="description" class="desc-cell">告警通知总开关</td><td data-col="category">misc</td><td data-col="value"><span class="value-cell" title="点击查看完整 Value">[true]</span></td><td data-col="updatedAt">2026-10-11 08:44:03</td><td data-col="updatedBy">liuh</td><td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td></tr>
+<tr data-item="retry_policy" data-row='{&quot;item&quot;:&quot;retry_policy&quot;,&quot;description&quot;:&quot;失败重试策略（次数 / 退避）&quot;,&quot;category&quot;:&quot;misc&quot;,&quot;value&quot;:[{&quot;max&quot;:[3]},{&quot;backoff_sec&quot;:[1,2,4]}],&quot;updatedAt&quot;:&quot;2026-10-11 08:47:26&quot;,&quot;updatedBy&quot;:&quot;liuh&quot;}'><td data-col="item" class="mono-cell">retry_policy</td><td data-col="description" class="desc-cell">失败重试策略（次数 / 退避）</td><td data-col="category">misc</td><td data-col="value"><span class="value-cell" title="点击查看完整 Value">[{&quot;max&quot;:[3]},{&quot;backoff_sec&quot;:[1,2,4]}]</span></td><td data-col="updatedAt">2026-10-11 08:47:26</td><td data-col="updatedBy">liuh</td><td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td></tr>
+          </tbody>
+        </table>
+        <div class="empty" id="emptyState" hidden style="padding:48px 16px;text-align:center;font-size:13px;color:var(--t3);">暂无数据</div>
+      </div>
+      <div class="pager" id="pager">
+        <span id="pagerTotal">共 0 条</span>
+        <span class="spacer"></span>
+        <button class="pg-btn" disabled>‹</button>
+        <button class="pg-btn active">1</button>
+        <button class="pg-btn">›</button>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" id="btnAdd" type="button" title="添加" aria-label="添加">＋</button>
+        <span style="font-size:12px;color:var(--t3);">添加（表格左下方图标）</span>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="mask" id="miscMask"></div>
+<div class="modal" id="miscModal" role="dialog" aria-hidden="true">
+  <div class="modal-head">
+    <h3 id="dlgTitle">配置</h3>
+    <span class="hint" id="dlgHint"></span>
+  </div>
+  <div class="modal-body">
+    <div class="dlg-row">
+      <div class="dlg-field" data-field="dlgItem">
+        <label for="dlgItem">Item <span class="req">*</span> <span style="font-size:11.5px;color:var(--t3);">（唯一索引，接口定位键）</span></label>
+        <input class="input" id="dlgItem" type="text" placeholder="env_list">
+        <span class="err"></span>
+      </div>
+      <div class="dlg-field" data-field="dlgCategory">
+        <label for="dlgCategory">Category <span class="req">*</span> <span style="font-size:11.5px;color:var(--t3);">（combobox：下拉 + 输入双模式，仅字母数字 ≤ 20）</span></label>
+        <input class="input" id="dlgCategory" type="text" list="catOptions" placeholder="global">
+        <datalist id="catOptions"></datalist>
+        <span class="err"></span>
+      </div>
+    </div>
+    <div class="dlg-field" data-field="dlgDesc">
+      <label for="dlgDesc">Description <span class="req">*</span> <span style="font-size:11.5px;color:var(--t3);">（多行文本域，不限字符格式，长度 ≤ 4000）</span></label>
+      <textarea class="input" id="dlgDesc" rows="2" placeholder="配置项描述"></textarea>
+      <span class="err"></span>
+    </div>
+    <div class="dlg-field" data-field="ve">
+      <label>Value <span class="req">*</span> <span style="font-size:11.5px;color:var(--t3);">（顶层恒为 JSON List · List ≤ 100 · 布尔只许 Single）</span></label>
+      <div class="ve" id="ve">
+        <div class="ve-bar">
+          <label class="seg"><input type="radio" name="veMode" id="modeSingle" value="single">Single Value</label>
+          <label class="seg"><input type="radio" name="veMode" id="modeMulti" value="multi" checked>Multi Value</label>
+        </div>
+        <div class="ve-body">
+          <div id="singleBox" hidden>
+            <div class="ve-single-type">
+              <label><input type="radio" name="singleType" id="singleText" checked>输入框（合法数字存数字，否则文本）</label>
+              <label><input type="radio" name="singleType" id="singleBool">布尔选择器</label>
+            </div>
+            <div id="singleInputBox"><input type="text" class="ve-input" id="singleInput" placeholder="单值（x ∈ 数字 / 文本 / 布尔 —— 全系统唯一允许布尔的形态）"></div>
+            <div id="singleBoolBox" class="bool-pick" hidden>
+              <label><input type="radio" name="boolVal" id="boolTrue">true</label>
+              <label><input type="radio" name="boolVal" id="boolFalse" checked>false</label>
+            </div>
+          </div>
+          <div id="multiBox">
+            <div id="nodeList"></div>
+            <button type="button" class="add-mini" id="btnAddNode">+ 添加节点（先选：值 | Map）</button>
+          </div>
+        </div>
+        <div class="ve-foot">Multi 节点可混排（值 | Map）；Map = 键 + 值数组（禁布尔），深度封顶两层</div>
+      </div>
+      <span class="err" id="veErr" style="font-size:11px;color:var(--err);"></span>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn" id="btnDlgClose" type="button" hidden>关闭</button>
+    <button class="btn" id="btnDlgCancel" type="button">Cancel</button>
+    <button class="btn primary" id="btnDlgConfirm" type="button">Confirm</button>
+  </div>
+</div>
+
+<div class="mask" id="delMask"></div>
+<div class="modal small" id="delModal" role="dialog" aria-hidden="true">
+  <div class="modal-head"><h3>删除配置</h3></div>
+  <div class="modal-body plain" id="delBody"></div>
+  <div class="modal-foot">
+    <button class="btn" id="btnDelCancel" type="button">取消</button>
+    <button class="btn primary" id="btnDelOk" type="button">删除</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var toastEl = $('toast'), toastTimer = null;
+  function toast(msg, kind) {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast show' + (kind ? ' ' + kind : '');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.className = 'toast'; }, 3200);
+  }
+  function setErr(id, msg) {
+    var box = document.querySelector('.dlg-field[data-field="' + id + '"]');
+    if (!box) return;
+    box.classList.toggle('invalid', !!msg);
+    var el = $(id);
+    if (el) el.classList.toggle('invalid', !!msg);
+    var slot = box.querySelector('.err');
+    if (slot && msg) slot.textContent = msg;
+  }
+
+  var DATA = [{"item":"env_list","description":"环境名候选（01/02/03 Environment 下拉）","category":"global","value":["PROD","PIRUN"],"updatedAt":"2026-10-08 10:12:31","updatedBy":"xuejm"},{"item":"ip_list","description":"Host IP 候选，按环境取键（环境联动）","category":"global","value":[{"PROD":["10.18.100.1","10.18.100.2"]},{"PIRUN":["10.18.200.1"]}],"updatedAt":"2026-10-08 10:15:02","updatedBy":"xuejm"},{"item":"server_category_list","description":"Server Category 候选","category":"global","value":["LIST","QUERY","FAB","IDE","XSITE"],"updatedAt":"2026-10-09 09:30:44","updatedBy":"wangy"},{"item":"rule_result_list","description":"Rule Result 候选（01 折叠区）","category":"global","value":["PASS","CANCELRULE"],"updatedAt":"2026-10-09 09:32:10","updatedBy":"wangy"},{"item":"hang_scan_interval_sec","description":"派生层 Hang 扫描间隔（秒）","category":"hang","value":[30],"updatedAt":"2026-10-10 14:02:55","updatedBy":"xuejm"},{"item":"hang_max_delay_sec","description":"判定运行允许的最大延迟（秒）","category":"hang","value":[120.5],"updatedAt":"2026-10-10 14:05:19","updatedBy":"xuejm"},{"item":"notify_enabled","description":"告警通知总开关","category":"misc","value":[true],"updatedAt":"2026-10-11 08:44:03","updatedBy":"liuh"},{"item":"retry_policy","description":"失败重试策略（次数 / 退避）","category":"misc","value":[{"max":[3]},{"backoff_sec":[1,2,4]}],"updatedAt":"2026-10-11 08:47:26","updatedBy":"liuh"}]; /* 全量（本地模拟） */
+  var view = { cat: '全部', condition: '' };
+
+  /* ── 左列表：数据源 = distinct(category)，字典序；首行恒「全部」 ── */
+  function distinctCats() {
+    var set = {};
+    DATA.forEach(function (r) { set[r.category] = 1; });
+    return Object.keys(set).sort();
+  }
+  function renderCats() {
+    var html = '<li class="all-item' + (view.cat === '全部' ? ' active' : '') + '" data-cat="全部">全部</li>';
+    distinctCats().forEach(function (c) {
+      html += '<li data-cat="' + c + '"' + (view.cat === c ? ' class="active"' : '') + '>' + c + '</li>';
+    });
+    $('catList').innerHTML = html;
+    /* 弹框 Category combobox 候选同源（= distinct(category)） */
+    $('catOptions').innerHTML = distinctCats().map(function (c) { return '<option value="' + c + '">'; }).join('');
+  }
+  function pickCat(cat) {
+    var changed = view.cat !== cat;
+    view.cat = cat;
+    renderCats();
+    if (changed) query(true);
+  }
+  $('catList').addEventListener('click', function (ev) {
+    var li = ev.target.closest('li');
+    if (li) pickCat(li.getAttribute('data-cat'));
+  });
+
+  /* ── 查询：category 等值 + condition 对 item/description/value(JSON 原文) 三栏前后模糊 ── */
+  function filterRows() {
+    var kw = view.condition.trim().toLowerCase();
+    return DATA.filter(function (r) {
+      if (view.cat !== '全部' && r.category !== view.cat) return false;
+      if (!kw) return true;
+      var hay = [r.item, r.description, JSON.stringify(r.value)].join('\n').toLowerCase();
+      return hay.indexOf(kw) >= 0;
+    });
+  }
+  function query(auto) {
+    var rows = filterRows();
+    var html = rows.map(rowHtmlOut).join('\n');
+    $('miscTableBody').innerHTML = html || '';
+    $('emptyState').hidden = rows.length > 0;
+    $('pagerTotal').textContent = '共 ' + rows.length + ' 条';
+    if (auto && view.cat !== '全部') toast('选中分类「' + view.cat + '」：自动查询第 1 页（带上 Condition 当前值，等值过滤 category）');
+  }
+  function rowHtmlOut(r) { return rowHtmlInner(r); }
+  function rowHtmlInner(r) {
+    return '<tr data-item="' + r.item + '" data-row=\'' + JSON.stringify(r).replace(/'/g, '&#39;') + '\'>'
+      + '<td data-col="item" class="mono-cell">' + r.item + '</td>'
+      + '<td data-col="description" class="desc-cell">' + r.description + '</td>'
+      + '<td data-col="category">' + r.category + '</td>'
+      + '<td data-col="value"><span class="value-cell" title="点击查看完整 Value">' + JSON.stringify(r.value) + '</span></td>'
+      + '<td data-col="updatedAt">' + r.updatedAt + '</td>'
+      + '<td data-col="updatedBy">' + r.updatedBy + '</td>'
+      + '<td class="sticky-right"><button type="button" class="link-btn row-edit">修改</button><button type="button" class="link-btn row-del">删除</button></td>'
+      + '</tr>';
+  }
+
+  $('conditionInput').addEventListener('input', function () { view.condition = this.value; });
+  $('btnSearch').addEventListener('click', function () {
+    view.condition = $('conditionInput').value;
+    query(false);
+    toast('Search：第 1 页 · category=' + (view.cat === '全部' ? '（不带，全部）' : view.cat) +
+      ' · condition=「' + (view.condition || '') + '」（item / description / value 三栏 contains）');
+  });
+
+  /* ── Value 列点击 → 查看弹框（编辑器只读态） ── */
+  $('miscTableBody').addEventListener('click', function (ev) {
+    var cell = ev.target.closest('.value-cell');
+    if (!cell) return;
+    var tr = cell.closest('tr');
+    openDialog('view', JSON.parse(tr.getAttribute('data-row')), tr);
+  });
+
+  /* ── 行内修改 / 删除 ── */
+  var editTr = null, placeholderTr = null;
+  $('miscTableBody').addEventListener('click', function (ev) {
+    var editBtn = ev.target.closest('.row-edit');
+    if (editBtn) {
+      var tr = editBtn.closest('tr');
+      openDialog('edit', JSON.parse(tr.getAttribute('data-row')), tr);
+      return;
+    }
+    var delBtn = ev.target.closest('.row-del');
+    if (delBtn) {
+      delTarget = delBtn.closest('tr');
+      var row = JSON.parse(delTarget.getAttribute('data-row'));
+      $('delBody').innerHTML = '确认删除配置项 <code>' + row.item + '</code>？';
+      $('delModal').classList.add('open');
+      $('delMask').classList.add('open');
+    }
+  });
+  var delTarget = null;
+  $('btnDelCancel').addEventListener('click', closeDel);
+  $('delMask').addEventListener('click', closeDel);
+  function closeDel() {
+    $('delModal').classList.remove('open');
+    $('delMask').classList.remove('open');
+  }
+  $('btnDelOk').addEventListener('click', function () {
+    var row = JSON.parse(delTarget.getAttribute('data-row'));
+    DATA = DATA.filter(function (r) { return r.item !== row.item; });
+    var gone = distinctCats().indexOf(view.cat) < 0 && view.cat !== '全部';
+    closeDel();
+    renderCats();
+    if (gone) { view.cat = '全部'; renderCats(); query(false); toast('删除成功；分类「' + row.category + '」已清空，回落「全部」并重查'); }
+    else { query(false); toast('删除成功（DELETE /api/v1/sys_misc，入参仅 item）；已重取 Category 列表'); }
+  });
+
+  /* ── 添加：表格第一行插空白行 + 打开新增弹框 ── */
+  $('btnAdd').addEventListener('click', function () {
+    placeholderTr = document.createElement('tr');
+    placeholderTr.className = 'placeholder-row';
+    placeholderTr.innerHTML = '<td colspan="7">新增中…（保存成功后本行填充为出参内容；取消 / 失败则移除）</td>';
+    $('miscTableBody').insertBefore(placeholderTr, $('miscTableBody').firstChild);
+    openDialog('add', null, placeholderTr);
+  });
+
+  /* ── 三模式弹框 ── */
+  var mode = 'add'; /* view | edit | add */
+  function setDisabled(dis) {
+    ['dlgItem', 'dlgDesc', 'dlgCategory'].forEach(function (id) { $(id).disabled = dis; });
+    $('ve').querySelectorAll('input,button').forEach(function (el) { el.disabled = dis; });
+  }
+  function openDialog(m, row, tr) {
+    mode = m;
+    editTr = m === 'view' ? null : tr;
+    $('dlgTitle').textContent = m === 'view' ? '查看配置' : m === 'edit' ? '修改配置' : '新增配置';
+    $('dlgHint').textContent = m === 'view' ? '只读（编辑器只读态）'
+      : m === 'edit' ? 'Item 锁定（定位键）；Category / Description / Value 为新值'
+      : 'Item 必填，仅大小写字母 + 数字，长度 ≤ 255；保存成功后填充表格第一行空白行';
+    $('btnDlgConfirm').hidden = m === 'view';
+    $('btnDlgCancel').hidden = m === 'view';
+    $('btnDlgClose').hidden = m !== 'view';
+    ['dlgItem', 'dlgDesc', 'dlgCategory'].forEach(function (id) { setErr(id, ''); });
+    $('veErr').textContent = '';
+    if (row) {
+      $('dlgItem').value = row.item;
+      $('dlgDesc').value = row.description;
+      $('dlgCategory').value = row.category;
+      parseToEditor(row.value);
+    } else {
+      $('dlgItem').value = '';
+      $('dlgDesc').value = '';
+      $('dlgCategory').value = '';
+      resetEditor();
+    }
+    setDisabled(m === 'view');
+    if (m === 'edit') { $('dlgItem').disabled = true; }
+    $('miscModal').classList.add('open');
+    $('miscMask').classList.add('open');
+  }
+  function closeDialog(removePlaceholder) {
+    $('miscModal').classList.remove('open');
+    $('miscMask').classList.remove('open');
+    if (removePlaceholder && placeholderTr && placeholderTr.parentNode) {
+      placeholderTr.parentNode.removeChild(placeholderTr);
+    }
+    placeholderTr = null;
+  }
+  $('btnDlgClose').addEventListener('click', function () { closeDialog(false); });
+  $('miscMask').addEventListener('click', function () {
+    closeDialog(mode === 'add');
+  });
+
+  /* ── Value 编辑器：Single / Multi 节点式 ── */
+  function resetEditor() {
+    $('modeMulti').checked = true;
+    $('nodeList').innerHTML = '';
+    syncMode();
+  }
+  function syncMode() {
+    var single = $('modeSingle').checked;
+    $('singleBox').hidden = !single;
+    $('multiBox').hidden = single;
+  }
+  ['modeSingle', 'modeMulti'].forEach(function (id) {
+    $(id).addEventListener('change', syncMode);
+  });
+  function syncSingleType() {
+    var isBool = $('singleBool').checked;
+    $('singleInputBox').hidden = isBool;
+    $('singleBoolBox').hidden = !isBool;
+  }
+  ['singleText', 'singleBool'].forEach(function (id) {
+    $(id).addEventListener('change', syncSingleType);
+  });
+
+  function scalarNode() {
+    var div = document.createElement('div');
+    div.className = 'node';
+    div.setAttribute('data-kind', 'value');
+    div.innerHTML =
+      '<div class="node-head">'
+      + '<label class="seg"><input type="radio" name="k' + nonce() + '" value="value" checked onchange="void 0">值</label>'
+      + '<label class="seg"><input type="radio" name="k' + nonce() + '" value="map" onchange="void 0">Map</label>'
+      + '<button type="button" class="del">删除节点</button></div>'
+      + '<input type="text" class="ve-input node-value" placeholder="标量（文本 / 数字，禁布尔）">';
+    return div;
+  }
+  function mapNode() {
+    var div = document.createElement('div');
+    div.className = 'node';
+    div.setAttribute('data-kind', 'map');
+    div.innerHTML =
+      '<div class="node-head">'
+      + '<label class="seg"><input type="radio" value="value">值</label>'
+      + '<label class="seg"><input type="radio" value="map" checked>Map</label>'
+      + '<span>键 = 自由键；值数组禁布尔、深度封顶两层</span>'
+      + '<button type="button" class="del">删除节点</button></div>'
+      + '<input type="text" class="ve-input node-key" placeholder="键（自由键）">'
+      + '<div class="map-vals"></div>'
+      + '<button type="button" class="add-mini">+ 添加值</button>';
+    return div;
+  }
+  var nonceSeed = 0;
+  function nonce() { return 'n' + (++nonceSeed); }
+  /* 节点内 值/Map 切换（事件委托） */
+  $('nodeList').addEventListener('change', function (ev) {
+    var node = ev.target.closest('.node');
+    if (!node || ev.target.name === 'singleType') return;
+    if (ev.target.type === 'radio' && (ev.target.value === 'value' || ev.target.value === 'map')) {
+      var kind = ev.target.value;
+      var fresh = kind === 'value' ? scalarNode() : mapNode();
+      node.parentNode.replaceChild(fresh, node);
+    }
+  });
+  $('nodeList').addEventListener('click', function (ev) {
+    var node = ev.target.closest('.node');
+    if (!node) return;
+    if (ev.target.className === 'del') { node.parentNode.removeChild(node); return; }
+    if (ev.target.className === 'add-mini') {
+      var box = node.querySelector('.map-vals');
+      var row = document.createElement('div');
+      row.className = 'map-val';
+      row.innerHTML = '<input type="text" class="ve-input" placeholder="标量（文本 / 数字，禁布尔）">'
+        + '<button type="button" class="del">×</button>';
+      box.appendChild(row);
+    }
+    if (ev.target.classList.contains('del') && ev.target.closest('.map-val')) {
+      ev.target.closest('.map-val').remove();
+    }
+  });
+  $('btnAddNode').addEventListener('click', function () {
+    $('nodeList').appendChild(scalarNode());
+  });
+
+  /* 数字自适应：合法数字存数字，否则文本 */
+  function autoScalar(text) {
+    return /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(text) ? Number(text) : text;
+  }
+
+  /* 序列化：编辑器 → JSON List */
+  function serializeEditor() {
+    if ($('modeSingle').checked) {
+      if ($('singleBool').checked) return [($('boolTrue').checked)];
+      return [autoScalar($('singleInput').value)];
+    }
+    var out = [];
+    var nodes = $('nodeList').querySelectorAll(':scope > .node');
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].getAttribute('data-kind') === 'value') {
+        out.push(autoScalar(nodes[i].querySelector('.node-value').value));
+      } else {
+        var key = nodes[i].querySelector('.node-key').value;
+        var vals = [];
+        var inputs = nodes[i].querySelectorAll('.map-val .ve-input');
+        for (var j = 0; j < inputs.length; j++) vals.push(autoScalar(inputs[j].value));
+        var obj = {};
+        obj[key] = vals;
+        out.push(obj);
+      }
+    }
+    return out;
+  }
+  /* 反解析：JSON List → 编辑器（长度 1 标量 ⇒ Single；其余 ⇒ Multi） */
+  function parseToEditor(value) {
+    var single = value.length === 1 && typeof value[0] !== 'object';
+    $('modeSingle').checked = single;
+    $('modeMulti').checked = !single;
+    syncMode();
+    if (single) {
+      var v = value[0];
+      if (typeof v === 'boolean') {
+        $('singleBool').checked = true;
+        $('boolTrue').checked = v === true;
+        $('boolFalse').checked = v === false;
+      } else {
+        $('singleText').checked = true;
+        $('singleInput').value = String(v);
+      }
+      syncSingleType();
+      return;
+    }
+    $('nodeList').innerHTML = '';
+    value.forEach(function (el) {
+      if (typeof el === 'object') {
+        var node = mapNode();
+        node.querySelector('.node-key').value = Object.keys(el)[0];
+        var box = node.querySelector('.map-vals');
+        el[Object.keys(el)[0]].forEach(function (x) {
+          var row = document.createElement('div');
+          row.className = 'map-val';
+          row.innerHTML = '<input type="text" class="ve-input">'
+            + '<button type="button" class="del">×</button>';
+          row.querySelector('input').value = String(x);
+          box.appendChild(row);
+        });
+        $('nodeList').appendChild(node);
+      } else {
+        var node2 = scalarNode();
+        node2.querySelector('.node-value').value = String(el);
+        $('nodeList').appendChild(node2);
+      }
+    });
+  }
+  /* 打开即建一个默认值节点，避免空列表 */
+  var booted = false;
+
+  /* ── 弹框校验 + Confirm ── */
+  function validate() {
+    var ok = true;
+    var item = $('dlgItem').value.trim();
+    if (!item) { setErr('dlgItem', '必填'); ok = false; }
+    else if (!/^[0-9A-Za-z]{1,255}$/.test(item)) { setErr('dlgItem', '仅大小写字母 + 数字，长度 ≤ 255'); ok = false; }
+    else setErr('dlgItem', '');
+    if (!$('dlgDesc').value.trim()) { setErr('dlgDesc', '必填；多行文本域，长度 ≤ 4000'); ok = false; }
+    else if ($('dlgDesc').value.length > 4000) { setErr('dlgDesc', '长度 ≤ 4000'); ok = false; }
+    else setErr('dlgDesc', '');
+    var cat = $('dlgCategory').value.trim();
+    if (!cat) { setErr('dlgCategory', '必填'); ok = false; }
+    else if (!/^[0-9A-Za-z]{1,20}$/.test(cat)) { setErr('dlgCategory', '仅大小写字母 + 数字，长度 ≤ 20'); ok = false; }
+    else setErr('dlgCategory', '');
+    $('veErr').textContent = '';
+    if ($('modeSingle').checked) {
+      if ($('singleText').checked && !$('singleInput').value.trim()) {
+        $('veErr').textContent = 'Value：Single 输入框不能为空'; ok = false;
+      }
+    } else {
+      var nodes = $('nodeList').querySelectorAll(':scope > .node');
+      if (!nodes.length) { $('veErr').textContent = 'Value：Multi 至少 1 个节点'; ok = false; }
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].getAttribute('data-kind') === 'value' && !nodes[i].querySelector('.node-value').value.trim()) {
+          $('veErr').textContent = 'Value：值节点不能为空'; ok = false; break;
+        }
+        if (nodes[i].getAttribute('data-kind') === 'map') {
+          var key = nodes[i].querySelector('.node-key').value.trim();
+          var vals = nodes[i].querySelectorAll('.map-val .ve-input');
+          if (!key) { $('veErr').textContent = 'Value：Map 节点键不能为空'; ok = false; break; }
+          if (!vals.length) { $('veErr').textContent = 'Value：Map 值数组至少 1 项'; ok = false; break; }
+        }
+      }
+    }
+    return ok;
+  }
+  $('btnDlgConfirm').addEventListener('click', function () {
+    if (!validate()) { toast('弹框不合法，已拦住保存', 'warn'); return; }
+    var value = serializeEditor();
+    var obj = {
+      item: $('dlgItem').value.trim(),
+      description: $('dlgDesc').value,
+      category: $('dlgCategory').value.trim(),
+      value: value,
+      updatedAt: '2026-10-13 12:00:00',
+      updatedBy: 'xuejm'
+    };
+    var isEdit = mode === 'edit';
+    if (isEdit) {
+      var old = JSON.parse(editTr.getAttribute('data-row'));
+      DATA = DATA.map(function (r) { return r.item === old.item ? obj : r; });
+    } else {
+      if (DATA.some(function (r) { return r.item === obj.item; })) {
+        toast('新增被拒：item「' + obj.item + '」已存在（唯一索引）', 'warn');
+        return;
+      }
+      DATA.unshift(obj);
+    }
+    closeDialog(false);
+    renderCats();
+    query(false);
+    toast((isEdit ? 'PUT' : 'POST') + ' /api/v1/sys_misc · value=' + JSON.stringify(value).slice(0, 80)
+      + (JSON.stringify(value).length > 80 ? '…' : '')
+      + '（已重取 Category 列表；' + (isEdit ? '行内容已覆盖' : '空白行已填充') + '）');
+  });
+  $('btnDlgCancel').addEventListener('click', function () { closeDialog(mode === 'add'); });
+
+  /* ── 进页面：默认选「全部」并查询第 1 页；左列表首建 ── */
+  renderCats();
+  query(false);
+  resetEditor();
+  toast('进页面：已取 Category 列表（distinct 字典序），默认选中「全部」并自动查询全部的第 1 页');
+})();
+
+</script>
+  <!-- 机器可读规格清单：AI / 开发者照此实现真实页面；人类标注由它派生，二者不会漂移 -->
+  <script type="application/json" id="prototype-spec">
+{
+  "schema": "annotated-prototype/spec@1",
+  "title": "System Misc · 全局配置",
+  "summary": "左右布局配置页：左 = Category 窄列表（distinct 字典序、首行恒「全部」、进页面默认选全部并自动查第 1 页、选中即查、增删改后重取、选中项消失回落全部、不做计数）；右 = 查询条件（Condition 对 item / description / value 三栏前后模糊）+ 配置列表（七列，Value 点击看详情）+ 行级操作（修改 / 删除确认）+ 添加图标（空白行占位）+ 三模式弹框（查看只读 / 修改锁 Item / 新增，Value 编辑器 Single / Multi 节点式）。接口口径依 02 文档 §五。",
+  "regions": [
+    {
+      "id": "catlist",
+      "label": "Category 窄列表（左侧）",
+      "role": "nav",
+      "desc": "精确过滤入口；数据源 = distinct(category) 字典序；与右侧条件是同一查询的两个输入面"
+    },
+    {
+      "id": "search",
+      "label": "查询条件区（右侧）",
+      "role": "search",
+      "desc": "仅一个 Condition 输入框 + Search"
+    },
+    {
+      "id": "table",
+      "label": "配置列表区（右侧）",
+      "role": "table",
+      "desc": "七列 + 分页（每页 20 不分档）+ 添加图标（表格左下方）"
+    },
+    {
+      "id": "dialog",
+      "label": "三模式弹框",
+      "role": "form",
+      "desc": "查看 / 修改 / 新增同一组件；Value 结构化编辑（Single / Multi）"
+    }
+  ],
+  "apis": [
+    {
+      "id": "sysMiscPage",
+      "method": "GET",
+      "path": "/api/v1/sys_misc/page",
+      "desc": "分页查询（含 Category 过滤 + Condition 三栏模糊）"
+    },
+    {
+      "id": "sysMiscCategoryList",
+      "method": "GET",
+      "path": "/api/v1/sys_misc/category/list",
+      "desc": "Category 窄列表候选（distinct(category) 字典序，不分页）"
+    },
+    {
+      "id": "sysMiscCreate",
+      "method": "POST",
+      "path": "/api/v1/sys_misc",
+      "desc": "新增（item 冲突即拒）"
+    },
+    {
+      "id": "sysMiscUpdate",
+      "method": "PUT",
+      "path": "/api/v1/sys_misc",
+      "desc": "修改（item 作定位键）"
+    },
+    {
+      "id": "sysMiscDelete",
+      "method": "DELETE",
+      "path": "/api/v1/sys_misc",
+      "desc": "删除（入参仅 item）"
+    }
+  ],
+  "controls": [
+    {
+      "selector": "#catList",
+      "kind": "other",
+      "label": "Category 窄列表",
+      "region": "Category 窄列表（左侧）",
+      "rules": [
+        "数据源：进页面调 category/list（= 本表 distinct(category)），按字典序展示；空表 ⇒ 只剩「全部」",
+        "首行恒显示「全部」，进页面默认选中「全部」⇒ 自动查询全部的第 1 页（无未查询空态）",
+        "选中某分类：自动调 page 查第 1 页（带上 Condition 当前值 + 本分类，等值匹配）；选中「全部」不带 category 入参",
+        "与 Search 是同一查询的两个输入面：Search 同样结合左列表当前选中项，两侧谁最后变谁触发",
+        "增删改成功后重取本列表；当前选中项消失（该分类最后一行被删等）⇒ 回落「全部」并重查",
+        "不做条数计数（快节奏轻查询，只出分类名）"
+      ],
+      "apis": [
+        "sysMiscCategoryList",
+        "sysMiscPage"
+      ],
+      "apiNotes": [
+        "category/list 出参：`data = { \"category\": [ … ] }`，不分页",
+        "page 的 category 入参：等值、可空 = 不按分类过滤（左列表选「全部」时不带）"
+      ]
+    },
+    {
+      "selector": "#conditionInput",
+      "kind": "input",
+      "label": "Condition 输入框",
+      "region": "查询条件区（右侧）",
+      "param": "condition",
+      "placeholder": "如 PROD、lock、10.18",
+      "rules": [
+        "对 item / description / value 三个栏位前后模糊匹配（contains），任一栏位命中即返回",
+        "value 按 JSON 字符串原文匹配；不填 = 不过滤"
+      ],
+      "apiNotes": [
+        "入参：URL 参数 `condition`（可空 = 不过滤）"
+      ]
+    },
+    {
+      "selector": "#btnSearch",
+      "kind": "button",
+      "label": "Search",
+      "region": "查询条件区（右侧）",
+      "rules": [
+        "查第 1 页，结合左列表当前选中项（选「全部」不带 category）"
+      ],
+      "apis": [
+        "sysMiscPage"
+      ],
+      "apiNotes": [
+        "入参：pageIndex=1、pageSize=20、condition、category"
+      ]
+    },
+    {
+      "selector": "#miscTable",
+      "kind": "table",
+      "label": "配置列表",
+      "region": "配置列表区（右侧）",
+      "rules": [
+        "列（按序）：Item、Description、Category、Value、Last Updated Time、Last Updated User + Action（最右固定）",
+        "Description 超长省略号截断；Value 按 JSON 字符串显示、超长省略号截断、可点击打开查看弹框",
+        "行键 = item（id 不出参）；分页每页 20（不分档），总条数取出参 total",
+        "新增保存成功 ⇒ 表格第一行空白行填充出参内容；取消 / 失败 ⇒ 移除空白行；修改保存 ⇒ 直接覆盖该行；删除 ⇒ 直接删该行"
+      ],
+      "apis": [
+        "sysMiscPage"
+      ],
+      "apiNotes": [
+        "行数据 = page 出参 contents[]（item / description / category / value / updatedAt / updatedBy）"
+      ]
+    },
+    {
+      "selector": ".value-cell",
+      "kind": "link",
+      "label": "Value 列（点击查看）",
+      "region": "配置列表区（右侧）",
+      "on": {
+        "click": [
+          "打开详情弹框展示完整 Value（只读，即三模式弹框的查看模式）"
+        ]
+      },
+      "apiNotes": [
+        "不调接口（数据已在行内，前端展示）"
+      ]
+    },
+    {
+      "selector": ".row-edit",
+      "kind": "button",
+      "label": "Action · 修改",
+      "region": "配置列表区（右侧）",
+      "on": {
+        "click": [
+          "打开修改弹框（Item 锁定，其余可改）"
+        ]
+      },
+      "apiNotes": [
+        "不调接口（提交在弹框 Confirm）"
+      ]
+    },
+    {
+      "selector": ".row-del",
+      "kind": "button",
+      "label": "Action · 删除",
+      "region": "配置列表区（右侧）",
+      "rules": [
+        "弹框确认后才调删除接口；成功后直接删除该行",
+        "删除成功后重取 Category 列表（选中项消失 ⇒ 回落「全部」并重查）"
+      ],
+      "apis": [
+        "sysMiscDelete"
+      ],
+      "apiNotes": [
+        "入参仅 item；出参只报成败"
+      ]
+    },
+    {
+      "selector": "#btnAdd",
+      "kind": "button",
+      "label": "添加图标（表格左下方）",
+      "region": "配置列表区（右侧）",
+      "on": {
+        "click": [
+          "表格第一行先插入空白行（占位），新增弹框同时打开"
+        ]
+      },
+      "apiNotes": [
+        "不调接口（纯前端行为）"
+      ]
+    },
+    {
+      "selector": "#pager",
+      "kind": "pager",
+      "label": "分页组件",
+      "region": "配置列表区（右侧）",
+      "rules": [
+        "每页 20 条（不分档）；翻页按页码再调 page"
+      ],
+      "apis": [
+        "sysMiscPage"
+      ],
+      "apiNotes": [
+        "翻页传目标 pageIndex"
+      ]
+    },
+    {
+      "selector": "#miscModal",
+      "kind": "modal",
+      "label": "三模式弹框（查看 / 修改 / 新增）",
+      "region": "三模式弹框",
+      "rules": [
+        "查看：全字段只读（Value 呈编辑器只读态），底部只有「关闭」",
+        "修改：Item 锁定（定位键）；Description / Category / Value 可改；Confirm 走 PUT，成功后出参直接覆盖该行",
+        "新增：Item 必填（仅大小写字母 + 数字 ≤ 255）；Confirm 走 POST，item 冲突（唯一索引）拒；成功后空白行填充出参",
+        "Cancel：清空全部控件值、关闭弹框（新增模式同时移除空白行）",
+        "Category：combobox（下拉 + 输入双模式），候选 = 本表 distinct（与 category/list 同源），仅字母数字 ≤ 20",
+        "Description：多行文本域，不限字符格式，长度 ≤ 4000"
+      ],
+      "apis": [
+        "sysMiscCreate",
+        "sysMiscUpdate"
+      ],
+      "apiNotes": [
+        "POST / PUT 入参四字段（item / category / description / value）；value 接口传入即入库格式，后端零转换"
+      ]
+    },
+    {
+      "selector": "#ve",
+      "kind": "other",
+      "label": "Value 编辑器（Single / Multi）",
+      "region": "三模式弹框",
+      "rules": [
+        "顶层恒为 JSON List；外层单选框定编辑模型",
+        "Single Value：输入框 / 布尔选择器二选一 —— 输入框自由输入（合法数字存数字，否则文本）；布尔 = true / false（全系统唯一允许布尔的形态）",
+        "Multi Value：节点式列表按节点增加，每个新节点先选「值 | Map」—— 值节点 = 标量输入（文本 / 数字，禁布尔）；Map 节点 = 键 + 值数组（复用值控件增删）；两类节点可混排",
+        "深度封顶两层（Map 的值不能再嵌 Map，也不能是 Single 形态）；List ≤ 100（顶层与 Map 值数组同限）",
+        "打开时形态识别：长度 1 且元素为标量 ⇒ 按 Single 呈现（等价表示，可切 Multi 继续加节点）；其余 ⇒ Multi",
+        "模式切换：Single → Multi 把当前单值转成一个值节点；Multi → Single 清空重选",
+        "必填（推定）：Single 输入框非空；Multi 至少 1 个节点且节点完整（值节点非空；Map 节点键与值数组非空）"
+      ],
+      "notes": [
+        "页面呈编辑器样式；视觉细节归 05 / 原型"
+      ],
+      "apiNotes": [
+        "不调接口：value 入参 = 编辑器序列化的 JSON List；后端按同一套类型规则复验（直调绕过编辑器时）"
+      ]
+    },
+    {
+      "selector": "#btnDlgConfirm",
+      "kind": "button",
+      "label": "Confirm（弹框）",
+      "region": "三模式弹框",
+      "rules": [
+        "提交前校验（Item / Description / Category / Value 全量），不合法拦住",
+        "新增 item 冲突（唯一索引）⇒ 拒（错误码，不覆盖）"
+      ],
+      "apis": [
+        "sysMiscCreate",
+        "sysMiscUpdate"
+      ],
+      "apiNotes": [
+        "保存成功后页面重取 Category 列表"
+      ]
+    },
+    {
+      "selector": "#btnDlgCancel",
+      "kind": "button",
+      "label": "Cancel（弹框）",
+      "region": "三模式弹框",
+      "rules": [
+        "关闭弹框；新增模式同时移除表格第一行空白行"
+      ],
+      "apiNotes": [
+        "不调接口（纯前端行为）"
+      ]
+    },
+    {
+      "selector": "#delModal",
+      "kind": "modal",
+      "label": "删除确认弹框",
+      "region": "配置列表区（右侧）",
+      "rules": [
+        "展示待删 item；确认后才调删除接口"
+      ],
+      "apis": [
+        "sysMiscDelete"
+      ],
+      "apiNotes": [
+        "入参仅 item"
+      ]
+    }
+  ],
+  "table": {
+    "selector": "#miscTable",
+    "dataApi": "sysMiscPage",
+    "columns": [
+      {
+        "key": "item",
+        "label": "Item",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "description",
+        "label": "Description",
+        "align": "left",
+        "format": "text",
+        "note": "超长省略号截断"
+      },
+      {
+        "key": "category",
+        "label": "Category",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "value",
+        "label": "Value",
+        "align": "left",
+        "format": "json",
+        "note": "JSON 字符串，超长省略号；点击 → 查看弹框"
+      },
+      {
+        "key": "updatedAt",
+        "label": "Last Updated Time",
+        "align": "left",
+        "format": "datetime"
+      },
+      {
+        "key": "updatedBy",
+        "label": "Last Updated User",
+        "align": "left",
+        "format": "text"
+      },
+      {
+        "key": "action",
+        "label": "Action",
+        "align": "center",
+        "format": "action",
+        "note": "最右固定：修改 / 删除"
+      }
+    ],
+    "pagination": {
+      "api": "sysMiscPage",
+      "pageParam": "pageIndex",
+      "pageSize": 20,
+      "pageSizeFixed": true,
+      "serverSide": true,
+      "totalField": "total"
+    },
+    "rowSelection": {
+      "mode": "none"
+    }
+  },
+  "mock": [
+    "所有接口路径、方法、入参与出参依 02 文档 §五；原型不真实发请求，数据全为本地模拟（8 行，value 覆盖 Single 数字 / 布尔、Multi 全值节点、Map 节点、Map 混排）",
+    "左列表、三栏模糊过滤、编辑器序列化 / 反解析（拆装 % 同理的 JSON 回填）、增删改后的行级行为与 Category 列表刷新均为真实前端行为",
+    "进页面默认选「全部」并查询第 1 页（本地数据即全部）",
+    "Confirm / 删除的接口调用以轻提示展示（含序列化出的 value JSON），不产生真实请求",
+    "分页页码为静态演示"
+  ],
+  "openQuestions": []
+}
+  </script>
+
+</div>
+
+<svg id="lines"></svg>
+<div class="anno" id="annoBox"></div>
+
+<script>
+/* ============================================================
+   热区配置（AI 生成时填充）
+   ============================================================ */
+const hotspots = [
+    {
+    id: "cat-list",
+    selector: "#catList",
+    title: "Category 窄列表｜控件",
+    items: [
+      { type: "front", text: "数据源：进页面调 category/list（= 本表 distinct(category)），按字典序展示；空表 ⇒ 只剩「全部」" },
+      { type: "front", text: "首行恒显示「全部」，进页面默认选中「全部」⇒ 自动查询全部的第 1 页（无未查询空态）" },
+      { type: "front", text: "选中某分类：自动调 page 查第 1 页（带上 Condition 当前值 + 本分类，等值匹配）；选中「全部」不带 category 入参" },
+      { type: "front", text: "与 Search 是同一查询的两个输入面：Search 同样结合左列表当前选中项，两侧谁最后变谁触发" },
+      { type: "front", text: "增删改成功后重取本列表；当前选中项消失（该分类最后一行被删等）⇒ 回落「全部」并重查" },
+      { type: "front", text: "不做条数计数（快节奏轻查询，只出分类名）" },
+      { type: "back", text: "GET /api/v1/sys_misc/category/list —— Category 窄列表候选（distinct(category) 字典序，不分页）" },
+      { type: "back", text: "GET /api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
+      { type: "back", text: "category/list 出参：`data = { \"category\": [ … ] }`，不分页" },
+      { type: "back", text: "page 的 category 入参：等值、可空 = 不按分类过滤（左列表选「全部」时不带）" }
+    ],
+  },
+  {
+    id: "condition-input",
+    selector: "#conditionInput",
+    title: "Condition 输入框｜输入框",
+    items: [
+      { type: "front", text: "对 item / description / value 三个栏位前后模糊匹配（contains），任一栏位命中即返回" },
+      { type: "front", text: "value 按 JSON 字符串原文匹配；不填 = 不过滤" },
+      { type: "back", text: "值作为查询参数 `condition` 随请求提交" },
+      { type: "back", text: "入参：URL 参数 `condition`（可空 = 不过滤）" }
+    ],
+  },
+  {
+    id: "btn-search",
+    selector: "#btnSearch",
+    title: "Search｜按钮",
+    items: [
+      { type: "front", text: "查第 1 页，结合左列表当前选中项（选「全部」不带 category）" },
+      { type: "back", text: "GET /api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
+      { type: "back", text: "入参：pageIndex=1、pageSize=20、condition、category" }
+    ],
+  },
+  {
+    id: "misc-table",
+    selector: "#miscTable",
+    title: "配置列表｜表格",
+    items: [
+      { type: "front", text: "列（按序）：Item、Description、Category、Value、Last Updated Time、Last Updated User + Action（最右固定）" },
+      { type: "front", text: "Description 超长省略号截断；Value 按 JSON 字符串显示、超长省略号截断、可点击打开查看弹框" },
+      { type: "front", text: "行键 = item（id 不出参）；分页每页 20（不分档），总条数取出参 total" },
+      { type: "front", text: "新增保存成功 ⇒ 表格第一行空白行填充出参内容；取消 / 失败 ⇒ 移除空白行；修改保存 ⇒ 直接覆盖该行；删除 ⇒ 直接删该行" },
+      { type: "back", text: "GET /api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
+      { type: "back", text: "行数据 = page 出参 contents[]（item / description / category / value / updatedAt / updatedBy）" }
+    ],
+  },
+  {
+    id: "value-cell",
+    selector: ".value-cell",
+    title: "Value 列（点击查看）｜链接",
+    items: [
+      { type: "front", text: "点击：打开详情弹框展示完整 Value（只读，即三模式弹框的查看模式）" },
+      { type: "back", text: "不调接口（数据已在行内，前端展示）" }
+    ],
+  },
+  {
+    id: "row-edit",
+    selector: ".row-edit",
+    title: "Action · 修改｜按钮",
+    items: [
+      { type: "front", text: "点击：打开修改弹框（Item 锁定，其余可改）" },
+      { type: "back", text: "不调接口（提交在弹框 Confirm）" }
+    ],
+  },
+  {
+    id: "row-del",
+    selector: ".row-del",
+    title: "Action · 删除｜按钮",
+    items: [
+      { type: "front", text: "弹框确认后才调删除接口；成功后直接删除该行" },
+      { type: "front", text: "删除成功后重取 Category 列表（选中项消失 ⇒ 回落「全部」并重查）" },
+      { type: "back", text: "DELETE /api/v1/sys_misc —— 删除（入参仅 item）" },
+      { type: "back", text: "入参仅 item；出参只报成败" }
+    ],
+  },
+  {
+    id: "btn-add",
+    selector: "#btnAdd",
+    title: "添加图标（表格左下方）｜按钮",
+    items: [
+      { type: "front", text: "点击：表格第一行先插入空白行（占位），新增弹框同时打开" },
+      { type: "back", text: "不调接口（纯前端行为）" }
+    ],
+  },
+  {
+    id: "pager",
+    selector: "#pager",
+    title: "分页组件｜分页控件",
+    items: [
+      { type: "front", text: "每页 20 条（不分档）；翻页按页码再调 page" },
+      { type: "back", text: "GET /api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
+      { type: "back", text: "翻页传目标 pageIndex" }
+    ],
+  },
+  {
+    id: "misc-modal",
+    selector: "#miscModal",
+    title: "三模式弹框（查看 / 修改 / 新增）｜弹窗",
+    items: [
+      { type: "front", text: "查看：全字段只读（Value 呈编辑器只读态），底部只有「关闭」" },
+      { type: "front", text: "修改：Item 锁定（定位键）；Description / Category / Value 可改；Confirm 走 PUT，成功后出参直接覆盖该行" },
+      { type: "front", text: "新增：Item 必填（仅大小写字母 + 数字 ≤ 255）；Confirm 走 POST，item 冲突（唯一索引）拒；成功后空白行填充出参" },
+      { type: "front", text: "Cancel：清空全部控件值、关闭弹框（新增模式同时移除空白行）" },
+      { type: "front", text: "Category：combobox（下拉 + 输入双模式），候选 = 本表 distinct（与 category/list 同源），仅字母数字 ≤ 20" },
+      { type: "front", text: "Description：多行文本域，不限字符格式，长度 ≤ 4000" },
+      { type: "back", text: "POST /api/v1/sys_misc —— 新增（item 冲突即拒）" },
+      { type: "back", text: "PUT /api/v1/sys_misc —— 修改（item 作定位键）" },
+      { type: "back", text: "POST / PUT 入参四字段（item / category / description / value）；value 接口传入即入库格式，后端零转换" }
+    ],
+  },
+  {
+    id: "ve",
+    selector: "#ve",
+    title: "Value 编辑器（Single / Multi）｜控件",
+    items: [
+      { type: "front", text: "顶层恒为 JSON List；外层单选框定编辑模型" },
+      { type: "front", text: "Single Value：输入框 / 布尔选择器二选一 —— 输入框自由输入（合法数字存数字，否则文本）；布尔 = true / false（全系统唯一允许布尔的形态）" },
+      { type: "front", text: "Multi Value：节点式列表按节点增加，每个新节点先选「值 | Map」—— 值节点 = 标量输入（文本 / 数字，禁布尔）；Map 节点 = 键 + 值数组（复用值控件增删）；两类节点可混排" },
+      { type: "front", text: "深度封顶两层（Map 的值不能再嵌 Map，也不能是 Single 形态）；List ≤ 100（顶层与 Map 值数组同限）" },
+      { type: "front", text: "打开时形态识别：长度 1 且元素为标量 ⇒ 按 Single 呈现（等价表示，可切 Multi 继续加节点）；其余 ⇒ Multi" },
+      { type: "front", text: "模式切换：Single → Multi 把当前单值转成一个值节点；Multi → Single 清空重选" },
+      { type: "front", text: "必填（推定）：Single 输入框非空；Multi 至少 1 个节点且节点完整（值节点非空；Map 节点键与值数组非空）" },
+      { type: "front", text: "页面呈编辑器样式；视觉细节归 05 / 原型" },
+      { type: "back", text: "不调接口：value 入参 = 编辑器序列化的 JSON List；后端按同一套类型规则复验（直调绕过编辑器时）" }
+    ],
+  },
+  {
+    id: "btn-dlg-confirm",
+    selector: "#btnDlgConfirm",
+    title: "Confirm（弹框）｜按钮",
+    items: [
+      { type: "front", text: "提交前校验（Item / Description / Category / Value 全量），不合法拦住" },
+      { type: "front", text: "新增 item 冲突（唯一索引）⇒ 拒（错误码，不覆盖）" },
+      { type: "back", text: "POST /api/v1/sys_misc —— 新增（item 冲突即拒）" },
+      { type: "back", text: "PUT /api/v1/sys_misc —— 修改（item 作定位键）" },
+      { type: "back", text: "保存成功后页面重取 Category 列表" }
+    ],
+  },
+  {
+    id: "btn-dlg-cancel",
+    selector: "#btnDlgCancel",
+    title: "Cancel（弹框）｜按钮",
+    items: [
+      { type: "front", text: "关闭弹框；新增模式同时移除表格第一行空白行" },
+      { type: "back", text: "不调接口（纯前端行为）" }
+    ],
+  },
+  {
+    id: "del-modal",
+    selector: "#delModal",
+    title: "删除确认弹框｜弹窗",
+    items: [
+      { type: "front", text: "展示待删 item；确认后才调删除接口" },
+      { type: "back", text: "DELETE /api/v1/sys_misc —— 删除（入参仅 item）" },
+      { type: "back", text: "入参仅 item" }
+    ],
+  },
+];
+
+const annoBox = document.getElementById('annoBox');
+const svg = document.getElementById('lines');
+const toggle = document.getElementById('toggle');
+
+let enabled = false;
+const hotspotEls = {};
+let hovered = null;
+let frameNo = 0;
+
+/* 悬停判定不依赖 DOM 事件的目标元素，而是「指针坐标 + 矩形包含 + 遮挡校验」。
+   这样延迟注入的元素、被 innerHTML 换掉的元素、父层 pointer-events:none 的
+   控件、禁用态控件都能命中；被弹层遮住的控件则不会被误命中。
+   且指针不动时页面滚动 / 布局变化（展开折叠面板等）也会实时重判。 */
+const pointer = { x: -1, y: -1, active: false };
+
+/* ============================================================
+   1. 建热区元素
+   ============================================================ */
+hotspots.forEach(h => {
+  const el = document.createElement('div');
+  el.className = 'hotspot';
+  document.body.appendChild(el);
+  hotspotEls[h.id] = el;
+  h._el = el;
+});
+
+/* ============================================================
+   2. 目标解析：只缓存「仍挂在文档里」的引用，失效就按 selector 重查
+   ============================================================ */
+const ro = new ResizeObserver(() => repositionAll());
+
+function targetOf(h){
+  if (h._target && h._target.isConnected) return h._target;
+  h._target = null;
+  const missAt = typeof h._missAt === 'number' ? h._missAt : -999;
+  if (frameNo - missAt < 12) return null;   // 未命中时限频重试，避免每帧 querySelector
+  h._missAt = frameNo;
+  const t = document.querySelector(h.selector);
+  if (t) { h._target = t; ro.observe(t); }
+  return h._target;
+}
+
+function depthOf(el){
+  let d = 0, p = el;
+  while ((p = p.parentElement)) d++;
+  return d;
+}
+
+/* 指针下方的热区：先按矩形圈定候选，再用 elementFromPoint 排除被遮挡的，
+   最后对嵌套热区取最内层 */
+function pickAt(x, y){
+  const top = document.elementFromPoint(x, y);
+  let best = null, bestDepth = -1;
+
+  for (let i = 0; i < hotspots.length; i++){
+    const h = hotspots[i];
+    const t = targetOf(h);
+    if (!t) continue;
+    const r = t.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    if (top && !(t.contains(top) || top.contains(t))) continue;
+    const d = depthOf(t);
+    if (d > bestDepth) { best = h; bestDepth = d; }
+  }
+  return best;
+}
+
+/* ============================================================
+   3. 统一重定位入口
+   ============================================================ */
+function repositionAll(){
+  hotspots.forEach(h => {
+    const t = targetOf(h);
+    const el = h._el;
+    if (!t) {
+      el.style.opacity = '0';
+      el._hidden = true;
+      return;
+    }
+    const r = t.getBoundingClientRect();
+
+    if (r.width === 0 && r.height === 0) {
+      el.style.opacity = '0';
+      el._hidden = true;
+      return;
+    }
+    el._hidden = false;
+    /* 目标重新可见时必须回清行内 opacity：
+       行内样式优先级高于 .hotspot.active{opacity:1}，不回清红框会永久不可见 */
+    if (el.style.opacity === '0') el.style.opacity = '';
+
+    el.style.left   = (r.left - 4) + 'px';
+    el.style.top    = (r.top  - 4) + 'px';
+    el.style.width  = (r.width  + 8) + 'px';
+    el.style.height = (r.height + 8) + 'px';
+  });
+
+  if (annoBox._current) {
+    const target = annoBox._current._target;
+    if (!target || !target.isConnected) { hide(); return; }
+    const r = target.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) { hide(); return; }
+    positionAnno(annoBox._current);
+    drawLine(annoBox._current);
+  }
+}
+
+/* ============================================================
+   4. 事件驱动
+   ============================================================ */
+window.addEventListener('resize', repositionAll);
+window.addEventListener('scroll', repositionAll, true);
+
+let _moPending = false;
+const mo = new MutationObserver(() => {
+  hotspots.forEach(h => { if (!h._target) h._missAt = -999; });   // DOM 变了，允许立刻重查
+  if (_moPending) return;
+  _moPending = true;
+  requestAnimationFrame(() => {
+    _moPending = false;
+    repositionAll();
+  });
+});
+mo.observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['class', 'style', 'hidden', 'open']
+});
+
+document.addEventListener('pointermove', e => {
+  pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true;
+}, true);
+document.documentElement.addEventListener('mouseleave', () => { pointer.active = false; });
+document.addEventListener('pointercancel', () => { pointer.active = false; }, true);
+window.addEventListener('blur', () => { pointer.active = false; });
+
+/* body 上的 transform / filter / contain 会把叠加层的包含块从视口改到 body，
+   坐标系随之变化；这里一次性告警，避免静默错位 */
+(function warnContainingBlock(){
+  const keys = ['transform', 'filter', 'perspective', 'contain', 'willChange'];
+  const hit = keys.filter(k => {
+    const v = getComputedStyle(document.body)[k];
+    return v && v !== 'none' && v !== 'auto' && v !== 'normal';
+  });
+  if (hit.length) console.warn('标注框架告警：body 上的 ' + hit.join(' / ') + ' 会成为叠加层的包含块，标注可能错位');
+})();
+
+/* ============================================================
+   5. 逐帧重定位 + 悬停重判（兜底：动画、过渡、指针不动时的滚动与布局变化）
+   ============================================================ */
+let _lastKey = '';
+function tick(){
+  frameNo++;
+
+  /* 跑满约 2 秒仍未命中的 selector 一次性告警：
+     延迟注入的元素会在这里之前被解析到，所以告警留下的就是真拼错的 selector */
+  if (frameNo === 120) {
+    hotspots.forEach(h => {
+      if (!h._target) console.warn('热区 selector 未命中：', h.selector);
+    });
+  }
+
+  let key = '';
+  for (let i = 0; i < hotspots.length; i++){
+    const t = targetOf(hotspots[i]);
+    if (!t) { key += '-|'; continue; }
+    const r = t.getBoundingClientRect();
+    key += Math.round(r.left) + ',' + Math.round(r.top) + ','
+         + Math.round(r.width) + ',' + Math.round(r.height) + '|';
+  }
+  if (key !== _lastKey) {
+    _lastKey = key;
+    repositionAll();
+  }
+
+  reconcileHover();
+  requestAnimationFrame(tick);
+}
+
+function reconcileHover(){
+  if (!enabled) return;
+  const h = pointer.active ? pickAt(pointer.x, pointer.y) : null;
+  if (h === hovered) return;
+  hovered = h;
+  if (h) show(h, h._el);
+  else hide();
+}
+
+requestAnimationFrame(tick);
+
+/* ============================================================
+   6. 显示 / 隐藏
+   ============================================================ */
+function show(h, el){
+  Object.values(hotspotEls).forEach(e => e.classList.remove('active'));
+  if (el.style.opacity === '0') el.style.opacity = '';
+  el.classList.add('active');
+
+  annoBox.innerHTML =
+    `<div class="head"><span class="dot"></span><h4>${h.title || ''}</h4></div>
+     <div class="body">` +
+     (h.items || []).map(it =>
+       `<div class="item ${it.type}">` +
+          `<span class="tag">${it.type==='back'?'后端':'前端'}</span>` +
+          `<span class="txt">${it.text || ''}</span>` +
+        `</div>`).join('') +
+     `</div>`;
+
+  annoBox.classList.add('show');
+  annoBox._current = h;
+
+  positionAnno(h);
+  requestAnimationFrame(() => drawLine(h));
+}
+
+function hide(){
+  hovered = null;
+  annoBox.classList.remove('show');
+  Object.values(hotspotEls).forEach(e => e.classList.remove('active'));
+  svg.innerHTML = '';
+  annoBox._current = null;
+}
+
+/* ============================================================
+   7. 标注框定位（自动避让视口）
+   ============================================================ */
+function positionAnno(h){
+  const r = h._el.getBoundingClientRect();
+  const gap = 28, pad = 16;
+  const w = annoBox.offsetWidth;
+  const ht = annoBox.offsetHeight;
+
+  let x, y, side;
+  if (r.right + gap + w <= innerWidth - pad) {
+    side = 'right';
+    x = r.right + gap;
+    y = r.top + r.height/2 - ht/2;
+  } else if (r.left - gap - w >= pad) {
+    side = 'left';
+    x = r.left - gap - w;
+    y = r.top + r.height/2 - ht/2;
+  } else {
+    side = 'bottom';
+    x = r.left + r.width/2 - w/2;
+    y = r.bottom + gap;
+  }
+
+  x = Math.max(pad, Math.min(x, innerWidth  - w  - pad));
+  y = Math.max(pad, Math.min(y, innerHeight - ht - pad));
+
+  annoBox.style.left = x + 'px';
+  annoBox.style.top  = y + 'px';
+  annoBox._rect = { x, y, w, h: ht, side };
+}
+
+/* ============================================================
+   8. 引线绘制
+   ============================================================ */
+function drawLine(h){
+  const r = h._el.getBoundingClientRect();
+  const a = annoBox._rect;
+  if (!a) return;
+  const ns = 'http://www.w3.org/2000/svg';
+
+  let p1, p2;
+  if (a.side === 'right') {
+    p1 = { x: r.right, y: r.top + r.height/2 };
+    p2 = { x: a.x,     y: a.y + a.h/2 };
+  } else if (a.side === 'left') {
+    p1 = { x: r.left,    y: r.top + r.height/2 };
+    p2 = { x: a.x + a.w, y: a.y + a.h/2 };
+  } else {
+    p1 = { x: r.left + r.width/2, y: r.bottom };
+    p2 = { x: a.x + a.w/2,        y: a.y };
+  }
+
+  let d;
+  if (a.side === 'bottom') {
+    const midY = (p1.y + p2.y) / 2;
+    d = `M ${p1.x} ${p1.y} L ${p1.x} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`;
+  } else {
+    const midX = (p1.x + p2.x) / 2;
+    d = `M ${p1.x} ${p1.y} L ${midX} ${p1.y} L ${midX} ${p2.y} L ${p2.x} ${p2.y}`;
+  }
+
+  const defs = document.createElementNS(ns,'defs');
+  defs.innerHTML = `<linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#e5484d" stop-opacity="0.35"/>
+    <stop offset="100%" stop-color="#e5484d" stop-opacity="1"/></linearGradient>`;
+
+  const path = document.createElementNS(ns,'path');
+  path.setAttribute('d', d);
+  path.setAttribute('stroke','url(#lg)');
+  path.setAttribute('stroke-width','1.75');
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke-linejoin','round');
+  path.setAttribute('stroke-linecap','round');
+
+  const halo = document.createElementNS(ns,'circle');
+  halo.setAttribute('cx',p1.x); halo.setAttribute('cy',p1.y); halo.setAttribute('r','8');
+  halo.setAttribute('fill','rgba(229,72,77,.15)');
+
+  const dot = document.createElementNS(ns,'circle');
+  dot.setAttribute('cx',p1.x); dot.setAttribute('cy',p1.y); dot.setAttribute('r','4');
+  dot.setAttribute('fill','#e5484d'); dot.setAttribute('stroke','#fff'); dot.setAttribute('stroke-width','1.5');
+
+  const dot2 = document.createElementNS(ns,'circle');
+  dot2.setAttribute('cx',p2.x); dot2.setAttribute('cy',p2.y); dot2.setAttribute('r','3');
+  dot2.setAttribute('fill','#e5484d');
+
+  svg.innerHTML = '';
+  [defs,path,halo,dot,dot2].forEach(n => svg.appendChild(n));
+
+  if (!h._drawn) {
+    const len = path.getTotalLength();
+    path.style.strokeDasharray = len;
+    path.style.strokeDashoffset = len;
+    path.getBoundingClientRect();
+    path.style.transition = 'stroke-dashoffset .28s ease';
+    path.style.strokeDashoffset = 0;
+    h._drawn = true;
+  }
+}
+
+/* ============================================================
+   9. 开关
+   ============================================================ */
+toggle.addEventListener('click', () => {
+  enabled = !enabled;
+  toggle.classList.toggle('on', enabled);
+  toggle.lastChild.textContent = enabled ? '标注已开启' : '标注已关闭';
+  if (!enabled) hide();
+});
+</script>
+</body>
+</html>
