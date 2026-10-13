@@ -1159,37 +1159,37 @@
     {
       "id": "envList",
       "method": "GET",
-      "path": "/api/v1/env/list",
+      "path": "/log-viewer/api/v1/env/list",
       "desc": "Source / Target 的 Environment 候选（同 01 §5.3 第 1 条）"
     },
     {
       "id": "lockObjectList",
       "method": "GET",
-      "path": "/api/v1/lock_object/list",
+      "path": "/log-viewer/api/v1/lock_object/list",
       "desc": "列设置 Lock Object 候选（同 01 §5.3 第 5 条）"
     },
     {
       "id": "callSysList",
       "method": "GET",
-      "path": "/api/v1/call_sys/list",
+      "path": "/log-viewer/api/v1/call_sys/list",
       "desc": "列设置 Call Sys 候选（同 01 §5.3 第 6 条）"
     },
     {
       "id": "ruleInfoPage",
       "method": "POST",
-      "path": "/api/v1/rule_info/page",
+      "path": "/log-viewer/api/v1/rule_info/page",
       "desc": "Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）"
     },
     {
       "id": "ruleInfoDetail",
       "method": "GET",
-      "path": "/api/v1/rule_info/detail",
+      "path": "/log-viewer/api/v1/rule_info/detail",
       "desc": "Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）"
     },
     {
       "id": "ruleInfoRuleLog",
       "method": "POST",
-      "path": "/api/v1/rule_info/rule_log",
+      "path": "/log-viewer/api/v1/rule_info/rule_log",
       "desc": "Download Rule Info 下载 Rule 日志（本功能新增）"
     }
   ],
@@ -1686,7 +1686,7 @@
         "ruleInfoDetail"
       ],
       "apiNotes": [
-        "点 Compare 后两侧分别调 GET /api/v1/rule_info/detail，游标分页拉完各自请求的完整日志（finished = true 为止）",
+        "点 Compare 后两侧分别调 GET /log-viewer/api/v1/rule_info/detail，游标分页拉完各自请求的完整日志（finished = true 为止）",
         "两侧各自独立持游标 (lastFingerprint, lastOffset)，互不影响"
       ]
     },
@@ -1934,7 +1934,7 @@ const hotspots = [
       { type: "front", text: "进页面默认不选中；为空则不能 Search（点 Search 拦住并标红）" },
       { type: "front", text: "等值过滤块文档字段 ENV" },
       { type: "front", text: "进入页面：进页面加载候选值" },
-      { type: "back", text: "GET /api/v1/env/list —— Source / Target 的 Environment 候选（同 01 §5.3 第 1 条）" },
+      { type: "back", text: "GET /log-viewer/api/v1/env/list —— Source / Target 的 Environment 候选（同 01 §5.3 第 1 条）" },
       { type: "back", text: "值作为查询参数 `env` 随请求提交" },
       { type: "back", text: "出参：`data.env` = 字符串数组" },
       { type: "back", text: "入参位置：`parameters.env`" }
@@ -2001,7 +2001,7 @@ const hotspots = [
       { type: "front", text: "前置校验：Environment 为空 / TID 为空 / 时间不合法 → 拦住，不发请求" },
       { type: "front", text: "清空 Source 列表选中行" },
       { type: "front", text: "点击：校验通过后查第 1 页；descTime = false（按 Start Time 正序）" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
       { type: "back", text: "入参：`pageIndex` = 1、`pageSize` = 20；`parameters` 只填本区条件：env + startTime / endTime + ruleName（非必填）+ tid；其余键一概不传" },
       { type: "back", text: "不假设 TID 只出一条 —— 命中几条就出几条" }
     ],
@@ -2015,7 +2015,7 @@ const hotspots = [
       { type: "front", text: "按 Start Time 正序（旧 → 新），与 Target 列表相反" },
       { type: "front", text: "Rule Result = CANCELRULE 单元格标红；多值字段首值 + 角标；耗时列单位秒" },
       { type: "front", text: "单选 1 条（行首单选框或点击整行）—— 选中的这条即 Source；换选 / 取消选中会复位 Target 区" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
       { type: "back", text: "行数据 = 出参 `data.contents[]`；出参 `id` = 块 _id，不出列，留给 Download Rule Info 与 Compare 当入参" },
       { type: "back", text: "与 Target 列表：列设置共用一份、列的顺序共用、横向滚动同步（列位天然对齐是同时滚动的前提）" }
     ],
@@ -2026,7 +2026,7 @@ const hotspots = [
     title: "Source 分页组件｜分页控件",
     items: [
       { type: "front", text: "默认每页 20 条，档位 20、50、100；始终显示；总条数取出参 total" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
       { type: "back", text: "翻页传目标 pageIndex；翻页保留已选中的行" }
     ],
   },
@@ -2069,7 +2069,7 @@ const hotspots = [
     items: [
       { type: "front", text: "每选中一项追加一列（Lock + 空格 + 对象名）；两个列表同时追加；缺该项耗时显示空" },
       { type: "front", text: "选项变化：勾选记入浏览器本地" },
-      { type: "back", text: "GET /api/v1/lock_object/list —— 列设置 Lock Object 候选（同 01 §5.3 第 5 条）" },
+      { type: "back", text: "GET /log-viewer/api/v1/lock_object/list —— 列设置 Lock Object 候选（同 01 §5.3 第 5 条）" },
       { type: "back", text: "出参：`data.lockObject` = 字符串数组；取值取当前页出参 `costBreakDown[]` 命中那条的 summary" }
     ],
   },
@@ -2080,7 +2080,7 @@ const hotspots = [
     items: [
       { type: "front", text: "每选中一项追加一列（Call + 空格 + 系统名）；两个列表同时追加" },
       { type: "front", text: "选项变化：勾选记入浏览器本地" },
-      { type: "back", text: "GET /api/v1/call_sys/list —— 列设置 Call Sys 候选（同 01 §5.3 第 6 条）" },
+      { type: "back", text: "GET /log-viewer/api/v1/call_sys/list —— 列设置 Call Sys 候选（同 01 §5.3 第 6 条）" },
       { type: "back", text: "出参：`data.calledSystem` = 字符串数组" }
     ],
   },
@@ -2127,7 +2127,7 @@ const hotspots = [
       { type: "front", text: "必填（占位「必选」）" },
       { type: "front", text: "未勾 Same Environment：本下拉可用，候选接口与 Source 区相同；为空不能 Search" },
       { type: "front", text: "勾选 Same Environment：本下拉禁用，值直接取选中 Source 行的 ENV" },
-      { type: "back", text: "GET /api/v1/env/list —— Source / Target 的 Environment 候选（同 01 §5.3 第 1 条）" },
+      { type: "back", text: "GET /log-viewer/api/v1/env/list —— Source / Target 的 Environment 候选（同 01 §5.3 第 1 条）" },
       { type: "back", text: "值作为查询参数 `env` 随请求提交" },
       { type: "back", text: "入参：`parameters.env`（勾 Same Environment 时填 Source 行的 ENV）" }
     ],
@@ -2181,7 +2181,7 @@ const hotspots = [
       { type: "front", text: "前置校验：Environment 为空（未勾 Same Environment 时）/ 时间不合法 → 拦住，不发请求" },
       { type: "front", text: "点击：查第 1 页；descTime = true（按 Start Time 倒排）；排除选中的 Source 那一行" },
       { type: "front", text: "前置条件：Source 列表已选中 1 条（Target 区已启用）" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
       { type: "back", text: "入参：`parameters` = env（未勾取本区下拉，勾了取 Source 行 ENV）+ startTime / endTime（Target 自己的）+ ruleName（恒带选中 Source 行的 RULENAME）+ 勾上的 Same X 字段；其余键一概不传" },
       { type: "back", text: "快速检索只取返回的第一行；深度检索多行分页" }
     ],
@@ -2196,7 +2196,7 @@ const hotspots = [
       { type: "front", text: "快速检索后只有 1 行且默认选中；深度检索后多行、不默认选中" },
       { type: "front", text: "单选 1 条（行首单选框或点击整行）—— 选中的这条即 Target" },
       { type: "front", text: "Source 换选 / 取消选中 → 本列表清空" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
       { type: "back", text: "行数据 = 出参 `data.contents[]`；出参 `id` = 块 _id，不出列，留给 Compare 当入参" }
     ],
   },
@@ -2207,7 +2207,7 @@ const hotspots = [
     items: [
       { type: "front", text: "默认每页 20 条，档位 20、50、100；始终显示" },
       { type: "front", text: "快速检索只输出第一行（不分页多行）" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）" },
       { type: "back", text: "翻页传目标 pageIndex" }
     ],
   },
@@ -2232,7 +2232,7 @@ const hotspots = [
       { type: "front", text: "文件名：RuleName_Start 时间戳.log（时间戳格式 yyyyMMddHHmmss）—— 取选中 Source 行的 RULENAME 与 START_TIME" },
       { type: "front", text: "与 01 Full Log 的区别只在产物：本接口下 Rule 日志（这一次执行）；Full Log 下该块涉及的全部文件（zip）" },
       { type: "front", text: "前置条件：Target 列表已选中 1 行" },
-      { type: "back", text: "POST /api/v1/rule_info/rule_log —— Download Rule Info 下载 Rule 日志（本功能新增）" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/rule_log —— Download Rule Info 下载 Rule 日志（本功能新增）" },
       { type: "back", text: "入参与 01 的 Full Log 接口完全相同（都是 id = 块 id）；出参是 .log 文件本身，直接下载不走统一响应包" }
     ],
   },
@@ -2246,8 +2246,8 @@ const hotspots = [
       { type: "front", text: "换选 Source 或 Target 行、或再点一次 Compare：两侧已加载内容清空、游标复位，都从第一页重新拉" },
       { type: "front", text: "点击：分别用选中 Source 行与 Target 行的块 id 打开比较弹窗" },
       { type: "front", text: "前置条件：Target 列表已选中 1 行" },
-      { type: "back", text: "GET /api/v1/rule_info/detail —— Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）" },
-      { type: "back", text: "点 Compare 后两侧分别调 GET /api/v1/rule_info/detail，游标分页拉完各自请求的完整日志（finished = true 为止）" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_info/detail —— Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）" },
+      { type: "back", text: "点 Compare 后两侧分别调 GET /log-viewer/api/v1/rule_info/detail，游标分页拉完各自请求的完整日志（finished = true 为止）" },
       { type: "back", text: "两侧各自独立持游标 (lastFingerprint, lastOffset)，互不影响" }
     ],
   },
@@ -2264,7 +2264,7 @@ const hotspots = [
       { type: "front", text: "摆哪些键：解析出多少摆多少（含 FPB08765 这类动态键）；行序按 Key 名的字典序" },
       { type: "front", text: "差异标注：两侧不一样的地方都做标记（本原型用红字 + 红底示意）" },
       { type: "front", text: "XML 形态（K = XMLDATA）：只保留 XML 数据，格式化后每个标签一行（值挂开标签行、结构行照占一行），三列同 KV 形态；同一 Rule 两条日志一般同为一种形态，不另设混合形态规则" },
-      { type: "back", text: "GET /api/v1/rule_info/detail —— Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_info/detail —— Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）" },
       { type: "back", text: "数据来源 = 两侧 detail 接口拉回的首行原文，解析在前端做" }
     ],
   },
@@ -2279,7 +2279,7 @@ const hotspots = [
       { type: "front", text: "提前预取：距已加载内容的末位约 20 行（按原始行计）即触发拉下一页；触发后检查两侧上一轮 finished：为 false 的都继续拉，已为 true 的不再拉" },
       { type: "front", text: "滚动联动：按滚动偏移同步 —— 一侧滚多少另一侧跟同样偏移；短的一侧先到底就停在底、长的一侧继续跟" },
       { type: "front", text: "同步解除：某一侧 finished = true 且已滚到底即解开偏移同步，之后各自滚动（本次对比内不再恢复）" },
-      { type: "back", text: "GET /api/v1/rule_info/detail —— Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_info/detail —— Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）" },
       { type: "back", text: "差异标注：两侧不一样的行做标记（本原型红字示意）" }
     ],
   },
@@ -2290,7 +2290,7 @@ const hotspots = [
     items: [
       { type: "front", text: "右栏 = Target；口径与 Source 日志栏一致（各自独立游标、偏移同步、提前预取）" },
       { type: "front", text: "终止：两侧都 finished = true 后，再滚到底不再触发" },
-      { type: "back", text: "GET /api/v1/rule_info/detail —— Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_info/detail —— Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）" },
       { type: "back", text: "两侧各自独立持 (lastFingerprint, lastOffset)，互不影响" }
     ],
   },

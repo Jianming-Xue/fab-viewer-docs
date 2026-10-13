@@ -1135,61 +1135,61 @@
     {
       "id": "envList",
       "method": "GET",
-      "path": "/api/v1/env/list",
+      "path": "/log-viewer/api/v1/env/list",
       "desc": "Environment 候选"
     },
     {
       "id": "ipAddressList",
       "method": "GET",
-      "path": "/api/v1/ipaddress/list",
+      "path": "/log-viewer/api/v1/ipaddress/list",
       "desc": "Host IP 候选（入参 environment 可缺省）"
     },
     {
       "id": "serverCategoryList",
       "method": "GET",
-      "path": "/api/v1/server_category/list",
+      "path": "/log-viewer/api/v1/server_category/list",
       "desc": "Server Category 候选"
     },
     {
       "id": "ruleResultList",
       "method": "GET",
-      "path": "/api/v1/rule_result/list",
+      "path": "/log-viewer/api/v1/rule_result/list",
       "desc": "Rule Result 候选"
     },
     {
       "id": "lockObjectList",
       "method": "GET",
-      "path": "/api/v1/lock_object/list",
+      "path": "/log-viewer/api/v1/lock_object/list",
       "desc": "Lock Object 多选候选"
     },
     {
       "id": "callSysList",
       "method": "GET",
-      "path": "/api/v1/call_sys/list",
+      "path": "/log-viewer/api/v1/call_sys/list",
       "desc": "Call Sys 多选候选"
     },
     {
       "id": "ruleInfoPage",
       "method": "POST",
-      "path": "/api/v1/rule_info/page",
+      "path": "/log-viewer/api/v1/rule_info/page",
       "desc": "结果分页查询"
     },
     {
       "id": "ruleInfoDetail",
       "method": "GET",
-      "path": "/api/v1/rule_info/detail",
+      "path": "/log-viewer/api/v1/rule_info/detail",
       "desc": "Rule Info Detail 日志按游标分页"
     },
     {
       "id": "ruleInfoFullLog",
       "method": "POST",
-      "path": "/api/v1/rule_info/full_log",
+      "path": "/log-viewer/api/v1/rule_info/full_log",
       "desc": "按块涉及的全部文件还原、打包 zip 下载"
     },
     {
       "id": "ruleInfoHangList",
       "method": "GET",
-      "path": "/api/v1/rule_info/hang_list",
+      "path": "/log-viewer/api/v1/rule_info/hang_list",
       "desc": "Server Hang 弹框明细（该块全部 Hang，不分页）"
     }
   ],
@@ -1670,7 +1670,7 @@
         "ruleInfoHangList"
       ],
       "apiNotes": [
-        "点击打开弹框时调 GET /api/v1/rule_info/hang_list，入参 `id` = 该行的块 id（page 出参 `contents[].id`）",
+        "点击打开弹框时调 GET /log-viewer/api/v1/rule_info/hang_list，入参 `id` = 该行的块 id（page 出参 `contents[].id`）",
         "原型按落库后实态演示：部分行 hangCount > 0（红色可点开弹框）、其余行演示置灰态；本期未落库前线上恒置灰"
       ]
     },
@@ -2102,7 +2102,7 @@
     "Export、Full Log、全量下载只弹轻提示，不产生真实文件下载",
     "列设置会真的增删列表列（静态列显隐 + EXEC_STATUS 与动态耗时列注入）；动态耗时列的取值由确定性算法模拟，真实页面取当前页出参 `costBreakDown[]` 里命中那条的 `summary`",
     "Server Hang 原型按落库后实态演示：部分行 hangCount > 0（红色可点开弹框）、其余行演示置灰态；本期未落库前线上按钮恒置灰",
-    "Server Hang 弹框内容为本地模拟（耗时、开始/结束行时间由确定性算法生成）；真实数据来自 GET /api/v1/rule_info/hang_list 出参"
+    "Server Hang 弹框内容为本地模拟（耗时、开始/结束行时间由确定性算法生成）；真实数据来自 GET /log-viewer/api/v1/rule_info/hang_list 出参"
   ],
   "openQuestions": [
     "Export 的导出接口文档未给出，当前按「前端生成 Excel」实现",
@@ -2131,7 +2131,7 @@ const hotspots = [
       { type: "front", text: "进入页面：进页面加载候选值" },
       { type: "front", text: "选项变化：重取 Host IP 候选值" },
       { type: "front", text: "选项变化：清空已选的 Host IP" },
-      { type: "back", text: "GET /api/v1/env/list —— Environment 候选" },
+      { type: "back", text: "GET /log-viewer/api/v1/env/list —— Environment 候选" },
       { type: "back", text: "值作为查询参数 `env` 随请求提交" },
       { type: "back", text: "出参：统一响应包里的 `data.env` = 字符串数组（候选值）" },
       { type: "back", text: "入参位置：`parameters.env`（16 项过滤条件都装在 parameters 里）" },
@@ -2147,7 +2147,7 @@ const hotspots = [
       { type: "front", text: "为空时 Server Number 置灰不可输入" },
       { type: "front", text: "选项变化：清空时一并清空 Server Number" },
       { type: "front", text: "选项变化：改选另一个值时 Server Number 保留原值" },
-      { type: "back", text: "GET /api/v1/server_category/list —— Server Category 候选" },
+      { type: "back", text: "GET /log-viewer/api/v1/server_category/list —— Server Category 候选" },
       { type: "back", text: "值作为查询参数 `serverCategory` 随请求提交" },
       { type: "back", text: "出参：`data.serverCategory` = 字符串数组，取值 LIST、QUERY、FAB、IDE、XSITE 这一类服务器类别" },
       { type: "back", text: "入参位置：`parameters.serverCategory`" }
@@ -2329,7 +2329,7 @@ const hotspots = [
       { type: "front", text: "被拦住时给轻提示，按钮不做置灰（置灰会让用户不知道为什么点不了）" },
       { type: "front", text: "点击：校验通过后把 16 项条件装进 parameters，pageIndex 传 1、pageSize 传 20，查第 1 页" },
       { type: "front", text: "点击：清空列表的选中行" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— 结果分页查询" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— 结果分页查询" },
       { type: "back", text: "入参：`pageIndex` = 1、`pageSize` = 20；16 项过滤条件放在 `parameters` 里，字段名见各条件控件的标注" },
       { type: "back", text: "出参：统一响应包 `{ success, errCode, data }`；`data.total` 给分页器显示「共 N 条」，`data.contents[]` 是当前页行数据" },
       { type: "back", text: "失败时列表区给出错误提示与重试入口" }
@@ -2357,7 +2357,7 @@ const hotspots = [
       { type: "front", text: "Environment 变化时清空已选值" },
       { type: "front", text: "进入页面：进页面调候选接口（不带参）" },
       { type: "front", text: "进入页面：Environment 选值后再调一次并带上 `environment` 参数" },
-      { type: "back", text: "GET /api/v1/ipaddress/list —— Host IP 候选（入参 environment 可缺省）" },
+      { type: "back", text: "GET /log-viewer/api/v1/ipaddress/list —— Host IP 候选（入参 environment 可缺省）" },
       { type: "back", text: "值作为查询参数 `ipaddress` 随请求提交" },
       { type: "back", text: "入参：`environment`（可缺省）；出参：`data.ipaddress` = 字符串数组" },
       { type: "back", text: "提交时键名照原样全小写：`parameters.ipaddress`" }
@@ -2394,7 +2394,7 @@ const hotspots = [
     items: [
       { type: "front", text: "非必填；不选 = 不过滤" },
       { type: "front", text: "列表里的标红只认 CANCELRULE，与本筛选项是否选中无关" },
-      { type: "back", text: "GET /api/v1/rule_result/list —— Rule Result 候选" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_result/list —— Rule Result 候选" },
       { type: "back", text: "值作为查询参数 `ruleResult` 随请求提交" },
       { type: "back", text: "出参：`data.ruleResult` = 字符串数组（如 PASS、CANCELRULE）" },
       { type: "back", text: "入参：`parameters.ruleResult`，等值匹配" }
@@ -2409,7 +2409,7 @@ const hotspots = [
       { type: "front", text: "多值字段显示首值 + 角标；耗时三列按秒（3 位小数）；Rule Result = CANCELRULE 标红" },
       { type: "front", text: "行选择单选（行首单选框或点击整行）；翻页保留，重新 Search 或重置清空" },
       { type: "front", text: "空结果 / 加载中：三个操作按钮都不可用；加载中显示加载动画" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— 结果分页查询" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— 结果分页查询" },
       { type: "back", text: "行数据 = 出参 `data.contents[]`，字段与列同名：env ipaddress serverId ruleName requestType startTime endTime ruleResult errorCode eqpId lotId carrierId userId tid totalCostTime costSummary unaccountedCost execStatus" },
       { type: "back", text: "多值字段出参为数组（errorCode、eqpId、lotId、carrierId、tid）；出参 `id` = 块 _id，不出列，留给 Rule Log 与 Full Log 当入参" },
       { type: "back", text: "动态耗时列取 `costBreakDown[]` 里 `item` 与 `group` 命中那条的 `summary`；出参无 Server Hang 字段" }
@@ -2425,7 +2425,7 @@ const hotspots = [
       { type: "front", text: "总条数显示「共 N 条」，取自出参 `total`" },
       { type: "front", text: "选项变化：切换页码或每页条数后重新请求该页：pageIndex 传目标页、pageSize 传 20 或 50 或 100" },
       { type: "front", text: "选项变化：翻页保留已选中的行" },
-      { type: "back", text: "POST /api/v1/rule_info/page —— 结果分页查询" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/page —— 结果分页查询" },
       { type: "back", text: "出参 `data.totalPage` 给页码数量，`data.total` 给总条数；`data.pageIndex` 与 `data.pageSize` 回显当前页" }
     ],
   },
@@ -2439,8 +2439,8 @@ const hotspots = [
       { type: "front", text: "本期 Hang 未落库：按钮按「数量 ≤ 0」渲染（恒置灰、点不开）；落库后启用" },
       { type: "front", text: "列位置：列表最后一列，永远最后" },
       { type: "front", text: "数量 = page 出参 `contents[].hangCount`（HANG_LIST 长度）；列表不带 HANG_LIST 本体" },
-      { type: "back", text: "GET /api/v1/rule_info/hang_list —— Server Hang 弹框明细（该块全部 Hang，不分页）" },
-      { type: "back", text: "点击打开弹框时调 GET /api/v1/rule_info/hang_list，入参 `id` = 该行的块 id（page 出参 `contents[].id`）" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_info/hang_list —— Server Hang 弹框明细（该块全部 Hang，不分页）" },
+      { type: "back", text: "点击打开弹框时调 GET /log-viewer/api/v1/rule_info/hang_list，入参 `id` = 该行的块 id（page 出参 `contents[].id`）" },
       { type: "back", text: "原型按落库后实态演示：部分行 hangCount > 0（红色可点开弹框）、其余行演示置灰态；本期未落库前线上恒置灰" }
     ],
   },
@@ -2454,7 +2454,7 @@ const hotspots = [
       { type: "front", text: "耗时按秒、3 位小数；列表按开始行时间正序" },
       { type: "front", text: "按钮只有「关闭」一个" },
       { type: "front", text: "Hang Reason 列推后（接口已带回 hangReason 字段，弹框暂不展示）" },
-      { type: "back", text: "GET /api/v1/rule_info/hang_list —— Server Hang 弹框明细（该块全部 Hang，不分页）" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_info/hang_list —— Server Hang 弹框明细（该块全部 Hang，不分页）" },
       { type: "back", text: "出参条目字段：startTime、endTime、hangCostMs、startLineLog、endLineLog、hangReason（推后不出列）、startLineId / endLineId（不出列，跳原文锚备用）" },
       { type: "back", text: "一个块内条数有限，不分页；按 startTime 升序原样输出" }
     ],
@@ -2480,7 +2480,7 @@ const hotspots = [
       { type: "front", text: "选中一行时可用；取消选中则不可用" },
       { type: "front", text: "点击：用该行的块 _id 拉取日志，打开 Rule Info Detail 弹窗" },
       { type: "front", text: "前置条件：列表已选中一行" },
-      { type: "back", text: "GET /api/v1/rule_info/detail —— Rule Info Detail 日志按游标分页" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_info/detail —— Rule Info Detail 日志按游标分页" },
       { type: "back", text: "入参：`id` = 该行的块 `_id`；首次调用 `lastFingerprint` 与 `lastOffset` 留空" },
       { type: "back", text: "失败时轻提示错误信息" }
     ],
@@ -2495,7 +2495,7 @@ const hotspots = [
       { type: "front", text: "每个文件一个 .log，文件内按 LOG_OFFSET 升序；块只落在一个文件里时 zip 内就 1 个" },
       { type: "front", text: "与弹窗底部「全量下载」刻意分成两个动作：Full Log 是文件级（块涉及的全部文件、每个文件的全部行，先按文件分组）；全量下载是块级（本块自己的全部行，先按 LOG_FINGERPRINT 分组）" },
       { type: "front", text: "前置条件：列表已选中一行" },
-      { type: "back", text: "POST /api/v1/rule_info/full_log —— 按块涉及的全部文件还原、打包 zip 下载" },
+      { type: "back", text: "POST /log-viewer/api/v1/rule_info/full_log —— 按块涉及的全部文件还原、打包 zip 下载" },
       { type: "back", text: "出参是 zip 文件本身（直接下载，不走统一响应包）" }
     ],
   },
@@ -2530,7 +2530,7 @@ const hotspots = [
       { type: "front", text: "动态耗时列追加在列表最后、Server Hang 列之前；选 N 项追加 N 列" },
       { type: "front", text: "取值：出参 `costBreakDown[]` 里 `item` = LOCK 且 `group` = 本列锁对象那条的 `summary`（秒）；缺该项耗时则单元格显示空" },
       { type: "front", text: "选项变化：勾选记入浏览器本地" },
-      { type: "back", text: "GET /api/v1/lock_object/list —— Lock Object 多选候选" },
+      { type: "back", text: "GET /log-viewer/api/v1/lock_object/list —— Lock Object 多选候选" },
       { type: "back", text: "出参：`data.lockObject` = 字符串数组（如 EQP、CARRIER、LOT）" }
     ],
   },
@@ -2543,7 +2543,7 @@ const hotspots = [
       { type: "front", text: "取值：出参 `costBreakDown[]` 里 `item` = CALL 且 `group` = 本列被调系统那条的 `summary`（秒）" },
       { type: "front", text: "动态列总条数 N = Lock Object 与 Call Sys 选中项数之和" },
       { type: "front", text: "选项变化：勾选记入浏览器本地" },
-      { type: "back", text: "GET /api/v1/call_sys/list —— Call Sys 多选候选" },
+      { type: "back", text: "GET /log-viewer/api/v1/call_sys/list —— Call Sys 多选候选" },
       { type: "back", text: "出参：`data.calledSystem` = 字符串数组（如 MCS、R2R、RMS、SPC、RTD）" }
     ],
   },
@@ -2595,7 +2595,7 @@ const hotspots = [
       { type: "front", text: "滚动到最底部时按上一次的 `finished` 决定是否再调；再调带上 `lastFingerprint` = 上次返回的 `fingerprint`、`lastOffset` = 上次返回的 `offset`" },
       { type: "front", text: "新日志追加到最底部；加载中显示加载效果；全部取完后最底部显示「搜索完毕」" },
       { type: "front", text: "日志原文一条一行；超过显示区宽度时自动换行，不横向滚动、不截断" },
-      { type: "back", text: "GET /api/v1/rule_info/detail —— Rule Info Detail 日志按游标分页" },
+      { type: "back", text: "GET /log-viewer/api/v1/rule_info/detail —— Rule Info Detail 日志按游标分页" },
       { type: "back", text: "出参 `data.fingerprint` 与 `data.offset` 是下一批的游标，原样回传给 `lastFingerprint` 与 `lastOffset`" },
       { type: "back", text: "日志还原按 `LOG_FINGERPRINT` + `LOG_OFFSET` 两级排序（04 §5.2.4），游标用 (fingerprint, offset) 这一对" }
     ],

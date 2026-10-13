@@ -558,7 +558,7 @@
     closeDel();
     renderCats();
     if (gone) { view.cat = '全部'; renderCats(); query(false); toast('删除成功；分类「' + row.category + '」已清空，回落「全部」并重查'); }
-    else { query(false); toast('删除成功（DELETE /api/v1/sys_misc，入参仅 item）；已重取 Category 列表'); }
+    else { query(false); toast('删除成功（DELETE /log-viewer/api/v1/sys_misc，入参仅 item）；已重取 Category 列表'); }
   });
 
   /* ── 添加：表格第一行插空白行 + 打开新增弹框 ── */
@@ -832,7 +832,7 @@
     closeDialog(false);
     renderCats();
     query(false);
-    toast((isEdit ? 'PUT' : 'POST') + ' /api/v1/sys_misc · value=' + JSON.stringify(value).slice(0, 80)
+    toast((isEdit ? 'PUT' : 'POST') + ' /log-viewer/api/v1/sys_misc · value=' + JSON.stringify(value).slice(0, 80)
       + (JSON.stringify(value).length > 80 ? '…' : '')
       + '（已重取 Category 列表；' + (isEdit ? '行内容已覆盖' : '空白行已填充') + '）');
   });
@@ -882,31 +882,31 @@
     {
       "id": "sysMiscPage",
       "method": "GET",
-      "path": "/api/v1/sys_misc/page",
+      "path": "/log-viewer/api/v1/sys_misc/page",
       "desc": "分页查询（含 Category 过滤 + Condition 三栏模糊）"
     },
     {
       "id": "sysMiscCategoryList",
       "method": "GET",
-      "path": "/api/v1/sys_misc/category/list",
+      "path": "/log-viewer/api/v1/sys_misc/category/list",
       "desc": "Category 窄列表候选（distinct(category) 字典序，不分页）"
     },
     {
       "id": "sysMiscCreate",
       "method": "POST",
-      "path": "/api/v1/sys_misc",
+      "path": "/log-viewer/api/v1/sys_misc",
       "desc": "新增（item 冲突即拒）"
     },
     {
       "id": "sysMiscUpdate",
       "method": "PUT",
-      "path": "/api/v1/sys_misc",
+      "path": "/log-viewer/api/v1/sys_misc",
       "desc": "修改（item 作定位键）"
     },
     {
       "id": "sysMiscDelete",
       "method": "DELETE",
-      "path": "/api/v1/sys_misc",
+      "path": "/log-viewer/api/v1/sys_misc",
       "desc": "删除（入参仅 item）"
     }
   ],
@@ -1235,8 +1235,8 @@ const hotspots = [
       { type: "front", text: "与 Search 是同一查询的两个输入面：Search 同样结合左列表当前选中项，两侧谁最后变谁触发" },
       { type: "front", text: "增删改成功后重取本列表；当前选中项消失（该分类最后一行被删等）⇒ 回落「全部」并重查" },
       { type: "front", text: "不做条数计数（快节奏轻查询，只出分类名）" },
-      { type: "back", text: "GET /api/v1/sys_misc/category/list —— Category 窄列表候选（distinct(category) 字典序，不分页）" },
-      { type: "back", text: "GET /api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
+      { type: "back", text: "GET /log-viewer/api/v1/sys_misc/category/list —— Category 窄列表候选（distinct(category) 字典序，不分页）" },
+      { type: "back", text: "GET /log-viewer/api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
       { type: "back", text: "category/list 出参：`data = { \"category\": [ … ] }`，不分页" },
       { type: "back", text: "page 的 category 入参：等值、可空 = 不按分类过滤（左列表选「全部」时不带）" }
     ],
@@ -1258,7 +1258,7 @@ const hotspots = [
     title: "Search｜按钮",
     items: [
       { type: "front", text: "查第 1 页，结合左列表当前选中项（选「全部」不带 category）" },
-      { type: "back", text: "GET /api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
+      { type: "back", text: "GET /log-viewer/api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
       { type: "back", text: "入参：pageIndex=1、pageSize=20、condition、category" }
     ],
   },
@@ -1271,7 +1271,7 @@ const hotspots = [
       { type: "front", text: "Description 超长省略号截断；Value 按 JSON 字符串显示、超长省略号截断、可点击打开查看弹框" },
       { type: "front", text: "行键 = item（id 不出参）；分页每页 20（不分档），总条数取出参 total" },
       { type: "front", text: "新增保存成功 ⇒ 表格第一行空白行填充出参内容；取消 / 失败 ⇒ 移除空白行；修改保存 ⇒ 直接覆盖该行；删除 ⇒ 直接删该行" },
-      { type: "back", text: "GET /api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
+      { type: "back", text: "GET /log-viewer/api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
       { type: "back", text: "行数据 = page 出参 contents[]（item / description / category / value / updatedAt / updatedBy）" }
     ],
   },
@@ -1300,7 +1300,7 @@ const hotspots = [
     items: [
       { type: "front", text: "弹框确认后才调删除接口；成功后直接删除该行" },
       { type: "front", text: "删除成功后重取 Category 列表（选中项消失 ⇒ 回落「全部」并重查）" },
-      { type: "back", text: "DELETE /api/v1/sys_misc —— 删除（入参仅 item）" },
+      { type: "back", text: "DELETE /log-viewer/api/v1/sys_misc —— 删除（入参仅 item）" },
       { type: "back", text: "入参仅 item；出参只报成败" }
     ],
   },
@@ -1319,7 +1319,7 @@ const hotspots = [
     title: "分页组件｜分页控件",
     items: [
       { type: "front", text: "每页 20 条（不分档）；翻页按页码再调 page" },
-      { type: "back", text: "GET /api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
+      { type: "back", text: "GET /log-viewer/api/v1/sys_misc/page —— 分页查询（含 Category 过滤 + Condition 三栏模糊）" },
       { type: "back", text: "翻页传目标 pageIndex" }
     ],
   },
@@ -1334,8 +1334,8 @@ const hotspots = [
       { type: "front", text: "Cancel：清空全部控件值、关闭弹框（新增模式同时移除空白行）" },
       { type: "front", text: "Category：combobox（下拉 + 输入双模式），候选 = 本表 distinct（与 category/list 同源），仅字母数字 ≤ 20" },
       { type: "front", text: "Description：多行文本域，不限字符格式，长度 ≤ 4000" },
-      { type: "back", text: "POST /api/v1/sys_misc —— 新增（item 冲突即拒）" },
-      { type: "back", text: "PUT /api/v1/sys_misc —— 修改（item 作定位键）" },
+      { type: "back", text: "POST /log-viewer/api/v1/sys_misc —— 新增（item 冲突即拒）" },
+      { type: "back", text: "PUT /log-viewer/api/v1/sys_misc —— 修改（item 作定位键）" },
       { type: "back", text: "POST / PUT 入参四字段（item / category / description / value）；value 接口传入即入库格式，后端零转换" }
     ],
   },
@@ -1362,8 +1362,8 @@ const hotspots = [
     items: [
       { type: "front", text: "提交前校验（Item / Description / Category / Value 全量），不合法拦住" },
       { type: "front", text: "新增 item 冲突（唯一索引）⇒ 拒（错误码，不覆盖）" },
-      { type: "back", text: "POST /api/v1/sys_misc —— 新增（item 冲突即拒）" },
-      { type: "back", text: "PUT /api/v1/sys_misc —— 修改（item 作定位键）" },
+      { type: "back", text: "POST /log-viewer/api/v1/sys_misc —— 新增（item 冲突即拒）" },
+      { type: "back", text: "PUT /log-viewer/api/v1/sys_misc —— 修改（item 作定位键）" },
       { type: "back", text: "保存成功后页面重取 Category 列表" }
     ],
   },
@@ -1382,7 +1382,7 @@ const hotspots = [
     title: "删除确认弹框｜弹窗",
     items: [
       { type: "front", text: "展示待删 item；确认后才调删除接口" },
-      { type: "back", text: "DELETE /api/v1/sys_misc —— 删除（入参仅 item）" },
+      { type: "back", text: "DELETE /log-viewer/api/v1/sys_misc —— 删除（入参仅 item）" },
       { type: "back", text: "入参仅 item" }
     ],
   },

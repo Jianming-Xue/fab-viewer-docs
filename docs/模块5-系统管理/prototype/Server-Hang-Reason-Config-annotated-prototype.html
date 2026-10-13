@@ -476,12 +476,12 @@
     var row = JSON.parse(tr.getAttribute('data-row'));
     row.enabled = on;
     tr.setAttribute('data-row', JSON.stringify(row));
-    toast('已切换 enabled = ' + on + '（POST /api/v1/srv_hang_cfg/state，局部更新本行不重拉；最迟 5 分钟生效，历史 Hang 不回算）');
+    toast('已切换 enabled = ' + on + '（POST /log-viewer/api/v1/srv_hang_cfg/state，局部更新本行不重拉；最迟 5 分钟生效，历史 Hang 不回算）');
   });
 
   /* 刷新：重拉第一页 */
   $('btnRefresh').addEventListener('click', function () {
-    toast('已重新拉取第一页（GET /api/v1/srv_hang_cfg/page，默认排序 ruleName + hangReason 升序）');
+    toast('已重新拉取第一页（GET /log-viewer/api/v1/srv_hang_cfg/page，默认排序 ruleName + hangReason 升序）');
   });
 
   /* 表单校验（Confirm 时全量；字符集/长度按 §4.2） */
@@ -510,9 +510,9 @@
     var sLike = joinLike($('startLineInput').value, radioOf('start'));
     var eLike = joinLike($('endLineInput').value, radioOf('end'));
     if (editing) {
-      toast('PUT /api/v1/srv_hang_cfg · id=' + editing + ' · startLineLike=“' + sLike + '” · endLineLike=“' + eLike + '”（% 由单选框拼回首尾）');
+      toast('PUT /log-viewer/api/v1/srv_hang_cfg · id=' + editing + ' · startLineLike=“' + sLike + '” · endLineLike=“' + eLike + '”（% 由单选框拼回首尾）');
     } else {
-      toast('POST /api/v1/srv_hang_cfg · id=null · startLineLike=“' + sLike + '” · endLineLike=“' + eLike + '”（新配置插入表格第一行；业务唯一键 ruleName+hangReason 冲突即拒）');
+      toast('POST /log-viewer/api/v1/srv_hang_cfg · id=null · startLineLike=“' + sLike + '” · endLineLike=“' + eLike + '”（新配置插入表格第一行；业务唯一键 ruleName+hangReason 冲突即拒）');
     }
   });
 
@@ -560,31 +560,31 @@
     {
       "id": "cfgPage",
       "method": "GET",
-      "path": "/api/v1/srv_hang_cfg/page",
+      "path": "/log-viewer/api/v1/srv_hang_cfg/page",
       "desc": "分页取配置（默认排序 ruleName + hangReason 升序）"
     },
     {
       "id": "cfgState",
       "method": "POST",
-      "path": "/api/v1/srv_hang_cfg/state",
+      "path": "/log-viewer/api/v1/srv_hang_cfg/state",
       "desc": "切换一条配置的 enabled"
     },
     {
       "id": "cfgCreate",
       "method": "POST",
-      "path": "/api/v1/srv_hang_cfg",
+      "path": "/log-viewer/api/v1/srv_hang_cfg",
       "desc": "新增（id 为空）"
     },
     {
       "id": "cfgUpdate",
       "method": "PUT",
-      "path": "/api/v1/srv_hang_cfg",
+      "path": "/log-viewer/api/v1/srv_hang_cfg",
       "desc": "编辑（id = 选中行）"
     },
     {
       "id": "cfgDelete",
       "method": "DELETE",
-      "path": "/api/v1/srv_hang_cfg",
+      "path": "/log-viewer/api/v1/srv_hang_cfg",
       "desc": "删除（仅 id）"
     }
   ],
@@ -954,7 +954,7 @@ const hotspots = [
     items: [
       { type: "front", text: "页面无搜索框，顶部只有本刷新按钮" },
       { type: "front", text: "点击重新调 page 取第一页并回显" },
-      { type: "back", text: "GET /api/v1/srv_hang_cfg/page —— 分页取配置（默认排序 ruleName + hangReason 升序）" },
+      { type: "back", text: "GET /log-viewer/api/v1/srv_hang_cfg/page —— 分页取配置（默认排序 ruleName + hangReason 升序）" },
       { type: "back", text: "入参仅 pageIndex=1、pageSize=20；出参 contents[] 含 id 与全部列字段（startLineLike / endLineLike 为带 % 的库中完整值）" }
     ],
   },
@@ -967,7 +967,7 @@ const hotspots = [
       { type: "front", text: "Start / End Line Like 列显示库中带 % 的完整值" },
       { type: "front", text: "行选择单选、不支持多选；点击行选中（Action 与开关不触发选中切换）" },
       { type: "front", text: "翻页按页码再调 page 接口（推定）" },
-      { type: "back", text: "GET /api/v1/srv_hang_cfg/page —— 分页取配置（默认排序 ruleName + hangReason 升序）" },
+      { type: "back", text: "GET /log-viewer/api/v1/srv_hang_cfg/page —— 分页取配置（默认排序 ruleName + hangReason 升序）" },
       { type: "back", text: "行数据 = page 出参 contents[]；id 不出列，编辑 / 删除 / 切换的入参都用它" }
     ],
   },
@@ -979,7 +979,7 @@ const hotspots = [
       { type: "front", text: "开关形态、可直接操作：true 打开 / false 关闭" },
       { type: "front", text: "停用即该配置不参与判定（块不再产出该 Reason 的 Hang）；已产出的历史 Hang 不受影响（不回算）" },
       { type: "front", text: "点击：调 state 接口切换该条 enabled；成功后局部更新该行 Enabled 列，不重拉列表" },
-      { type: "back", text: "POST /api/v1/srv_hang_cfg/state —— 切换一条配置的 enabled" },
+      { type: "back", text: "POST /log-viewer/api/v1/srv_hang_cfg/state —— 切换一条配置的 enabled" },
       { type: "back", text: "入参 { id, enabled }；出参 data 为空只报成败" },
       { type: "back", text: "判定行为最迟 5 分钟生效（消费方 5min 缓存）" }
     ],
@@ -1002,7 +1002,7 @@ const hotspots = [
     items: [
       { type: "front", text: "弹框确认后才调 DELETE；成功后表格中删除该行" },
       { type: "front", text: "已产出的历史 Hang 记录不受影响（不回算）" },
-      { type: "back", text: "DELETE /api/v1/srv_hang_cfg —— 删除（仅 id）" },
+      { type: "back", text: "DELETE /log-viewer/api/v1/srv_hang_cfg —— 删除（仅 id）" },
       { type: "back", text: "入参仅 id；出参 data 为空只报成败" }
     ],
   },
@@ -1088,8 +1088,8 @@ const hotspots = [
       { type: "front", text: "提交拼接：startLineLike / endLineLike 的入参值 = 输入框文本按各自单选框追加 % 后的完整形态" },
       { type: "front", text: "enabled 不入参（新增默认值由后端定，出参回显）" },
       { type: "front", text: "新增 / 修改校验业务唯一键（ruleName + hangReason，冲突即拒）" },
-      { type: "back", text: "POST /api/v1/srv_hang_cfg —— 新增（id 为空）" },
-      { type: "back", text: "PUT /api/v1/srv_hang_cfg —— 编辑（id = 选中行）" },
+      { type: "back", text: "POST /log-viewer/api/v1/srv_hang_cfg —— 新增（id 为空）" },
+      { type: "back", text: "PUT /log-viewer/api/v1/srv_hang_cfg —— 编辑（id = 选中行）" },
       { type: "back", text: "两接口入参同为 5 字段（id / ruleName / hangReason / startLineLike / endLineLike）；出参 = 单条配置对象" }
     ],
   },
@@ -1109,7 +1109,7 @@ const hotspots = [
     items: [
       { type: "front", text: "每页 20 条（不分档）；按页码再调 page 接口" },
       { type: "front", text: "总条数取出参 total" },
-      { type: "back", text: "GET /api/v1/srv_hang_cfg/page —— 分页取配置（默认排序 ruleName + hangReason 升序）" },
+      { type: "back", text: "GET /log-viewer/api/v1/srv_hang_cfg/page —— 分页取配置（默认排序 ruleName + hangReason 升序）" },
       { type: "back", text: "翻页传目标 pageIndex" }
     ],
   },
@@ -1119,7 +1119,7 @@ const hotspots = [
     title: "删除确认弹框｜弹窗",
     items: [
       { type: "front", text: "展示待删配置的 ruleName / hangReason 与「历史 Hang 不回算」提示；确认后才调 DELETE" },
-      { type: "back", text: "DELETE /api/v1/srv_hang_cfg —— 删除（仅 id）" },
+      { type: "back", text: "DELETE /log-viewer/api/v1/srv_hang_cfg —— 删除（仅 id）" },
       { type: "back", text: "入参仅 id" }
     ],
   },

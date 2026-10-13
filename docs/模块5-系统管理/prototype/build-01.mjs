@@ -289,12 +289,12 @@ const PAGE_SCRIPT = `
     var row = JSON.parse(tr.getAttribute('data-row'));
     row.enabled = on;
     tr.setAttribute('data-row', JSON.stringify(row));
-    toast('已切换 enabled = ' + on + '（POST /api/v1/srv_hang_cfg/state，局部更新本行不重拉；最迟 5 分钟生效，历史 Hang 不回算）');
+    toast('已切换 enabled = ' + on + '（POST /log-viewer/api/v1/srv_hang_cfg/state，局部更新本行不重拉；最迟 5 分钟生效，历史 Hang 不回算）');
   });
 
   /* 刷新：重拉第一页 */
   $('btnRefresh').addEventListener('click', function () {
-    toast('已重新拉取第一页（GET /api/v1/srv_hang_cfg/page，默认排序 ruleName + hangReason 升序）');
+    toast('已重新拉取第一页（GET /log-viewer/api/v1/srv_hang_cfg/page，默认排序 ruleName + hangReason 升序）');
   });
 
   /* 表单校验（Confirm 时全量；字符集/长度按 §4.2） */
@@ -323,9 +323,9 @@ const PAGE_SCRIPT = `
     var sLike = joinLike($('startLineInput').value, radioOf('start'));
     var eLike = joinLike($('endLineInput').value, radioOf('end'));
     if (editing) {
-      toast('PUT /api/v1/srv_hang_cfg · id=' + editing + ' · startLineLike=“' + sLike + '” · endLineLike=“' + eLike + '”（% 由单选框拼回首尾）');
+      toast('PUT /log-viewer/api/v1/srv_hang_cfg · id=' + editing + ' · startLineLike=“' + sLike + '” · endLineLike=“' + eLike + '”（% 由单选框拼回首尾）');
     } else {
-      toast('POST /api/v1/srv_hang_cfg · id=null · startLineLike=“' + sLike + '” · endLineLike=“' + eLike + '”（新配置插入表格第一行；业务唯一键 ruleName+hangReason 冲突即拒）');
+      toast('POST /log-viewer/api/v1/srv_hang_cfg · id=null · startLineLike=“' + sLike + '” · endLineLike=“' + eLike + '”（新配置插入表格第一行；业务唯一键 ruleName+hangReason 冲突即拒）');
     }
   });
 
@@ -465,11 +465,11 @@ const spec = {
     { id: 'form', label: '配置控件区（表单）', role: 'form', desc: '新增 / 编辑共用一套表单；四式匹配用单选框表达、% 不进输入框；Confirm 按模式走 POST / PUT' },
   ],
   apis: [
-    { id: 'cfgPage', method: 'GET', path: '/api/v1/srv_hang_cfg/page', desc: '分页取配置（默认排序 ruleName + hangReason 升序）' },
-    { id: 'cfgState', method: 'POST', path: '/api/v1/srv_hang_cfg/state', desc: '切换一条配置的 enabled' },
-    { id: 'cfgCreate', method: 'POST', path: '/api/v1/srv_hang_cfg', desc: '新增（id 为空）' },
-    { id: 'cfgUpdate', method: 'PUT', path: '/api/v1/srv_hang_cfg', desc: '编辑（id = 选中行）' },
-    { id: 'cfgDelete', method: 'DELETE', path: '/api/v1/srv_hang_cfg', desc: '删除（仅 id）' },
+    { id: 'cfgPage', method: 'GET', path: '/log-viewer/api/v1/srv_hang_cfg/page', desc: '分页取配置（默认排序 ruleName + hangReason 升序）' },
+    { id: 'cfgState', method: 'POST', path: '/log-viewer/api/v1/srv_hang_cfg/state', desc: '切换一条配置的 enabled' },
+    { id: 'cfgCreate', method: 'POST', path: '/log-viewer/api/v1/srv_hang_cfg', desc: '新增（id 为空）' },
+    { id: 'cfgUpdate', method: 'PUT', path: '/log-viewer/api/v1/srv_hang_cfg', desc: '编辑（id = 选中行）' },
+    { id: 'cfgDelete', method: 'DELETE', path: '/log-viewer/api/v1/srv_hang_cfg', desc: '删除（仅 id）' },
   ],
   controls: [
     {

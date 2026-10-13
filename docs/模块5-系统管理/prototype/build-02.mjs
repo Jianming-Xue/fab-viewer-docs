@@ -327,7 +327,7 @@ const PAGE_SCRIPT = `
     closeDel();
     renderCats();
     if (gone) { view.cat = '全部'; renderCats(); query(false); toast('删除成功；分类「' + row.category + '」已清空，回落「全部」并重查'); }
-    else { query(false); toast('删除成功（DELETE /api/v1/sys_misc，入参仅 item）；已重取 Category 列表'); }
+    else { query(false); toast('删除成功（DELETE /log-viewer/api/v1/sys_misc，入参仅 item）；已重取 Category 列表'); }
   });
 
   /* ── 添加：表格第一行插空白行 + 打开新增弹框 ── */
@@ -601,7 +601,7 @@ const PAGE_SCRIPT = `
     closeDialog(false);
     renderCats();
     query(false);
-    toast((isEdit ? 'PUT' : 'POST') + ' /api/v1/sys_misc · value=' + JSON.stringify(value).slice(0, 80)
+    toast((isEdit ? 'PUT' : 'POST') + ' /log-viewer/api/v1/sys_misc · value=' + JSON.stringify(value).slice(0, 80)
       + (JSON.stringify(value).length > 80 ? '…' : '')
       + '（已重取 Category 列表；' + (isEdit ? '行内容已覆盖' : '空白行已填充') + '）');
   });
@@ -769,11 +769,11 @@ const spec = {
     { id: 'dialog', label: '三模式弹框', role: 'form', desc: '查看 / 修改 / 新增同一组件；Value 结构化编辑（Single / Multi）' },
   ],
   apis: [
-    { id: 'sysMiscPage', method: 'GET', path: '/api/v1/sys_misc/page', desc: '分页查询（含 Category 过滤 + Condition 三栏模糊）' },
-    { id: 'sysMiscCategoryList', method: 'GET', path: '/api/v1/sys_misc/category/list', desc: 'Category 窄列表候选（distinct(category) 字典序，不分页）' },
-    { id: 'sysMiscCreate', method: 'POST', path: '/api/v1/sys_misc', desc: '新增（item 冲突即拒）' },
-    { id: 'sysMiscUpdate', method: 'PUT', path: '/api/v1/sys_misc', desc: '修改（item 作定位键）' },
-    { id: 'sysMiscDelete', method: 'DELETE', path: '/api/v1/sys_misc', desc: '删除（入参仅 item）' },
+    { id: 'sysMiscPage', method: 'GET', path: '/log-viewer/api/v1/sys_misc/page', desc: '分页查询（含 Category 过滤 + Condition 三栏模糊）' },
+    { id: 'sysMiscCategoryList', method: 'GET', path: '/log-viewer/api/v1/sys_misc/category/list', desc: 'Category 窄列表候选（distinct(category) 字典序，不分页）' },
+    { id: 'sysMiscCreate', method: 'POST', path: '/log-viewer/api/v1/sys_misc', desc: '新增（item 冲突即拒）' },
+    { id: 'sysMiscUpdate', method: 'PUT', path: '/log-viewer/api/v1/sys_misc', desc: '修改（item 作定位键）' },
+    { id: 'sysMiscDelete', method: 'DELETE', path: '/log-viewer/api/v1/sys_misc', desc: '删除（入参仅 item）' },
   ],
   controls: [
     {

@@ -379,11 +379,11 @@ const spec = {
     { id: 'actions', label: '底部操作区', role: 'actions', desc: 'Download（唯一按钮，已选 ≥ 1 行才可用）' },
   ],
   apis: [
-    { id: 'envList', method: 'GET', path: '/api/v1/env/list', desc: 'Environment 候选（沿用 01 §5.3 第 1 条）' },
-    { id: 'ipAddressList', method: 'GET', path: '/api/v1/ipaddress/list', desc: 'Host IP 候选（沿用 01 §5.3 第 2 条；入参 environment 可缺省）' },
-    { id: 'serverCategoryList', method: 'GET', path: '/api/v1/server_category/list', desc: 'Server Category 候选（沿用 01 §5.3 第 3 条）' },
-    { id: 'rawLogPage', method: 'GET', path: '/api/v1/raw_log/page', desc: '文件分页查询（条件走 URL 参数）' },
-    { id: 'rawLogDownload', method: 'POST', path: '/api/v1/raw_log/download', desc: '整文件还原打包 zip 下载' },
+    { id: 'envList', method: 'GET', path: '/log-viewer/api/v1/env/list', desc: 'Environment 候选（沿用 01 §5.3 第 1 条）' },
+    { id: 'ipAddressList', method: 'GET', path: '/log-viewer/api/v1/ipaddress/list', desc: 'Host IP 候选（沿用 01 §5.3 第 2 条；入参 environment 可缺省）' },
+    { id: 'serverCategoryList', method: 'GET', path: '/log-viewer/api/v1/server_category/list', desc: 'Server Category 候选（沿用 01 §5.3 第 3 条）' },
+    { id: 'rawLogPage', method: 'GET', path: '/log-viewer/api/v1/raw_log/page', desc: '文件分页查询（条件走 URL 参数）' },
+    { id: 'rawLogDownload', method: 'POST', path: '/log-viewer/api/v1/raw_log/download', desc: '整文件还原打包 zip 下载' },
   ],
   controls: [
     {

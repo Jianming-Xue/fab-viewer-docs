@@ -1139,12 +1139,12 @@ const spec = {
     { id: 'compare', label: 'Compare Rule Info 弹窗', role: 'detail', desc: '上框 = 请求 message 比对（首行解析成 KV 集合、按 Key 字典序对齐、差异标记）；下框 = 完整日志左右比对（各自游标分页、原始行号对齐、偏移同步滚动、提前预取）' },
   ],
   apis: [
-    { id: 'envList', method: 'GET', path: '/api/v1/env/list', desc: 'Source / Target 的 Environment 候选（同 01 §5.3 第 1 条）' },
-    { id: 'lockObjectList', method: 'GET', path: '/api/v1/lock_object/list', desc: '列设置 Lock Object 候选（同 01 §5.3 第 5 条）' },
-    { id: 'callSysList', method: 'GET', path: '/api/v1/call_sys/list', desc: '列设置 Call Sys 候选（同 01 §5.3 第 6 条）' },
-    { id: 'ruleInfoPage', method: 'POST', path: '/api/v1/rule_info/page', desc: 'Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）' },
-    { id: 'ruleInfoDetail', method: 'GET', path: '/api/v1/rule_info/detail', desc: 'Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）' },
-    { id: 'ruleInfoRuleLog', method: 'POST', path: '/api/v1/rule_info/rule_log', desc: 'Download Rule Info 下载 Rule 日志（本功能新增）' },
+    { id: 'envList', method: 'GET', path: '/log-viewer/api/v1/env/list', desc: 'Source / Target 的 Environment 候选（同 01 §5.3 第 1 条）' },
+    { id: 'lockObjectList', method: 'GET', path: '/log-viewer/api/v1/lock_object/list', desc: '列设置 Lock Object 候选（同 01 §5.3 第 5 条）' },
+    { id: 'callSysList', method: 'GET', path: '/log-viewer/api/v1/call_sys/list', desc: '列设置 Call Sys 候选（同 01 §5.3 第 6 条）' },
+    { id: 'ruleInfoPage', method: 'POST', path: '/log-viewer/api/v1/rule_info/page', desc: 'Source 与 Target 的检索（同 01 §5.3 第 9 条；本功能调两次，填参差异见各 Search 控件标注）' },
+    { id: 'ruleInfoDetail', method: 'GET', path: '/log-viewer/api/v1/rule_info/detail', desc: 'Compare 时两侧分页拉日志（同 01 §5.3 第 7 条；两侧各持一套游标）' },
+    { id: 'ruleInfoRuleLog', method: 'POST', path: '/log-viewer/api/v1/rule_info/rule_log', desc: 'Download Rule Info 下载 Rule 日志（本功能新增）' },
   ],
   controls: [
     {
@@ -1362,7 +1362,7 @@ const spec = {
       on: { click: ['分别用选中 Source 行与 Target 行的块 id 打开比较弹窗'] },
       apis: ['ruleInfoDetail'],
       apiNotes: [
-        '点 Compare 后两侧分别调 GET /api/v1/rule_info/detail，游标分页拉完各自请求的完整日志（finished = true 为止）',
+        '点 Compare 后两侧分别调 GET /log-viewer/api/v1/rule_info/detail，游标分页拉完各自请求的完整日志（finished = true 为止）',
         '两侧各自独立持游标 (lastFingerprint, lastOffset)，互不影响',
       ],
     },

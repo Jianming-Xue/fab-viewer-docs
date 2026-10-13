@@ -482,31 +482,31 @@
     {
       "id": "envList",
       "method": "GET",
-      "path": "/api/v1/env/list",
+      "path": "/log-viewer/api/v1/env/list",
       "desc": "Environment 候选（沿用 01 §5.3 第 1 条）"
     },
     {
       "id": "ipAddressList",
       "method": "GET",
-      "path": "/api/v1/ipaddress/list",
+      "path": "/log-viewer/api/v1/ipaddress/list",
       "desc": "Host IP 候选（沿用 01 §5.3 第 2 条；入参 environment 可缺省）"
     },
     {
       "id": "serverCategoryList",
       "method": "GET",
-      "path": "/api/v1/server_category/list",
+      "path": "/log-viewer/api/v1/server_category/list",
       "desc": "Server Category 候选（沿用 01 §5.3 第 3 条）"
     },
     {
       "id": "rawLogPage",
       "method": "GET",
-      "path": "/api/v1/raw_log/page",
+      "path": "/log-viewer/api/v1/raw_log/page",
       "desc": "文件分页查询（条件走 URL 参数）"
     },
     {
       "id": "rawLogDownload",
       "method": "POST",
-      "path": "/api/v1/raw_log/download",
+      "path": "/log-viewer/api/v1/raw_log/download",
       "desc": "整文件还原打包 zip 下载"
     }
   ],
@@ -855,7 +855,7 @@ const hotspots = [
       { type: "front", text: "进入页面：进页面加载候选值" },
       { type: "front", text: "选项变化：重取 Host IP 候选值" },
       { type: "front", text: "选项变化：清空已选的 Host IP" },
-      { type: "back", text: "GET /api/v1/env/list —— Environment 候选（沿用 01 §5.3 第 1 条）" },
+      { type: "back", text: "GET /log-viewer/api/v1/env/list —— Environment 候选（沿用 01 §5.3 第 1 条）" },
       { type: "back", text: "值作为查询参数 `env` 随请求提交" },
       { type: "back", text: "出参：`data.env` = 字符串数组" },
       { type: "back", text: "入参：URL 参数 `env`" }
@@ -871,7 +871,7 @@ const hotspots = [
       { type: "front", text: "Environment 变化时重取候选并清空已选值" },
       { type: "front", text: "进入页面：进页面调候选接口（不带参）" },
       { type: "front", text: "进入页面：Environment 选值后再调一次并带上 `environment` 参数" },
-      { type: "back", text: "GET /api/v1/ipaddress/list —— Host IP 候选（沿用 01 §5.3 第 2 条；入参 environment 可缺省）" },
+      { type: "back", text: "GET /log-viewer/api/v1/ipaddress/list —— Host IP 候选（沿用 01 §5.3 第 2 条；入参 environment 可缺省）" },
       { type: "back", text: "值作为查询参数 `hostIp` 随请求提交" },
       { type: "back", text: "入参：`environment`（可缺省）；出参：`data.ipaddress` = 字符串数组" },
       { type: "back", text: "入参：URL 参数 `hostIp`" }
@@ -884,7 +884,7 @@ const hotspots = [
     items: [
       { type: "front", text: "非必填；不选 = 不过滤" },
       { type: "front", text: "等值过滤行文档字段 SERVER_CATEGORY" },
-      { type: "back", text: "GET /api/v1/server_category/list —— Server Category 候选（沿用 01 §5.3 第 3 条）" },
+      { type: "back", text: "GET /log-viewer/api/v1/server_category/list —— Server Category 候选（沿用 01 §5.3 第 3 条）" },
       { type: "back", text: "值作为查询参数 `serverCategory` 随请求提交" },
       { type: "back", text: "出参：`data.serverCategory` = 字符串数组" },
       { type: "back", text: "入参：URL 参数 `serverCategory`" }
@@ -925,7 +925,7 @@ const hotspots = [
       { type: "front", text: "调接口前对条件做前置校验，不合法不发请求" },
       { type: "front", text: "重新 Search 会清空已选文件（与翻页保留相反）" },
       { type: "front", text: "点击：查第 1 页：pageIndex 传 1、pageSize 传 20" },
-      { type: "back", text: "GET /api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
+      { type: "back", text: "GET /log-viewer/api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
       { type: "back", text: "入参：URL 参数 pageIndex / pageSize + 五个可选条件（env、hostIp、serverCategory 等值；startTime / endTime 打 LOG_TIME）" },
       { type: "back", text: "出参：统一响应包 `data` = totalPage / total / pageIndex / pageSize / contents[]" }
     ],
@@ -952,7 +952,7 @@ const hotspots = [
       { type: "front", text: "File Name = 行文档 LOG_FILE 原值（含滚动序号，如 DT_PRD_MBX.FABsrv.log.1）" },
       { type: "front", text: "行选择多选（复选框，与功能 1 / 2 的单选不同）；跨页保留；重新 Search / 重置一律清空" },
       { type: "front", text: "空结果时 Download 不可用；加载中列表显示动画、Download 置灰" },
-      { type: "back", text: "GET /api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
+      { type: "back", text: "GET /log-viewer/api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
       { type: "back", text: "行数据 = 出参 `data.contents[]`：env、hostIp、serverCategory、startTime、endTime、fileName" },
       { type: "back", text: "出参 `id` = 文件 id（base64url(ENV|HOSTIP|LOG_FINGERPRINT 完整 64 hex)），对客户端不透明、不出列、同一文件恒定；两个文件代 = 两个指纹 = 两个 id，列表天然两行" }
     ],
@@ -977,7 +977,7 @@ const hotspots = [
       { type: "front", text: "总条数显示「共 N 条」，取自出参 total" },
       { type: "front", text: "翻页保留已选文件" },
       { type: "front", text: "选项变化：翻页请求目标页：pageIndex 传目标页" },
-      { type: "back", text: "GET /api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
+      { type: "back", text: "GET /log-viewer/api/v1/raw_log/page —— 文件分页查询（条件走 URL 参数）" },
       { type: "back", text: "出参 `data.totalPage` 给页码数量" }
     ],
   },
@@ -992,7 +992,7 @@ const hotspots = [
       { type: "front", text: "单个 id 解码失败 / 查无行 ⇒ 整单失败返回错误（不部分下载）" },
       { type: "front", text: "单次上限不设（后端流式生成 zip）" },
       { type: "front", text: "前置条件：已选中 ≥ 1 行（空列表 / 未选中不可用）" },
-      { type: "back", text: "POST /api/v1/raw_log/download —— 整文件还原打包 zip 下载" },
+      { type: "back", text: "POST /log-viewer/api/v1/raw_log/download —— 整文件还原打包 zip 下载" },
       { type: "back", text: "入参：`{\"ids\": [\"<文件 id>\", \"...\"]}`；出参是 .zip 文件本身，直接下载不走统一响应包" },
       { type: "back", text: ".log 命名 = 环境-类别-文件首行时间戳（还原后全部行的最早行，yyyyMMddHHmmss）；同目录撞名追加 .1、.2（不覆盖）" },
       { type: "back", text: "zip 内三级目录：环境 → Host IP → Server Category" },
