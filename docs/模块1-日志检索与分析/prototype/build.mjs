@@ -1,7 +1,7 @@
 /**
  * 生成「MES Rule 信息检索」标注原型（单文件自包含 HTML）。
  *
- * 设计依据：docs/模块1-日志检索与分析/01-MES Rule信息检索.md（2026-09-22 新口径）
+ * 设计依据：docs/模块1-日志检索与分析/01-MES Rule信息检索.md
  * 视觉令牌：docs/05-视觉与交互规范.md（AntD 5 语汇 · 高级绿 #2F7D5A · 圆角 6px）
  * 生成框架：~/.config/mimocode/skills/annotated-prototype（只替换 4 个占位符）
  *

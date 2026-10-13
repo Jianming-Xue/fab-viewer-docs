@@ -38,13 +38,13 @@
 
 | # | 模块 | 一期内容 | 性质 | 状态 |
 |---|---|---|---|---|
-| 1 | 日志检索与分析 | Rule 信息检索 / Rule 实效分析 / 原始日志下载 | 迁移 | **已收口**（2026-09-14）；功能 2 留 1 项待办；Hang 展示唯一出口在功能 1（`hangCount` + `hang_list` 接口；功能 2 **不消费**，2026-10-09 定） |
-| 2 | 日志监控与报警 | 关键字监控 / Server Hang 报警 / RV QUEUE（仅展示） | 迁移 | **沟通中**：功能 1 已收口、功能 2 判定两轮（2026-09-24）+ 配置存储架构与拆分（2026-10-09，**只剩第二类**）、功能 3 暂挂（数据源非日志） |
+| 1 | 日志检索与分析 | Rule 信息检索 / Rule 实效分析 / 原始日志下载 | 迁移 | **已收口**；功能 2 留 1 项待办；Hang 展示唯一出口在功能 1（`hangCount` + `hang_list` 接口；功能 2 **不消费**） |
+| 2 | 日志监控与报警 | 关键字监控 / Server Hang 报警 / RV QUEUE（仅展示） | 迁移 | **沟通中**：功能 1 已收口、功能 2 判定两轮 + 配置存储架构与拆分（**只剩第二类**）、功能 3 暂挂（数据源非日志） |
 | 3 | 性能报告 | Server / Rule / Loading 等五项报告 | 迁移 | 未开工 |
 | 4 | Home 页 | 关键 Server Dashboard / 告警 Dashboard | 迁移 | 未开工（报警卡片指标与模块 2 联动，留到此阶段定） |
-| 5 | 系统管理 | 用户权限 / 连接配置 / Misc / Server Hang 配置 | **重做** | 未开工（各配置页候选值依赖它）；**Server Hang Reason Config 已定稿**（2026-10-09：配置逻辑 + 页面 + 五接口，零待定） |
+| 5 | 系统管理 | 用户权限 / 连接配置 / Misc / Server Hang 配置 | **重做** | 未开工（各配置页候选值依赖它）；**Server Hang Reason Config 已定稿** |
 
-**告警层：** `07-告警服务工程实现.md` 与 `08-告警详情设计.md` **已清空**（2026-09-21 告警层重做）—— 配置模型改为「**可复用配置表 + 发送规则**」两层，待新口径定稿后重写。链路口径三件事（规则进 Oracle、报警进 Oracle 不进 OpenSearch、数据源取自链路已产出的日志）已在 `04` §六 定死，重写时以此为边界。
+**告警层：** `07-告警服务工程实现.md` 与 `08-告警详情设计.md` **已清空**—— 配置模型改为「**可复用配置表 + 发送规则**」两层，待新口径定稿后重写。链路口径三件事（规则进 Oracle、报警进 Oracle 不进 OpenSearch、数据源取自链路已产出的日志）已在 `04` §六 定死，重写时以此为边界。
 
 ---
 
@@ -81,15 +81,15 @@
 | 文档 | 内容 | 状态 | git |
 |---|---|---|---|
 | `模块1/00-模块概览.md` | 功能清单与依赖 | 收口 | ✅ |
-| `模块1/01-MES Rule信息检索.md` | 16 条件 + 列表 + 4 按钮 + 9 接口 | **需求已冻结**（2026-09-22） | ✅ |
-| `模块1/02-MES Rule实效分析.md` | Source/Target 对比 + Compare 双框 | 需求沟通中（2026-09-22 重梳） | ✅ |
-| `模块1/03-原始日志下载.md` | 文件列表多选下载（2026-10-10 重写：指纹聚合、文件 id 不透明编码、整文件还原、两接口）；命名与目录规则沿用 | 需求已冻结；**已入 git**（2026-10-10） | ✅ |
+| `模块1/01-MES Rule信息检索.md` | 16 条件 + 列表 + 4 按钮 + 9 接口 | **需求已冻结** | ✅ |
+| `模块1/02-MES Rule实效分析.md` | Source/Target 对比 + Compare 双框 | 需求沟通中 | ✅ |
+| `模块1/03-原始日志下载.md` | 文件列表多选下载；命名与目录规则沿用 | 需求已冻结；**已入 git** | ✅ |
 | `模块1/prototype/` | 功能 1 标注原型 HTML + `build.mjs` 生成源 | — | ✅ |
 | `模块2/00-模块概览.md` | 功能清单、告警处置 C 档（状态闭环+复盘）、状态机初稿 | 沟通中 | ⬜ |
 | `模块2/01-MES关键字监控与告警.md` | 三道检查、规则/行两级配置、A 方案固定窗口+重叠、限流与通知 | 已收口（23 条口径已确认，3 项待定） | ⬜ |
-| `模块2/02-MES Server Hang 监控与告警.md` | **第二类**（Server Hang / Endless Rule 报警）：判据、Monitor 表、落点；**附第一类判定与运行口径速查**（暂存，动 06 迁出） | 沟通中（2026-10-09 拆分后只剩第二类） | ⬜ |
-| `模块5/01-Server Hang Reason Config.md` | **第一类** Server Hang List 的**配置逻辑**：表结构、四式语义、页面与五接口（2026-10-09 拆分自模块 2 功能 2） | 配置逻辑已定、页面未开工 | ✅ |
-| `模块5/02-System Misc.md` | **全局配置**：`FabViewerMisc`（item 唯一 / value JSON 三类 / 无 enabled）、三模式弹框、四接口；**六个候选 /list 接口的数据源**（2026-10-10） | 定稿 | ✅ |
+| `模块2/02-MES Server Hang 监控与告警.md` | **第二类**（Server Hang / Endless Rule 报警）：判据、Monitor 表、落点；**附第一类判定与运行口径速查**（暂存，动 06 迁出） | 沟通中 | ⬜ |
+| `模块5/01-Server Hang Reason Config.md` | **第一类** Server Hang List 的**配置逻辑**：表结构、四式语义、页面与五接口 | 配置逻辑已定、页面未开工 | ✅ |
+| `模块5/02-System Misc.md` | **全局配置**：`FabViewerMisc`（item 唯一 / value JSON 三类 / 无 enabled）、三模式弹框、四接口；**六个候选 /list 接口的数据源** | 定稿 | ✅ |
 | `模块2/04-原型页面清单.md` | P1/P2/D1/D2（当前仅功能 1） | — | ⬜ |
 
 ### 3.5 权威关系（冲突时以谁为准）
@@ -155,8 +155,8 @@ flowchart LR
 |---|---|
 | 环境 | `PIRUN` / `PROD`；日志目录 `/mes/<env>/systemlogs/`；同一台机器可并存两套环境 |
 | 系统名 | `system.name = MES-300Works`（常量，**大小写敏感**，每条查询都带） |
-| 版本矩阵 | OpenSearch **3.8.0**（可组合模板、ISM 靠 `ism_template` 挂）/ Logstash **9.5.0**（`api.http.*`、ECS 关）/ logstash-output-opensearch **2.x** / Filebeat **≥ 9.5**（fingerprint 身份 + `log.file.fingerprint` 输出，2026-10-10 定） |
-| 现场形态 | OpenSearch 与 Logstash **已存在、别的系统在用** → 三层全部**追加部署**；上线顺序 **存储 → 加工 → 派生 → 采集**（顺序不能反；2026-10-10 起派生层先于采集 —— 行文档 `LOG_INODE` 换 `LOG_FINGERPRINT`，旧派生读不到新行的文件身份） |
+| 版本矩阵 | OpenSearch **3.8.0**（可组合模板、ISM 靠 `ism_template` 挂）/ Logstash **9.5.0**（`api.http.*`、ECS 关）/ logstash-output-opensearch **2.x** / Filebeat **≥ 9.5**（fingerprint 身份 + `log.file.fingerprint` 输出 定） |
+| 现场形态 | OpenSearch 与 Logstash **已存在、别的系统在用** → 三层全部**追加部署**；上线顺序 **存储 → 加工 → 派生 → 采集**（顺序不能反；**派生层必须先于采集** —— 行文档 `LOG_INODE` 换 `LOG_FINGERPRINT`，旧派生读不到新行的文件身份） |
 | 索引 | 行 `mes-log-line-{env}-{yyyy.MM.dd}`（`{env}` 小写）360 天删；块 `mes-log-exec-{env}-{yyyy.MM}` 永久归档 |
 | Oracle（派生层调度态） | 四表：`FabViewerTurn`（轮次，恒两行）/ `FabViewerTask`（待办，一行一流）/ `FabViewerNode`（心跳）/ `FabViewerStream`（哈希环落点） |
 | 共用配置 | `deploy/logstash/fabviewer.yaml` 六段：`msg_kinds`（加工层唯一消费段）/ `cost_items` / `biz_fields` / `derive` / `worker_health` / `alert` |
@@ -165,7 +165,7 @@ flowchart LR
 
 ---
 
-## 六、当前工作状态（2026-09-29）
+## 六、当前工作状态
 
 | 项 | 说明 |
 |---|---|
@@ -181,10 +181,10 @@ flowchart LR
 - `07` / `08` 按新口径「可复用配置表 + 发送规则」两层重写；定稿前不对外引用。
 - `04` §六 现只登记「MES 日志关键字监控与告警」一项；**Server Hang 报警**（模块 2 功能 2 第二类）定稿后需回补 `04`（冻结文档，动前先与薛建明确认）。
 
-**Server Hang —— 2026-10-09 拆分后：**
+**Server Hang（拆分后）：**
 
 - **拆分**：第一类（Server Hang List）归模块 5 `Server Hang Reason Config`（配置）+ 派生服务（运行）+ 模块 1（展示：Rule Info 检索 §3.6 与 Rule 实效分析）；第二类（Server Hang / Endless Rule 报警）留模块 2 功能 2。
-- **第一类（口径全定；04/06/09/deploy 已动刀完成，2026-10-09）**：配置逻辑见模块 5 `01`（`FabViewerSrvHangConfig`：唯一键 ruleName+hangReason、不分环境、四式 `%` 语义、ruleName 精确、页面与五接口定稿）；判定与运行口径速查暂存模块 2 `02` 附录。`HANG_LIST`（8 项）已落 `04` §5.3.2 / `06` §2.2·§2.3·§4.7·§十 / `09` §四 / `12-template-exec.json` —— 块字段 **34→35、nested 3→4**；派生层读 Oracle 新路径落在 `06` §4.7（块级按需查 + 5min 缓存 + Redis 演进）。**存量块不回算**：`HANG_LIST` / `LOCK_SEQ` / `INNER_RULES` 三字段一个口径（`06` §4.7）。余项：上线时给存量块索引 `PUT mapping`（命令在 deploy/opensearch/README.md）、模块 1 弹框加 Hang Reason 列。
+- **第一类（口径全定；04/06/09/deploy 已动刀完成）**：配置逻辑见模块 5 `01`（`FabViewerSrvHangConfig`：唯一键 ruleName+hangReason、不分环境、四式 `%` 语义、ruleName 精确、页面与五接口定稿）；判定与运行口径速查暂存模块 2 `02` 附录。`HANG_LIST`（8 项）已落 `04` §5.3.2 / `06` §2.2·§2.3·§4.7·§十 / `09` §四 / `12-template-exec.json` —— 块字段 **34→35、nested 3→4**；派生层读 Oracle 新路径落在 `06` §4.7（块级按需查 + 5min 缓存 + Redis 演进）。**存量块不回算**：`HANG_LIST` / `LOCK_SEQ` / `INNER_RULES` 三字段一个口径（`06` §4.7）。余项：上线时给存量块索引 `PUT mapping`（命令在 deploy/opensearch/README.md）、模块 1 弹框加 Hang Reason 列。
 - **第二类（见模块 2 `02`）**：`FabViewerSrvHangMonitor`（环境级）；**Alarm 存 Oracle**（04 §六边界不破）；独立 Alarm Application 定时读块文档。跨层约束（方向已修正）：`maxDelay` 须**严格小于**静默期 5min 并留扫描裕量 —— 或判据 A 扩认超时封口（07/08 拍）。待定 10 条（第一张卡：`alarmItems` 语义）。
 - `04` §六需回补 Server Hang 报警（冻结，动前确认）。
 
@@ -192,7 +192,7 @@ flowchart LR
 
 **模块侧：**
 
-- 模块 1 待更新项（2026-10-09 需求审查后）：功能 1 原型待补 Hang 列实态与弹框（构建框架 annotated-prototype skill 已不在本机，走手改 HTML + 同步 `build.mjs`）；功能 1 已补 `hangCount` / `rule_info/hang_list` 接口与进行中块行标色、Max Cost 值域放开到 99999.99。
+- 模块 1 待更新项：功能 1 原型待补 Hang 列实态与弹框（构建框架 annotated-prototype skill 已不在本机，走手改 HTML + 同步 `build.mjs`）；功能 1 已补 `hangCount` / `rule_info/hang_list` 接口与进行中块行标色、Max Cost 值域放开到 99999.99。
 - 模块 2 功能 1 待定 3 项：单规则每轮硬上限条数（建议 50）、「上次 Report 时间」定义、「特殊 Rule Name」改名。
 - 模块 2 功能 3（RV QUEUE）暂挂：数据源非日志。
 
@@ -202,10 +202,10 @@ flowchart LR
 
 | # | 不一致 | 位置 |
 |---|---|---|
-| 1 | ~~功能 3 状态不一致~~ ✅ 已修（2026-10-09）：`模块1/03` 头部改为「需求已冻结」 | — |
+| 1 | ~~功能 3 状态不一致~~ ✅ 已修：`模块1/03` 头部改为「需求已冻结」 | — |
 | 2 | 模块 2 功能 1 状态：概览写「需求已收口」，文档头部写「需求沟通中」 | `模块2/00` vs `模块2/01` 头部 |
-| 3 | ~~概览待办引用 `prototype/index.html`~~ ✅ 已修（2026-10-09）：待办改为指向现存的功能 1 标注原型 | — |
-| 4 | 模块 2 概览 §五「Hang 数据同源」与拆分后归属不符；功能 2 描述仍含第一类 | `模块2/00` vs `模块2/02`（2026-10-09 拆分，概览待同步） |
+| 3 | ~~概览待办引用 `prototype/index.html`~~ ✅ 已修：待办改为指向现存的功能 1 标注原型 | — |
+| 4 | 模块 2 概览 §五「Hang 数据同源」与拆分后归属不符；功能 2 描述仍含第一类 | `模块2/00` vs `模块2/02` |
 
 ---
 
@@ -216,7 +216,6 @@ flowchart LR
 - `deploy/assets/_src/` 放截图生成源（`shot.js` / 页面骨架），产物 PNG 在 `assets/`。
 
 ---
-
 ## 更新记录
 
 | 日期 | 记录 |

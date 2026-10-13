@@ -189,7 +189,7 @@ queue.mem:
 ###################### 输出 ######################
 
 output.logstash:
-  # 端口 = Logstash MES 管道（mes-lines）的专用 beats 口，与 10-input.conf 一致（2026-10-13 定）
+  # 端口 = Logstash MES 管道（mes-lines）的专用 beats 口，与 10-input.conf 一致
   hosts: ["logstash-01:5045", "logstash-02:5045"]
   loadbalance: true
   worker: 2
