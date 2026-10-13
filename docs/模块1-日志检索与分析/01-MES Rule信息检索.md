@@ -42,8 +42,8 @@
 
 | # | 控件 | 必填 | 取值来源 | 过滤块文档字段 | 匹配方式 | 不填 / 不选 |
 |---|---|---|---|---|---|---|
-| 1 | Environment | 否 | 进页面调 `GET /api/v1/env/list` | `ENV` | 等值 | 不过滤 |
-| 2 | Server Category | 否 | 进页面调 `GET /api/v1/server_category/list` | `SERVER_CATEGORY` | 等值 | 不过滤 |
+| 1 | Environment | 否 | 进页面调 `GET log-viewer/api/v1/env/list` | `ENV` | 等值 | 不过滤 |
+| 2 | Server Category | 否 | 进页面调 `GET log-viewer/api/v1/server_category/list` | `SERVER_CATEGORY` | 等值 | 不过滤 |
 | 3 | Server Number | 否 | 手输，英文逗号分隔多值 | `SERVER_ID` | 与 Category 拼成 `SERVER_ID` 后等值，多值为或关系 | 不过滤 |
 | 4 | 开始时间 | **是** | 时间选择器，精确到分钟 | `START_TIME` | 区间下界 | — |
 | 5 | 结束时间 | **是** | 时间选择器，精确到分钟 | `START_TIME` | 区间上界 | — |
@@ -101,10 +101,10 @@
 
 | 控件 | 必填 | 取值来源 | 过滤块文档字段 | 匹配方式 | 不填 / 不选 |
 |---|---|---|---|---|---|
-| Host IP | 否 | 进页面调 `GET /api/v1/ipaddress/list`（**不带参**）；Environment 选值后再调一次，带参数 `environment` | `HOSTIP` | 等值 | 不过滤 |
+| Host IP | 否 | 进页面调 `GET log-viewer/api/v1/ipaddress/list`（**不带参**）；Environment 选值后再调一次，带参数 `environment` | `HOSTIP` | 等值 | 不过滤 |
 | User ID | 否 | 手输，**单项值** | `USERID`（keyword，可多值） | 精确比对，命中任一即算；`*` 当普通字符 | 不过滤 |
 | Error Code | 否 | 手输，**单项值** | `ERR_CODE`（多值） | 命中其中任一即算；**不做模糊** | 不过滤 |
-| Rule Result | 否 | 进页面调 `GET /api/v1/rule_result/list` | `RULE_RESULT` | 等值 | 不过滤 |
+| Rule Result | 否 | 进页面调 `GET log-viewer/api/v1/rule_result/list` | `RULE_RESULT` | 等值 | 不过滤 |
 
 Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变了仍要重取候选并清空已选值。
 
@@ -122,7 +122,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 
 | 按钮 | 行为 |
 |---|---|
-| Search | 调 `POST /api/v1/rule_info/page`，查**第 1 页**；调接口前对全部条件做前置校验，不合法不发请求 |
+| Search | 调 `POST log-viewer/api/v1/rule_info/page`，查**第 1 页**；调接口前对全部条件做前置校验，不合法不发请求 |
 | 重置 | 条件区全部恢复进页面时的默认值；结果列表**清空**回到未查询态；**不自动查询** |
 
 「重置」后各控件的取值：Environment / Host IP / Server Category / Server Number 清空；Rule Name / Rule Result / Error Code / TID / EQP / Carrier / Lot / User ID 清空；开始时间 = 当前时刻 − 1 小时；结束时间 = 当前时刻；Min / Max Cost Time = `0` / `999`；Desc Time 开关 = 关闭。
@@ -222,8 +222,8 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 
 1. 可隐藏三列的显隐勾选（Total Cost Time、Item Cost Summary、UnAccounted Cost），默认勾上
 2. EXEC_STATUS 的显隐勾选，默认不勾
-3. `Lock Object` 多选下拉，进页面调 `GET /api/v1/lock_object/list` 取候选
-4. `Call Sys` 多选下拉，进页面调 `GET /api/v1/call_sys/list` 取候选
+3. `Lock Object` 多选下拉，进页面调 `GET log-viewer/api/v1/lock_object/list` 取候选
+4. `Call Sys` 多选下拉，进页面调 `GET log-viewer/api/v1/call_sys/list` 取候选
 
 | 项 | 口径 |
 |---|---|
@@ -320,8 +320,8 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 | 按钮 | 可用条件 | 动作 |
 |---|---|---|
 | Export | 列表**有值**时可用 | 把**当前页**列表内容导出到 Excel；**只导显示中的列**，隐藏列不导出 |
-| Rule Log | **选中一行**时可用；取消选中则不可用 | 用该行的块 `id` 调 `GET /api/v1/rule_info/detail` → 打开 **Rule Info Detail 弹窗** |
-| Full Log | **选中一行**时可用 | 用该行块 `id` 调 `POST /api/v1/rule_info/full_log` → 下载该块涉及**全部文件**的全量日志，`.zip` |
+| Rule Log | **选中一行**时可用；取消选中则不可用 | 用该行的块 `id` 调 `GET log-viewer/api/v1/rule_info/detail` → 打开 **Rule Info Detail 弹窗** |
+| Full Log | **选中一行**时可用 | 用该行块 `id` 调 `POST log-viewer/api/v1/rule_info/full_log` → 下载该块涉及**全部文件**的全量日志，`.zip` |
 | 可选列 | — | 打开列设置抽屉 |
 
 ### 4.1 Export
@@ -353,7 +353,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 
 | 项 | 口径 |
 |---|---|
-| 接口 | `GET /api/v1/rule_info/detail` |
+| 接口 | `GET log-viewer/api/v1/rule_info/detail` |
 | 首次入参 | `id` = 选中行的块 `id`（列表出参的 `id` 字段）；`lastFingerprint`、`lastOffset` **为空** |
 | 返回 | `data.raw` = 本次的日志原文（**多行以换行符拼接成一个字符串**）；`data.finished` = 是否搜索完毕 |
 | 显示 | 按返回顺序逐行显示在显示控件里 |
@@ -385,7 +385,7 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 | 项 | 口径 |
 |---|---|
 | 可用条件 | **选中一行** |
-| 接口 | `POST /api/v1/rule_info/full_log` |
+| 接口 | `POST log-viewer/api/v1/rule_info/full_log` |
 | 入参 | `id` = 该行的块 `id`（列表出参的 `id` 字段） |
 | 后端做什么 | 由该块的 `_id` 找出**涉及的全部文件**，逐个做**文件级还原**，打包成 `.zip` 下载 |
 | 还原顺序 | 每个文件内按 `LOG_OFFSET` 升序（`04` §5.2.4 文件级还原） |
@@ -417,16 +417,16 @@ Host IP 虽默认收起，**进页面照旧调候选接口**；Environment 变�
 
 | # | 接口 | 方法 | 用途 | 调用时机 |
 |---|---|---|---|---|
-| 1 | `/api/v1/env/list` | `GET` | Environment 候选 | 进页面 |
-| 2 | `/api/v1/ipaddress/list` | `GET` | Host IP 候选 | 进页面（不带参）；Environment 选值后再调 |
-| 3 | `/api/v1/server_category/list` | `GET` | Server Category 候选 | 进页面 |
-| 4 | `/api/v1/rule_result/list` | `GET` | Rule Result 候选 | 进页面 |
-| 5 | `/api/v1/lock_object/list` | `GET` | Lock Object 多选候选 | 进页面 |
-| 6 | `/api/v1/call_sys/list` | `GET` | Call Sys 多选候选 | 进页面 |
-| 7 | `/api/v1/rule_info/detail` | `GET` | Rule Info Detail 弹窗的日志，按游标分页 | 点 `Rule Log` 时；触底再调 |
-| 8 | `/api/v1/rule_info/full_log` | `POST` | Full Log 打包下载 | 点 `Full Log` 时 |
-| 9 | `/api/v1/rule_info/page` | `POST` | 结果分页查询 | 点 `Search` 时 |
-| 10 | `/api/v1/rule_info/hang_list` | `GET` | Server Hang 弹框的明细（块内全部 Hang） | 点 `Hang (N)` 按钮时 |
+| 1 | `log-viewer/api/v1/env/list` | `GET` | Environment 候选 | 进页面 |
+| 2 | `log-viewer/api/v1/ipaddress/list` | `GET` | Host IP 候选 | 进页面（不带参）；Environment 选值后再调 |
+| 3 | `log-viewer/api/v1/server_category/list` | `GET` | Server Category 候选 | 进页面 |
+| 4 | `log-viewer/api/v1/rule_result/list` | `GET` | Rule Result 候选 | 进页面 |
+| 5 | `log-viewer/api/v1/lock_object/list` | `GET` | Lock Object 多选候选 | 进页面 |
+| 6 | `log-viewer/api/v1/call_sys/list` | `GET` | Call Sys 多选候选 | 进页面 |
+| 7 | `log-viewer/api/v1/rule_info/detail` | `GET` | Rule Info Detail 弹窗的日志，按游标分页 | 点 `Rule Log` 时；触底再调 |
+| 8 | `log-viewer/api/v1/rule_info/full_log` | `POST` | Full Log 打包下载 | 点 `Full Log` 时 |
+| 9 | `log-viewer/api/v1/rule_info/page` | `POST` | 结果分页查询 | 点 `Search` 时 |
+| 10 | `log-viewer/api/v1/rule_info/hang_list` | `GET` | Server Hang 弹框的明细（块内全部 Hang） | 点 `Hang (N)` 按钮时 |
 
 ### 5.3 各接口入参 / 出参
 

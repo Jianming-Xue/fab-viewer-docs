@@ -43,3 +43,11 @@
 !/docs/模块5-系统管理/prototype/System-Misc-annotated-prototype.html
 !/docs/模块5-系统管理/prototype/build-01.mjs
 !/docs/模块5-系统管理/prototype/build-02.mjs
+
+!/docs/模块6-用户与安全管理/
+/docs/模块6-用户与安全管理/*
+!/docs/模块6-用户与安全管理/00-模块概览.md
+!/docs/模块6-用户与安全管理/01-Login Policy.md
+!/docs/模块6-用户与安全管理/02-角色管理.md
+!/docs/模块6-用户与安全管理/03-用户管理.md
+!/docs/模块6-用户与安全管理/04-Login History.md

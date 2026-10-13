@@ -44,7 +44,7 @@
 
 | 项 | 口径 |
 |---|---|
-| 数据源 | 进页面调 `GET /api/v1/sys_misc/category/list`（= 本表 `distinct(category)`），按**字典序**展示 |
+| 数据源 | 进页面调 `GET log-viewer/api/v1/sys_misc/category/list`（= 本表 `distinct(category)`），按**字典序**展示 |
 | 首行 | 恒显示「**全部**」，进页面**默认选中「全部」** |
 | 进页面行为 | 默认选中「全部」⇒ **自动查询全部的第 1 页**（打开页面直接出数据，无未查询空态） |
 | 选中某分类 | **自动**调 `page` 查第 1 页：带上右侧查询输入框当前值 + 本分类；**等值**匹配 |
@@ -59,7 +59,7 @@
 | 项 | 口径 |
 |---|---|
 | 条件 | **仅一个 `Condition` 输入框**，对 `item` / `description` / `value` **三个栏位前后模糊匹配**（contains），任一栏位命中即返回（与 Reason Config 的 `ruleName` 精确匹配不同） |
-| 按钮 | `Search` → `GET /api/v1/sys_misc/page` 查第 1 页，**结合左列表当前选中项**（§3.1）；Condition 不填 = 不过滤 |
+| 按钮 | `Search` → `GET log-viewer/api/v1/sys_misc/page` 查第 1 页，**结合左列表当前选中项**（§3.1）；Condition 不填 = 不过滤 |
 
 ### 3.3 表格区
 
@@ -89,7 +89,7 @@
 |---|---|---|---|
 | Item | 只读 | **锁定**（定位键） | 必填；仅大小写字母 + 数字，长度 ≤ 255（推定） |
 | Description | 只读 | 可改 | 必填；**多行文本域**，不限字符格式，**长度 ≤ 4000** |
-| Category | 只读 | **可改** | 必填；**下拉 + 输入双模式**（combobox），候选 = 本表 `distinct(category)`（与 `/api/v1/sys_misc/category/list` 同源，§五-5）；仅大小写字母 + 数字，**长度 ≤ 20** |
+| Category | 只读 | **可改** | 必填；**下拉 + 输入双模式**（combobox），候选 = 本表 `distinct(category)`（与 `log-viewer/api/v1/sys_misc/category/list` 同源，§五-5）；仅大小写字母 + 数字，**长度 ≤ 20** |
 | Value | 只读（编辑器只读态） | 可改 | 必填（推定）；Single / Multi 单选 + 编辑器（§四） |
 
 ---
@@ -124,11 +124,11 @@
 
 | # | 接口 | Method | 用途 |
 |---|---|---|---|
-| 1 | `/api/v1/sys_misc/page` | `GET` | 分页查询（含 Category 过滤） |
-| 2 | `/api/v1/sys_misc` | `POST` | 新增 |
-| 3 | `/api/v1/sys_misc` | `PUT` | 修改 |
-| 4 | `/api/v1/sys_misc` | `DELETE` | 删除 |
-| 5 | `/api/v1/sys_misc/category/list` | `GET` | Category 窄列表候选（`distinct(category)`） |
+| 1 | `log-viewer/api/v1/sys_misc/page` | `GET` | 分页查询（含 Category 过滤） |
+| 2 | `log-viewer/api/v1/sys_misc` | `POST` | 新增 |
+| 3 | `log-viewer/api/v1/sys_misc` | `PUT` | 修改 |
+| 4 | `log-viewer/api/v1/sys_misc` | `DELETE` | 删除 |
+| 5 | `log-viewer/api/v1/sys_misc/category/list` | `GET` | Category 窄列表候选（`distinct(category)`） |
 
 **1 · `page`（GET，URL 参数）**
 
@@ -178,12 +178,12 @@
 
 | 候选接口 | 消费方 | Misc 的 `item` | Value 形态（§四） |
 |---|---|---|---|
-| `GET /api/v1/env/list` | 01 / 02 / 03 的 Environment 下拉 | `env_list` | Multi · 全值节点（标量列表） |
-| `GET /api/v1/ipaddress/list?environment=` | 01 / 03 的 Host IP 下拉（环境联动） | `ip_list` | Multi · **Map 节点**（键 = 环境名，值 = IP 数组）—— 联动即「按 `environment` 取键」 |
-| `GET /api/v1/server_category/list` | 01 / 03 的 Server Category 下拉 | `server_category_list` | Multi · 全值节点（标量列表） |
-| `GET /api/v1/rule_result/list` | 01 折叠区 Rule Result 下拉 | `rule_result_list` | Multi · 全值节点（标量列表） |
-| `GET /api/v1/lock_object/list` | 01 列设置 Lock Object 候选 | `lock_object_list` | Multi · 全值节点（标量列表） |
-| `GET /api/v1/call_sys/list` | 01 列设置 Call Sys 候选 | `call_sys_list` | Multi · 全值节点（标量列表） |
+| `GET log-viewer/api/v1/env/list` | 01 / 02 / 03 的 Environment 下拉 | `env_list` | Multi · 全值节点（标量列表） |
+| `GET log-viewer/api/v1/ipaddress/list?environment=` | 01 / 03 的 Host IP 下拉（环境联动） | `ip_list` | Multi · **Map 节点**（键 = 环境名，值 = IP 数组）—— 联动即「按 `environment` 取键」 |
+| `GET log-viewer/api/v1/server_category/list` | 01 / 03 的 Server Category 下拉 | `server_category_list` | Multi · 全值节点（标量列表） |
+| `GET log-viewer/api/v1/rule_result/list` | 01 折叠区 Rule Result 下拉 | `rule_result_list` | Multi · 全值节点（标量列表） |
+| `GET log-viewer/api/v1/lock_object/list` | 01 列设置 Lock Object 候选 | `lock_object_list` | Multi · 全值节点（标量列表） |
+| `GET log-viewer/api/v1/call_sys/list` | 01 列设置 Call Sys 候选 | `call_sys_list` | Multi · 全值节点（标量列表） |
 
 > `lock_object` / `call_sys` 在 04 的「开放集合、零配置」指**落库侧不设清单**（见到什么记什么）；下拉候选从 Misc 出只是**输入辅助**，不构成白名单 —— 两者不矛盾。候选取数即「按 `item` 读 Misc 的 `value`」。
 

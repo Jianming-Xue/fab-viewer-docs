@@ -56,17 +56,17 @@
 
 ### 4.1 表格区
 
-**进入页面**：调用 `/api/v1/srv_hang_cfg/page` 分页取**第一页**并回显；默认**每页 20 条**。页面**无搜索框**，顶部只有一个**刷新图标按钮**。
+**进入页面**：调用 `log-viewer/api/v1/srv_hang_cfg/page` 分页取**第一页**并回显；默认**每页 20 条**。页面**无搜索框**，顶部只有一个**刷新图标按钮**。
 
 | 项 | 口径 |
 |---|---|
 | 列（按序） | Rule Name、Start Line Like、End Line Like、Hang Reason、Enabled、Last Updated Time、Last Updated User |
 | 行选择 | **单选，不支持多选** |
 | Action 列 | **最右侧固定**，两个操作：**删除 / 编辑** |
-| Enabled 列 | **开关**形态、可操作 —— `true` 打开 / `false` 关闭；点击调用 `/api/v1/srv_hang_cfg/state` 切换该条配置的 `enabled` |
+| Enabled 列 | **开关**形态、可操作 —— `true` 打开 / `false` 关闭；点击调用 `log-viewer/api/v1/srv_hang_cfg/state` 切换该条配置的 `enabled` |
 | 翻页 | 按页码再调 `page` 接口（推定） |
 
-**删除**（Action 列）：**弹框确认后**调用 `DELETE /api/v1/srv_hang_cfg` 删除该条配置（弹框形态按 `05`）；已产出的历史 Hang 记录不受影响（不回算）。
+**删除**（Action 列）：**弹框确认后**调用 `DELETE log-viewer/api/v1/srv_hang_cfg` 删除该条配置（弹框形态按 `05`）；已产出的历史 Hang 记录不受影响（不回算）。
 
 ### 4.2 配置控件区（下方表单）
 
@@ -84,8 +84,8 @@
 
 | 模式 | 触发 | 行为 |
 |---|---|---|
-| **编辑模式**（已点编辑、表单已回填） | 点 **Confirm** | 调用 `PUT /api/v1/srv_hang_cfg`；**入参 `id` = 选中行的 `id`** |
-| **新增模式**（表单为空） | 点 **Confirm** | 调用 `POST /api/v1/srv_hang_cfg`；**入参 `id` 可为空** |
+| **编辑模式**（已点编辑、表单已回填） | 点 **Confirm** | 调用 `PUT log-viewer/api/v1/srv_hang_cfg`；**入参 `id` = 选中行的 `id`** |
+| **新增模式**（表单为空） | 点 **Confirm** | 调用 `POST log-viewer/api/v1/srv_hang_cfg`；**入参 `id` 可为空** |
 | 任意模式 | 点 **Cancel** | **清空全部控件值**（回到新增模式）＋ **取消表格选中** |
 
 **提交拼接（Confirm 时 定）**：`startLineLike` / `endLineLike` 的入参值 = 输入框文本**按各自单选框把 `%` 追加到首尾**后的完整形态（只前模糊加头、只后模糊加尾、前后都加、精确不加）。
@@ -96,11 +96,11 @@
 
 | # | 接口 | Method | 用途 |
 |---|---|---|---|
-| 1 | `/api/v1/srv_hang_cfg/page` | `GET` | 分页取配置 |
-| 2 | `/api/v1/srv_hang_cfg/state` | `POST` | 切换一条配置的 `enabled` |
-| 3 | `/api/v1/srv_hang_cfg` | `POST` | 新增（`id` 为空） |
-| 4 | `/api/v1/srv_hang_cfg` | `PUT` | 编辑（`id` = 选中行） |
-| 5 | `/api/v1/srv_hang_cfg` | `DELETE` | 删除 |
+| 1 | `log-viewer/api/v1/srv_hang_cfg/page` | `GET` | 分页取配置 |
+| 2 | `log-viewer/api/v1/srv_hang_cfg/state` | `POST` | 切换一条配置的 `enabled` |
+| 3 | `log-viewer/api/v1/srv_hang_cfg` | `POST` | 新增（`id` 为空） |
+| 4 | `log-viewer/api/v1/srv_hang_cfg` | `PUT` | 编辑（`id` = 选中行） |
+| 5 | `log-viewer/api/v1/srv_hang_cfg` | `DELETE` | 删除 |
 
 **1 · `srv_hang_cfg/page`**
 

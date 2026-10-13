@@ -32,7 +32,7 @@
 
 | # | 控件 | 必填 | 取值来源 | 过滤块文档字段 | 匹配方式 | 不填 / 不选 |
 |---|---|---|---|---|---|---|
-| 1 | Environment | **是** | 进页面调 `GET /api/v1/env/list` | `ENV` | 等值 | 进页面**默认不选中**；为空则不能 `Search` |
+| 1 | Environment | **是** | 进页面调 `GET log-viewer/api/v1/env/list` | `ENV` | 等值 | 进页面**默认不选中**；为空则不能 `Search` |
 | 2 | 开始时间 | **是** | 时间选择器，精确到分钟 | `START_TIME` | 区间下界 | — |
 | 3 | 结束时间 | **是** | 时间选择器，精确到分钟 | `START_TIME` | 区间上界 | — |
 | 4 | Rule Name | 否 | 手输 | `RULENAME` | **精确匹配**，不支持模糊 | 不过滤 |
@@ -48,7 +48,7 @@
 
 | 项 | 口径 |
 |---|---|
-| 接口 | `POST /api/v1/rule_info/page`（同功能 1 的检索接口） |
+| 接口 | `POST log-viewer/api/v1/rule_info/page`（同功能 1 的检索接口） |
 | 结果去向 | 写入 **Source Rule Info 列表**（§2.3） |
 | 前置校验 | 点 `Search` 时先校验：**Environment 为空 / TID 为空 / 时间不合法 → 拦住，不发请求** |
 
@@ -120,7 +120,7 @@ Target 区最上面是一组「Same X」开关，共 **7 个**，逐一对应 So
 
 | 项 | 口径 |
 |---|---|
-| `Same Environment` 未勾选 | Target 自己的 Environment 下拉**可用** —— 候选接口与 Source 区相同（`GET /api/v1/env/list`） |
+| `Same Environment` 未勾选 | Target 自己的 Environment 下拉**可用** —— 候选接口与 Source 区相同（`GET log-viewer/api/v1/env/list`） |
 | `Same Environment` 勾选 | 值直接取**选中那条 Source 行的 `ENV`** |
 | 必填 | **是** |
 
@@ -228,7 +228,7 @@ Target 列表下方共 **3 个按钮**：
 | 位置 | Target 列表下方（§3.8） |
 | 可用条件 | **Target 列表选中 1 行之后**可用 |
 | 下载的是谁 | **Source 那条** —— 用**选中 Source 行的块 `id`**（列表出参里的 `id` 字段，值 = 块 `_id`，**不出列**） |
-| 接口 | **`POST /api/v1/rule_info/rule_log`** —— **入参与 `full_log` 完全相同**（都是 `id` = 块 id） |
+| 接口 | **`POST log-viewer/api/v1/rule_info/rule_log`** —— **入参与 `full_log` 完全相同**（都是 `id` = 块 id） |
 | 与 `full_log` 的区别 | 只在产物：本接口下 **Rule 日志**；`full_log` 下该块涉及的**全部文件**（`.zip`） |
 | 产物 | **一个 `.log` 文件** |
 | 文件名 | **`<RuleName>_<Start 时间戳>.log`** —— 取选中 **Source 行**的 `RULENAME` 与 `START_TIME` |
@@ -242,7 +242,7 @@ Target 列表下方共 **3 个按钮**：
 | 可用条件 | **Target 列表选中 1 行之后**可用 |
 | 形态 | **左右比较**（形同 Beyond Compare）：**左栏恒为 Source、右栏恒为 Target** |
 | 纵向分区 | **上下两个比较框** —— **上框**比**请求消息**、**下框**比**完整日志** |
-| 取数 | 点 `Compare` 后，用**选中 Source 行的块 `id`** 与**选中 Target 行的块 `id`**（列表出参里的 `id` 字段，值 = 块 `_id`，**不出列**），**分别调 `GET /api/v1/rule_info/detail`**（功能 1 的 `Rule Log` 弹窗那个接口），**游标分页拉完各自请求的完整日志**（`finished = true` 为止） |
+| 取数 | 点 `Compare` 后，用**选中 Source 行的块 `id`** 与**选中 Target 行的块 `id`**（列表出参里的 `id` 字段，值 = 块 `_id`，**不出列**），**分别调 `GET log-viewer/api/v1/rule_info/detail`**（功能 1 的 `Rule Log` 弹窗那个接口），**游标分页拉完各自请求的完整日志**（`finished = true` 为止） |
 | 上框内容 | **首行（消息行）** —— 各自日志里**自上而下第一条**含 `FwEventManager:message to process: :>>L` 或 `FwEventManager:message to process: :>>T` 的行；按 `06-附录A-块首行解析方案.md` **解成一个 KV 集合**后左右比对，见下「上框：请求 message 比对」 |
 | 差异标注 | **要标** —— **两个框里两侧不一样的地方都做标记**（颜色与样式归原型 SKILL） |
 | 下框内容 | **首行之外的其余日志原封不动**放入下框，左右比对，见下「下框：完整日志比对」 |
@@ -309,12 +309,12 @@ Target 列表下方共 **3 个按钮**：
 
 | # | 接口 | 方法 | 用途 | 入参 / 出参 |
 |---|---|---|---|---|
-| 1 | `/api/v1/env/list` | `GET` | Source / Target 的 Environment 候选 | **同 `01` §5.3 第 1 条** |
-| 2 | `/api/v1/lock_object/list` | `GET` | 列设置的 Lock Object 候选（与 `01` **共用一份列设置**，§2.4） | **同 `01` §5.3 第 5 条** |
-| 3 | `/api/v1/call_sys/list` | `GET` | 列设置的 Call Sys 候选（同上） | **同 `01` §5.3 第 6 条** |
-| 4 | `/api/v1/rule_info/page` | `POST` | Source 的 `Search`、Target 的 `Search` | **同 `01` §5.3 第 9 条**；本功能的填参差异见 §5.3 |
-| 5 | `/api/v1/rule_info/detail` | `GET` | `Compare Rule Info` 时两侧分页拉日志 | **同 `01` §5.3 第 7 条**；本功能的用法差异见 §4.2「下框」（两侧各持一套游标） |
-| 6 | `/api/v1/rule_info/rule_log` | `POST` | `Download Rule Info` 下载 Rule 日志 | **本功能新增**，见 §5.4 |
+| 1 | `log-viewer/api/v1/env/list` | `GET` | Source / Target 的 Environment 候选 | **同 `01` §5.3 第 1 条** |
+| 2 | `log-viewer/api/v1/lock_object/list` | `GET` | 列设置的 Lock Object 候选（与 `01` **共用一份列设置**，§2.4） | **同 `01` §5.3 第 5 条** |
+| 3 | `log-viewer/api/v1/call_sys/list` | `GET` | 列设置的 Call Sys 候选（同上） | **同 `01` §5.3 第 6 条** |
+| 4 | `log-viewer/api/v1/rule_info/page` | `POST` | Source 的 `Search`、Target 的 `Search` | **同 `01` §5.3 第 9 条**；本功能的填参差异见 §5.3 |
+| 5 | `log-viewer/api/v1/rule_info/detail` | `GET` | `Compare Rule Info` 时两侧分页拉日志 | **同 `01` §5.3 第 7 条**；本功能的用法差异见 §4.2「下框」（两侧各持一套游标） |
+| 6 | `log-viewer/api/v1/rule_info/rule_log` | `POST` | `Download Rule Info` 下载 Rule 日志 | **本功能新增**，见 §5.4 |
 
 ### 5.3 沿用 `01` 的接口：本功能的填参差异
 
