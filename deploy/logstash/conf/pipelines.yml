@@ -2,7 +2,7 @@
 # 管道声明。本链路只有一条管道：原始日志行 → 行文档（04 §1.2）
 #
 # path.config 用 glob：目录内文件**按文件名顺序**加载与拼接，
-#   10-input → 20-parse → 30-msgkind → 40-derive-fields → 50-output
+#   10-input → 15-guard（守门哨） → 20-parse → 30-msgkind → 40-derive-fields → 50-output
 #   其中 30-msgkind.conf 是**生成物**（tools/render_msgkinds.py），别手改
 # ==============================================================================
 

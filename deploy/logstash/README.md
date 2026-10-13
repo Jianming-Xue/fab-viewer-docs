@@ -36,7 +36,7 @@
 | 文件 | 行 | 改成什么 |
 |---|---|---|
 | `pipeline/50-output.conf` | 23 | `hosts` → 现场 OpenSearch 地址。走 HTTPS 保留 `ssl => true`；内网 HTTP 改成 `false` 并删掉两行证书校验 |
-| `pipeline/10-input.conf` | 12 | `port => 5044` → 现场**没被占用**的端口。别的系统的管道若已占 5044 就必须换，且 Filebeat 侧 `hosts` 同值 |
+| `pipeline/10-input.conf` | — | `port => 5045`（已按专用口预设，2026-10-13）→ 仍需现场核对**没被占用**；占用则换，且 Filebeat 侧 `hosts` 同值。守门哨 `15-guard.conf` 随管道生效，无需配置 |
 
 改完这 2 行，本目录其余文件原样可用。
 

@@ -6,7 +6,7 @@
 # 同一台机器上 PIRUN 与 PROD 两套环境的日志可能并存（共享 IP）。
 # 因此：**一台机器一份本配置** —— 一份配置覆盖该机器上的全部环境与全部服务族。
 #
-# 落地必改一处：output.logstash 的地址。
+# 落地必改两处：output.logstash 的地址与端口 —— 端口是 MES 管道专用口（默认 5044 大概率被现场占用，见 04 §3.4）。
 # 挂载点：日志盘统一挂 /mes，日志目录 /mes/<env>/systemlogs/
 #   PIRUN → /mes/pirun/systemlogs/ ；PROD → /mes/prod/systemlogs/
 #   同一台机器上 PIRUN 与 PROD 是两个目录；哪台机器若挂到别处，只改该机器这份配置的前缀。
@@ -189,7 +189,8 @@ queue.mem:
 ###################### 输出 ######################
 
 output.logstash:
-  hosts: ["logstash-01:5044", "logstash-02:5044"]
+  # 端口 = Logstash MES 管道（mes-lines）的专用 beats 口，与 10-input.conf 一致（2026-10-13 定）
+  hosts: ["logstash-01:5045", "logstash-02:5045"]
   loadbalance: true
   worker: 2
   bulk_max_size: 2048
