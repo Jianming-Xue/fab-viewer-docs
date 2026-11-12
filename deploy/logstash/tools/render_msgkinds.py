@@ -5,14 +5,14 @@
 ==============================================================
 
 为什么要有这一步：
-  「新增一个标签 = 加一条配置，不改代码」（docs/04-后台链路与数据模型.md §3.2.3）。
+  「新增一个标签 = 加一条配置，不改代码」。
   规则写在 fabviewer.yaml 里（人类可读、和派生层共用一份），
   Logstash 侧只认 conf —— 所以由本脚本把规则翻译成 conf。
   生成物 pipeline/30-msgkind.conf 由 Logstash 自动重载（config.reload.automatic），
   改完规则重跑本脚本即可生效，**不重启进程、不改代码**。
 
 运行环境：本地 / 构建机（python3 + pyyaml）。生成物随配置一起发布到 Logstash 服务器。
-  /Users/xuejianming/.workbuddy/binaries/python/versions/3.13.12/bin/python3 render_msgkinds.py
+  python3 render_msgkinds.py
 
 用法：
   python3 render_msgkinds.py            # 渲染，写 pipeline/30-msgkind.conf
@@ -35,14 +35,14 @@ SRC = ROOT / "fabviewer.yaml"
 OUT = ROOT / "pipeline" / "30-msgkind.conf"
 
 HEADER = """# ==============================================================================
-# 第 3 段：打消息类型标签（MSG_KIND）—— 口径见 docs/04-后台链路与数据模型.md §3.2.3
+# 第 3 段：打消息类型标签（MSG_KIND）
 #
 # ⚠ 本文件由 tools/render_msgkinds.py 从 fabviewer.yaml 的第 1 段**自动生成**，
 #   不要手改。改规则请改 fabviewer.yaml，然后重跑：
 #       python3 tools/render_msgkinds.py
 #   Logstash 开了 config.reload.automatic（3s），生成后自动重载。
 #
-# 语义：按 yaml 里的顺序，**第一条命中的规则生效**（第一个命中即停）—— 对应 04 §3.2.3
+# 语义：按 yaml 里的顺序，**第一条命中的规则生效**（第一个命中即停）
 #   「每行只打一个标签」。命中的同时把 capture / set 的值写进行级字段
 #   （CALL_SYS / LOCK_OBJ / LOCK_ID / ERR_CODE / RULE_RESULT）。
 #   全都不命中 → MSG_KIND = OTHER。
@@ -55,7 +55,7 @@ filter {{
 """
 
 TAIL = """  else {
-    # 以上都不是（04 §3.2.3 标签表的默认值）
+    # 以上都不是
     mutate { replace => { "MSG_KIND" => "OTHER" } }
   }
 }

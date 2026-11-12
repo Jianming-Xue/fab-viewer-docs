@@ -1,6 +1,6 @@
 # ==============================================================================
 # Logstash 主配置（加工层）
-# 口径见 docs/04-后台链路与数据模型.md §3.1 ~ §3.4
+# 本文件按 Logstash 9.x 写；堆大小在 jvm.options，这里只管管道行为与队列
 #
 # 目标版本：Logstash 9.5。本文件按 9.x 写 —— 与 8.x 的差别都在注释里标了
 # 落地必改：无（地址类参数都在 pipeline 与 pipelines.yml 里）
@@ -12,7 +12,7 @@ api.http.port: 9600             # 9.0 起 http.* 两个参数已被移除、改�
 log.level: info
 path.logs: /var/log/logstash
 
-# ---- 规则热加载（04 §3.4）----
+# ---- 规则热加载 ----
 # msg_kinds 的规则改完由 tools/render_msgkinds.py 渲染进 pipeline/30-msgkind.conf，
 # 这里开自动重载，渲染完 3 秒内生效，**不用重启进程**
 config.reload.automatic: true
@@ -26,13 +26,13 @@ pipeline.batch.delay: 50
 # 上面 -Xmx4g 是按堆外 buffer 估的；若堆压力偏大，解开下一行回到 8.x 的行为。
 # 注意这是**整实例**设置，会影响别的管道，别在别人不知情时打开。
 # pipeline.buffer.type: direct
-pipeline.ordered: false         # 不要求保序：行文档写一次不再改，日志顺序由派生层按二级重排还原（04 §5.2.4）
+pipeline.ordered: false         # 不要求保序：行文档写一次不再改，日志顺序由派生层按二级重排还原
 # 关键：关掉 ECS 兼容。开着的话 Logstash 会给事件补 ecs / host 等元字段，
-# 而行索引模板是 dynamic: strict，多一个字段整篇写入失败（04 §5.3.1）
+# 而行索引模板是 dynamic: strict，多一个字段整篇写入失败
 pipeline.ecs_compatibility: disabled
 
 # ---- 队列 ----
-# 持久化队列：Logstash 重启不丢事件。行文档按行身份串幂等（_id，04 §3.2.2），
+# 持久化队列：Logstash 重启不丢事件。行文档按行身份串（_id）幂等，
 # 重放同一批不会产生重复行；纯文本行例外，它每次派生的 LOG_TIME（=采集时刻）不同
 queue.type: persisted
 queue.max_bytes: 8gb
