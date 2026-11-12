@@ -17,7 +17,7 @@
 
 ---
 
-## 1. 现场必改 4 项
+## 1. 现场必改 5 项
 
 ![现场必改项](../assets/logstash-step1.png)
 
@@ -27,8 +27,19 @@
 | 2 | `/etc/default/logstash`（包外，已有内容就追加） | `OS_USER` / `OS_PASSWORD` —— `50-output.conf` 用环境变量引用，整实例共享 |
 | 3 | `pipeline/10-input.conf` 第 15 行 | `port => 5045` 核对没被占用；换值要与 Filebeat 的 `output.logstash.hosts` 同值 |
 | 4 | `pipeline/40-derive-fields.conf` 第 102 行 | `cidrs` → 现场内网网段 |
+| 5 | `pipeline/40-derive-fields.conf` 第 142 行 | `prefix = 'dev-'` → 现场索引前缀。必须与已入库的索引名、读别名、索引模板 / ISM pattern 一致；换环境只改这一行 |
 
 其余文件原样可用。
+
+**换环境前缀（例如切到 `test-`）只改一处配置**：`40-derive-fields.conf` 第 142 行 `prefix = 'dev-'` → `prefix = 'test-'`。这一行拼出 `[@metadata][index]`，`50-output.conf` 的 `index => "%{[@metadata][index]}"` 只是透传；索引名变成 `test-mes-log-line-{env}-{yyyy.MM.dd}`，中间的 env 段、日期、`_id`、字段白名单和其余 5 段 pipeline 都不受影响。
+
+下面 3 处只是文字，不改也能跑，但会跟新值对不上，建议同步：
+
+| 位置 | 要同步的文字 |
+|---|---|
+| `40-derive-fields.conf` 第 127 行 | 注释「当前开发环境 dev-」 |
+| `50-output.conf` 第 4 行 | 目标索引名举例 `dev-mes-log-line-...` |
+| 本文件第 5 项 | `prefix = 'dev-'` 举例 |
 
 ---
 
