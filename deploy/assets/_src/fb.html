@@ -59,7 +59,7 @@
 <span class="ln note">  ↑ 隔十几秒再看一眼，mtime 要往前爬 —— 在爬 = 真在采</span>
 <span class="ln"> </span>
 <span class="ln"><span class="p">$</span> <span class="cmd">sudo journalctl -u filebeat -n 20</span></span>
-<span class="ln out">Harvester started for file: /mes/prod/systemlogs/MESFABsrv.log</span>
+<span class="ln out">Harvester started for file: /mes/dev/systemlogs/MESFABsrv.log</span>
 <span class="ln note">  ↑ 没有 ERR 就是干净</span>
     </span></div>
     <div class="goal"><b>目的：</b>一眼分开「没在采」和「在采但送不出去」—— <b>mtime 不动</b> = 路径没匹配上；<b>mtime 在动但加工层 events.in 不涨</b> = 送不出去（回第 2 步）。</div>

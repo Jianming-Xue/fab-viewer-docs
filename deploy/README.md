@@ -50,7 +50,7 @@
 
    ```bash
    curl -s "$OS/mes-log-line-read/_count?q=system.name:MES-300Works"
-   curl -s "$OS/mes-log-line-prod-$(date +%Y.%m.%d)/_mapping" | jq '.[].mappings.properties.LOG_TIME'
+   curl -s "$OS/mes-log-line-dev-$(date +%Y.%m.%d)/_mapping" | jq '.[].mappings.properties.LOG_TIME'
    # 期望：{"type":"keyword"}；若出现 "text" 或带 fields.keyword，说明模板没生效，索引是猜出来的
    ```
 

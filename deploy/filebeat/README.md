@@ -2,7 +2,7 @@
 
 本层是**新装**（业务机上原本没有 Filebeat）。三步：**改 1 行 → 拷 + 自检 → 起服务 + 验证**。
 
-一台机器一份配置，覆盖该机上的**全部环境与全部服务族** —— 同一台机器上 PIRUN 与 PROD 可能并存，日志目录统一 `/mes/<env>/systemlogs/`。
+当前只采 **DEV 开发环境**（`ENV: DEV`）的 3 类日志：`*FABsrv.log*` / `*COMM_RCVsrv*.log*` / `*COMM_SNDsrv*.log*`；UAT 两组 input（`ENV: UAT`）与其余服务族在 `filebeat.yml` 里已注释，按需放开。日志目录 DEV → `/mes/dev/systemlogs/`、UAT → `/mes/uat/systemlogs/`（ENV 值大写，目录名小写）；装之前核一下现场实际目录名。输出目标 `logstash-01:5045` / `logstash-02:5045`。
 
 ---
 
@@ -19,16 +19,15 @@
 | 情况 | 改哪 |
 |---|---|
 | 日志盘没挂在 `/mes` | 各组 `paths` 的前缀 |
-| 单环境机器（只有 PROD 或只有 PIRUN） | 删掉另一环境的两组 input。留着只是空跑，日志里会提示路径不存在 |
+| 要采 UAT 环境 | 把 `filebeat.yml` 里 UAT 两组 input 逐行取消注释，并按需放开服务族路径 |
 
-**四组 input 的职责**（`id` 别随手改 —— `id` 变了等于换了一个采集器，registry 会另起一份、从头重读）：
+**当前生效的 input**（`id` 别随手改 —— `id` 变了等于换了一个采集器，registry 会另起一份、从头重读）：
 
-| input id | 采什么 | 多行合并 |
-|---|---|---|
-| `mes-pirun-plain` | PIRUN 业务族 + `POLL` + `COMM_RCV` | 否 |
-| `mes-pirun-comm-snd` | PIRUN 的 `*COMM_SNDsrv*.log*` | **是** |
-| `mes-prod-plain` | PROD 同左 | 否 |
-| `mes-prod-comm-snd` | PROD 的 `*COMM_SNDsrv*.log*` | **是** |
+| input id | 采什么 | 多行合并 | 状态 |
+|---|---|---|---|
+| `mes-dev-plain` | DEV 的 `*FABsrv.log*` / `*COMM_RCVsrv*.log*` | 否 | 启用 |
+| `mes-dev-comm-snd` | DEV 的 `*COMM_SNDsrv*.log*` | **是** | 启用 |
+| `mes-uat-plain` / `mes-uat-comm-snd` | UAT 对应两类 | 同左 | 整组注释 |
 
 ---
 
@@ -87,18 +86,7 @@ sudo systemctl enable --now filebeat
 | 采到归档件（`.log.1.gz`） | 通配把压缩件匹配进来了 | `prospector.scanner.exclude_files` 里要有压缩与改名两类 |
 | `HOSTIP` 为空、锁流三元组缺一段 | `add_host_metadata.netinfo.enabled` 是 `false` | 改 `true`。这个开关管的就是往事件里带不带 `host.ip` |
 | `too many open files` | `harvester_limit` 或 `ulimit -n` 太小 | 见第二步第 2 条 |
-| 重启后重复投递 | registry flush 后重读（正常） | 不用管：行文档按 `LOG_LINE_ID` 做 `_id`，重复投递覆盖同一篇。**纯文本行除外** —— 它取不到行首时间戳、时间改用采集时刻，重投会多出一篇（04 §3.2.2） |
+| 重启后重复投递 | registry flush 后重读（正常） | 不用管：行文档按 `LOG_LINE_ID` 做 `_id`，重复投递覆盖同一篇。**纯文本行除外** —— 它取不到行首时间戳、时间改用采集时刻，重投会多出一篇 |
 | 采集明显滞后 | 文件滚太快，harvester 跟不上 | 确认 `check_interval: 5s`，再看是不是被 `harvester_limit` 排队挡住 |
 
-**升级与回滚**：动之前先 `sudo tar czf /root/filebeat-registry-$(date +%F).tgz /var/lib/filebeat`。丢了 registry 会**全量重读**（不丢数据，靠幂等覆盖，但会灌一批重复事件）。多台机器**滚动升级**，不要一次全停 —— 采集是幂等的（**纯文本行除外**，会被重复投递，见 04 §3.2.2）。
-
----
-
-## 口径在哪
-
-| 内容 | 出处 |
-|---|---|
-| 输入字段、加工逻辑（含多行合并） | `docs/04` §2.1、§2.2 |
-| 输出字段（7 项） | `docs/04` §2.3 |
-| 采集配置与每个参数的取值理由 | `docs/04` §2.4 |
-| 归档件不回采、挂载点约定 | `docs/04` §2.1、§2.4 |
+**升级与回滚**：动之前先 `sudo tar czf /root/filebeat-registry-$(date +%F).tgz /var/lib/filebeat`。丢了 registry 会**全量重读**（不丢数据，靠幂等覆盖，但会灌一批重复事件）。多台机器**滚动升级**，不要一次全停 —— 采集是幂等的（**纯文本行除外**，会被重复投递）。
