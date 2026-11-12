@@ -98,7 +98,7 @@
 2. **派生层机制**（四个终态、静默期、水位线、切块重放流程）→ `06`；`04` 只留三样：块文档字段定义（§5.3.2）、不切块名单（§4.2.1）、边界来源（§4.2.2）。
 3. **块首行解析** → `06-附录A`；派生层（Go）与前端（JS）照同一套伪代码各自实现，产物必须逐字节一致。
 4. **索引模板**：`deploy/opensearch/*.json`（可执行）← `09`（带理由）← `04` §5（权威）；三者冲突以 `04` 为准并回头改齐。
-5. **部署操作** → `deploy/` 三份 README；口径全在 `docs/`。
+5. **部署操作** → `deploy/` 采集 / 加工两份 README；存储层只交 4 个 JSON，部署方案由项目后端按项目要求整理。口径全在 `docs/`。
 6. **视觉与交互** → `05`；模块文档只记「哪个条件触发」，不记呈现。
 7. **字段与取值** → 模块文档一律引用 `04`，不另立字段口径。
 8. **告警** → 判定设计归 `08`、工程实现归 `07`（均待重写）；链路口径归 `04` §六。
@@ -184,7 +184,7 @@ flowchart LR
 **Server Hang（拆分后）：**
 
 - **拆分**：第一类（Server Hang List）归模块 5 `Server Hang Reason Config`（配置）+ 派生服务（运行）+ 模块 1（展示：Rule Info 检索 §3.6 与 Rule 实效分析）；第二类（Server Hang / Endless Rule 报警）留模块 2 功能 2。
-- **第一类（口径全定；04/06/09/deploy 已动刀完成）**：配置逻辑见模块 5 `01`（`FabViewerSrvHangConfig`：唯一键 ruleName+hangReason、不分环境、四式 `%` 语义、ruleName 精确、页面与五接口定稿）；判定与运行口径速查暂存模块 2 `02` 附录。`HANG_LIST`（8 项）已落 `04` §5.3.2 / `06` §2.2·§2.3·§4.7·§十 / `09` §四 / `12-template-exec.json` —— 块字段 **34→35、nested 3→4**；派生层读 Oracle 新路径落在 `06` §4.7（块级按需查 + 5min 缓存 + Redis 演进）。**存量块不回算**：`HANG_LIST` / `LOCK_SEQ` / `INNER_RULES` 三字段一个口径（`06` §4.7）。余项：上线时给存量块索引 `PUT mapping`（命令在 deploy/opensearch/README.md）、模块 1 弹框加 Hang Reason 列。
+- **第一类（口径全定；04/06/09/deploy 已动刀完成）**：配置逻辑见模块 5 `01`（`FabViewerSrvHangConfig`：唯一键 ruleName+hangReason、不分环境、四式 `%` 语义、ruleName 精确、页面与五接口定稿）；判定与运行口径速查暂存模块 2 `02` 附录。`HANG_LIST`（8 项）已落 `04` §5.3.2 / `06` §2.2·§2.3·§4.7·§十 / `09` §四 / `12-template-exec.json` —— 块字段 **34→35、nested 3→4**；派生层读 Oracle 新路径落在 `06` §4.7（块级按需查 + 5min 缓存 + Redis 演进）。**存量块不回算**：`HANG_LIST` / `LOCK_SEQ` / `INNER_RULES` 三字段一个口径（`06` §4.7）。余项：上线时给存量块索引 `PUT mapping`（命令由项目后端整理进部署方案）、模块 1 弹框加 Hang Reason 列。
 - **第二类（见模块 2 `02`）**：`FabViewerSrvHangMonitor`（环境级）；**Alarm 存 Oracle**（04 §六边界不破）；独立 Alarm Application 定时读块文档。跨层约束（方向已修正）：`maxDelay` 须**严格小于**静默期 5min 并留扫描裕量 —— 或判据 A 扩认超时封口（07/08 拍）。待定 10 条（第一张卡：`alarmItems` 语义）。
 - `04` §六需回补 Server Hang 报警（冻结，动前确认）。
 

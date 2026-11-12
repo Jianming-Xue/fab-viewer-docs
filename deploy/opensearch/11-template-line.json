@@ -38,9 +38,7 @@
     }
   },
   "_meta": {
-    "doc": "docs/09-OpenSearch索引模板.md",
-    "field_list": "docs/04-后台链路与数据模型.md §5.3.1",
-    "note": "LOG_RAW 只在 _source 里供还原用，不建索引也不建 doc_values；LOG_BODY 是唯一分词字段",
-    "ism": "策略**不写**在索引模板里 —— 靠 ISM policy 的 ism_template 按索引模式自动挂（官方唯一推荐路径，见 OpenSearch ISM 文档）。旧的 plugins.index_state_management.policy_id 已弃用、OpenSearch 3.x 下可能让索引创建被 unknown setting 直接拒掉，不要加回来。"
+    "index": "mes-log-line-{env}-{yyyy.MM.dd}，每天一个；读别名 mes-log-line-read，写入直接指定当天索引名（不设写别名）",
+    "mapping": "20 个字段、dynamic: strict（表外字段整篇拒写）；LOG_RAW 只留 _source，不建索引也不建 doc_values；LOG_BODY 是唯一分词字段"
   }
 }

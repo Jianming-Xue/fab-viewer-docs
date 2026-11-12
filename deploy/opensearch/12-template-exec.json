@@ -89,9 +89,8 @@
     }
   },
   "_meta": {
-    "doc": "docs/09-OpenSearch索引模板.md",
-    "field_list": "docs/04-后台链路与数据模型.md §5.3.2",
-    "note": "七个业务字段与 ERR_CODE 可多值（同字段多值 = keyword 数组）；START_TIME / END_TIME / LAST_LINE_TIME / COST_BREAKDOWN 的时间子字段走日志格式，CLOSE_TIME / REOPENED_AT 是墙钟、走 ISO",
-    "ism": "策略**不写**在索引模板里 —— 靠 ISM policy 的 ism_template 按索引模式自动挂（官方唯一推荐路径，见 OpenSearch ISM 文档）。旧的 plugins.index_state_management.policy_id 已弃用、OpenSearch 3.x 下可能让索引创建被 unknown setting 直接拒掉，不要加回来。"
+    "index": "mes-log-exec-{env}-{yyyy.MM}，每月一个；块文档按块首行时刻选索引；读别名 mes-log-exec-read（不设写别名）",
+    "mapping": "33 个字段、dynamic: strict；4 个 nested：REOPEN_LOG / COST_BREAKDOWN / INNER_RULES / HANG_LIST",
+    "fields": "RULENAME / LOTID / EQPID / PORTID / CARRIERID / USERID / TID / ERR_CODE 可多值（keyword 数组）；CLOSE_TIME、REOPEN_LOG.REOPENED_AT 用 ISO 墙钟，其余时间字段用日志格式 yyyy/MM/dd HH:mm:ss.SSS"
   }
 }

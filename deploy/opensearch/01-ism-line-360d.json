@@ -1,6 +1,6 @@
 {
   "policy": {
-    "description": "mes-log-line-*：热 0~30d / 温 30~180d / 冷 180~360d / 360d 到期删除。按天命名、不用 rollover，min_index_age 就是索引年龄。口径见 docs/04-后台链路与数据模型.md §5.2.5。",
+    "description": "行索引 mes-log-line-* 生命周期：0~30d 热（可写）；30d 起转温（只读、副本 1、force merge 单段）；180d 起转冷；360d 删除。按天建索引、不用 rollover，min_index_age 按索引创建时间算。",
     "default_state": "hot",
     "states": [
       {

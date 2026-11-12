@@ -1,6 +1,6 @@
 {
   "policy": {
-    "description": "mes-log-exec-*：热 0~360d / 360d 之后转归档，不删除。归档后不再回写（块写哪个索引由块首行时刻决定）。口径见 docs/04-后台链路与数据模型.md §5.2.5。",
+    "description": "块索引 mes-log-exec-* 生命周期：0~360d 热（可写）；360d 起转冷（只读，不删除）。按月建索引、不用 rollover，min_index_age 按索引创建时间算。",
     "default_state": "hot",
     "states": [
       {
