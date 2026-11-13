@@ -1,0 +1,39 @@
+# MES 日志加工层 · Logstash 容器编排（Docker Compose 部署）
+#
+# 配置：本目录 pipeline/*.conf + patterns/mes + fabviewer.yaml + tools/（源 fab-viewer-docs deploy/logstash；
+#       站点化改动见 50-output.conf / 40-derive-fields.conf 内【现场改】标注）
+# 镜像：logstash:9.5.5 + logstash-output-opensearch 2.x（见同目录 Dockerfile；
+#       镜像准备与离线导入见 ../DEPLOY-DOCKER.md §3）
+# 路径：容器内沿用仓库写死路径 —— pipeline 挂 /etc/logstash-mes/pipeline、patterns 挂
+#       /etc/logstash/patterns，pipelines.yml 与 20-parse.conf 的写死路径零改动
+#
+#   docker compose run --rm logstash /usr/share/logstash/bin/logstash -t   # 配置校验
+#   docker compose up -d             # 启动
+#   curl -s localhost:9600/_node/stats/pipelines | jq '.pipelines["mes-lines"].events'  # in/out 都涨即通
+#   docker compose down              # 停止（queue/dlq 卷保留）
+services:
+  logstash:
+    image: logstash-mes:9.5.5        # 联网机构建好后 save/load 导入；离线机不再 build
+    container_name: logstash-mes
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      # 【现场填】OS 凭据走环境变量，50-output.conf 以 ${OS_USER}/${OS_PASSWORD} 引用。
+      # 真实值只写在本机此文件，勿提交、勿外发
+      OS_USER: <OS_USER>
+      OS_PASSWORD: <OS_PASSWORD>
+    ports:
+      - "5045:5045"   # MES 专用 beats 口（10-input.conf），Filebeat 的 output.logstash 指宿主此口
+      - "9600:9600"   # 监控 API，README 验证口
+    volumes:
+      # 主配置：Docker 部署版（api 绑 0.0.0.0）；管道声明原样
+      - ./conf/logstash.docker.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ../../logstash/conf/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      # 管道与 patterns：容器内路径 = 仓库写死路径（pipelines.yml 的 path.config、
+      # 20-parse.conf 的 patterns_dir），conf 文件零路径改动
+      - ../../logstash/pipeline:/etc/logstash-mes/pipeline:ro
+      - ../../logstash/patterns:/etc/logstash/patterns:ro
+      # 持久化队列 + 死信队列（pipelines.yml queue.type: persisted / DLQ）
+      - logstash-data:/usr/share/logstash/data
+volumes:
+  logstash-data:

@@ -1,0 +1,31 @@
+# MES 日志采集 · Filebeat 容器编排（采集层，Docker Compose 部署）
+#
+# 配置：同目录 filebeat.yml（源 fab-viewer-docs deploy/filebeat；仅输出段按
+#       Docker 部署调整为 host.docker.internal:5045，改动处已标注）
+# 日志：MES 日志放 ./systemlogs/（宿主目录，拷入即被采集；容器内挂为
+#       /mes/dev/systemlogs/，与 filebeat.yml 的 paths 一一对应）
+# 进度：registry 落 ./data/，容器重建不重读；删掉该目录 = 下次全量重采
+#
+#   docker compose up -d            # 启动
+#   docker compose logs -f filebeat # 看采集动态
+#   docker compose down             # 停止（./data 进度保留）
+services:
+  filebeat:
+    image: elastic/filebeat:9.5.6   # 本机已拉取；9.5+ 与配置的 fingerprint 口径一致
+    container_name: filebeat
+    restart: unless-stopped
+    user: root                      # 读宿主挂载目录所需（镜像本就 root 运行，显式写明）
+    # -e：自身日志走 stderr → docker compose logs 可见
+    # --strict.perms=false：跳过对挂载进来的配置文件的属主/权限强校验（bind mount 常见差异）
+    command: filebeat -e --strict.perms=false
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      # MES 日志目录：现场日志拷入 ./systemlogs/ 即被采集（只读挂，filebeat 不回写）
+      - ./systemlogs:/mes/dev/systemlogs:ro
+      # UAT 放开时（filebeat.yml 去掉 UAT 两组注释）加一行：
+      # - ./systemlogs-uat:/mes/uat/systemlogs:ro
+      # registry（采集进度）持久化到宿主，容器重建不重读
+      - ./data:/var/lib/filebeat
+    # 对接 logstash：filebeat.yml 输出段已指 host.docker.internal:5045（宿主映射口）
