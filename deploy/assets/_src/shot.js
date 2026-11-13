@@ -1,5 +1,6 @@
 // 用法（在 _src 目录下）：node shot.js <卡片html> <输出目录>
 // 例：node shot.js fb.html ..
+// 没装 playwright 自带浏览器时，用 CHROME_PATH 指向本机 Chrome 可执行文件
 const { chromium } = require('playwright-core');
 const path = require('path');
 const fs = require('fs');
@@ -12,7 +13,7 @@ const fs = require('fs');
   const outDir = path.resolve(outArg);
   fs.mkdirSync(outDir, { recursive: true });
 
-  const b = await chromium.launch();
+  const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined });
   const p = await b.newPage({ viewportSize: { width: 1120, height: 900 }, deviceScaleFactor: 2 });
   await p.goto('file://' + html);
 

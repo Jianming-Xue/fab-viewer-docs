@@ -1,0 +1,38 @@
+# ==============================================================================
+# Logstash 主配置 · Docker 部署版（源 conf/logstash.yml，容器化调整两处：
+#   api 改绑 0.0.0.0 供宿主访问 9600 验证口；去掉 path.logs 落盘 —— 容器日志走 stdout）
+# 挂载点：docker-compose.yml 把本文件挂为容器内 /usr/share/logstash/config/logstash.yml
+#
+# 管道声明 / workers / 队列类型都在 conf/pipelines.yml（mes-lines 一段，原样挂载）
+# 堆大小：不动容器镜像默认（-Xmx1g），本地量级够用；要调时另挂 jvm.options
+# ==============================================================================
+
+api.http.host: 0.0.0.0        # 【Docker 部署改】容器内 127.0.0.1 宿主够不着，改绑全网卡
+api.http.port: 9600           # 9.0 起 http.* 两个参数已被移除、改名 api.* —— 留旧名会直接启动失败
+log.level: info
+
+# ---- 规则热加载 ----
+# msg_kinds 的规则改完由 tools/render_msgkinds.py 渲染进 pipeline/30-msgkind.conf，
+# 这里开自动重载，渲染完 3 秒内生效，**不用重启进程**
+config.reload.automatic: true
+config.reload.interval: 3s
+
+# ---- 管道 ----
+pipeline.workers: 4             # 与 CPU 核数相当；单条事件的处理是纯 CPU（grok + ruby）
+pipeline.batch.size: 500
+pipeline.batch.delay: 50
+pipeline.ordered: false         # 不要求保序：行文档写一次不再改，日志顺序由派生层按二级重排还原
+# 关键：关掉 ECS 兼容。开着会补 ecs / host 元字段，行索引模板 dynamic: strict，
+# 多一个字段整篇写入失败（pipelines.yml 里也有关，双保险）
+pipeline.ecs_compatibility: disabled
+
+# ---- 队列 ----
+# 持久化队列：Logstash 重启不丢事件。行文档按行身份串（_id）幂等
+queue.type: persisted
+queue.max_bytes: 8gb
+queue.checkpoint.writes: 1024
+
+# ---- 死信队列 ----
+# 写不进索引的事件落这里（映射不符、字段类型错），不静默丢
+dead_letter_queue.enable: true
+dead_letter_queue.max_bytes: 1gb

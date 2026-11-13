@@ -1,7 +1,7 @@
 * { box-sizing: border-box; }
 body { margin:0; padding:24px; background:#F7F8F8;
        font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif; }
-.shot { width:1040px; margin:0 0 24px; background:#fff; border:1px solid #E5E8E6;
+.shot { width:880px; margin:0 0 24px; background:#fff; border:1px solid #E5E8E6;
         border-radius:12px; overflow:hidden; }
 .bar { display:flex; align-items:center; gap:10px; padding:12px 18px;
        border-bottom:1px solid #EDF0EE; background:#FBFCFB; }
