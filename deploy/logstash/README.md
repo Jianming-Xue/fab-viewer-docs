@@ -19,8 +19,6 @@
 
 ## 1. 现场必改 5 项
 
-![现场必改项](../assets/logstash-step1.png)
-
 | # | 文件 | 改成什么 |
 |---|---|---|
 | 1 | `pipeline/50-output.conf` 第 23 行 | `hosts` → 现场 OpenSearch 地址；内网 HTTP 时 `ssl => false` 并删掉两行证书校验 |
@@ -60,8 +58,6 @@ sudo chown -R logstash:logstash /etc/logstash-mes
 
 ## 3. 追加两处
 
-![往现有配置追加什么](../assets/logstash-step3.png)
-
 **现场 `pipelines.yml` 末尾追加**（别人的条目一个字不动）：
 
 ```yaml
@@ -85,7 +81,5 @@ sudo chown -R logstash:logstash /etc/logstash-mes
 sudo -u logstash /usr/share/logstash/bin/logstash -t      # 期望 Configuration OK
 sudo systemctl restart logstash                          # 别的管道会一起断几秒；多节点逐个重启
 ```
-
-![验证事件在流](../assets/logstash-verify.png)
 
 判据：`curl -s localhost:9600/_node/stats/pipelines | jq '.pipelines["mes-lines"].events'`，`in` 与 `out` 都涨即正常；`in` 涨、`out` 不涨去查 DLQ 与 OpenSearch 认证 / 模板。

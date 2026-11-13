@@ -60,7 +60,7 @@
 | `docs/06-派生服务工程实现.md` | **派生层实现权威**：Scheduler/Worker、快慢轮次、四路+路5、Oracle 四表、幂等、配置六段、拉行分页、§十逐行重放 | 已结项冻结（有未提交改动） | ✅ |
 | `docs/06-附录A-块首行解析方案.md` | 块首行解析**执行细则**（剥壳/切块/合成 KV/XML/TXN 取 TxnName），**派生层与前端两端同一套算法** | 定稿 | ✅ |
 | `docs/09-OpenSearch索引模板.md` | `04` §5.2/§5.3 的**可执行版本**：2 个可组合模板 + 2 个 ISM 策略与取值理由 | 定稿 | ✅ |
-| `deploy/` | **部署操作层**：filebeat / logstash / opensearch 三份配置 + README + 截图；派生层源码**不在**本仓库（自研服务 `tworks-log-int`） | 已交付 | ✅ |
+| `deploy/` | **部署操作层**：filebeat / logstash / opensearch 三份配置 + README；派生层源码**不在**本仓库（自研服务 `tworks-log-int`） | 已交付 | ✅ |
 
 ### 3.2 告警层
 
@@ -213,7 +213,7 @@ flowchart LR
 
 - `.gitignore` 采用**白名单**制：`/*` 全忽略、逐条 `!` 放行 —— **本仓库只收录交付物**。新文档要进 git，须在白名单加一行。
 - 已入：`04` / `06` / `06-附录A` / `09` / 模块 1（00/01/02 + prototype 两文件）/ `deploy` 全部 / 本 README。
-- `deploy/assets/_src/` 放截图生成源（`shot.js` / 页面骨架），产物 PNG 在 `assets/`。
+- `deploy/assets/_src/` 放截图生成源（`shot.js` / 页面骨架）；产物 PNG 暂不收录，等部署文件稳定后统一重出。
 
 ---
 ## 更新记录

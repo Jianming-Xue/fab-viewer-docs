@@ -8,8 +8,6 @@
 
 ## 第一步：改 1 行
 
-![filebeat 第一步：改 output.logstash.hosts](../assets/filebeat-step1.png)
-
 | 文件 | 位置 | 改成什么 |
 |---|---|---|
 | `filebeat.yml` | 末尾「输出」段 | `hosts` → 现场的加工层地址（多节点有几个写几个）。**端口必须与 logstash 侧 `10-input.conf` 同值** |
@@ -32,8 +30,6 @@
 ---
 
 ## 第二步：拷 + 自检
-
-![filebeat 第二步：落配置并自检](../assets/filebeat-step2.png)
 
 ```bash
 sudo cp filebeat.yml /etc/filebeat/filebeat.yml
@@ -61,8 +57,6 @@ sudo filebeat test output -c /etc/filebeat/filebeat.yml     # 期望 talk to ser
 ---
 
 ## 第三步：起服务 + 验证
-
-![filebeat 第三步：确认采集在动](../assets/filebeat-verify.png)
 
 ```bash
 sudo systemctl enable --now filebeat
