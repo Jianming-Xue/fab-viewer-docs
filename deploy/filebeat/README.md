@@ -1,86 +1,64 @@
-# filebeat · 采集层部署（每台业务机一份）
+# filebeat · 采集层部署
 
-本层是**新装**（业务机上原本没有 Filebeat）。三步：**改 1 行 → 拷 + 自检 → 起服务 + 验证**。
+每台业务机一份配置，本层是**新装**。方案：改输出与日志路径 → 拷配置自检 → 起服务 → 看 registry。
 
-当前只采 **DEV 开发环境**（`ENV: DEV`）的 3 类日志：`*FABsrv.log*` / `*COMM_RCVsrv*.log*` / `*COMM_SNDsrv*.log*`；UAT 两组 input（`ENV: UAT`）与其余服务族在 `filebeat.yml` 里已注释，按需放开。日志目录 DEV → `/mes/dev/systemlogs/`、UAT → `/mes/uat/systemlogs/`（ENV 值大写，目录名小写）；装之前核一下现场实际目录名。输出目标 `logstash-01:5045` / `logstash-02:5045`。
+**当前配置**：只采 DEV（`ENV: DEV`）的 3 类日志 `*FABsrv.log*` / `*COMM_RCVsrv*.log*` / `*COMM_SNDsrv*.log*`，默认目录 `/mes/dev/systemlogs/`；UAT 两组 input 整组注释。输出到 `logstash-01:5045` / `logstash-02:5045`。例：`/mes/dev/systemlogs/MESFABsrv.log` 里的一行，被采成带 `ENV=DEV` 的事件送到 5045。
 
----
+上线顺序是**存储 → 加工 → 采集**：加工层管道没起来之前别开采集，否则事件会堵在内存队列里。
 
-## 第一步：改 1 行
+## 1. 改配置
 
-| 文件 | 位置 | 改成什么 |
-|---|---|---|
-| `filebeat.yml` | 末尾「输出」段 | `hosts` → 现场的加工层地址（多节点有几个写几个）。**端口必须与 logstash 侧 `10-input.conf` 同值** |
+**① 输出**：`filebeat.yml` 末尾 `output.logstash.hosts` 改成现场加工层地址，端口必须与 `10-input.conf` 同值。
 
-其余整份照拷。只有这两种机器要多改：
+```yaml
+hosts: ["logstash-01:5045", "logstash-02:5045"]   # 例：两个加工节点
+```
 
-| 情况 | 改哪 |
-|---|---|
-| 日志盘没挂在 `/mes` | 各组 `paths` 的前缀 |
-| 要采 UAT 环境 | 把 `filebeat.yml` 里 UAT 两组 input 逐行取消注释，并按需放开服务族路径 |
+**② 日志路径**：每组 `paths` 是绝对路径 glob，**不要求挂在 `/mes` 下**，日志盘挂哪儿就写哪儿。例：日志实际在 `/data/meslogs/dev/systemlogs/`，生效的 3 条（前两条在 `mes-dev-plain`、第三条在 `mes-dev-comm-snd`）按所在组改成
 
-**当前生效的 input**（`id` 别随手改 —— `id` 变了等于换了一个采集器，registry 会另起一份、从头重读）：
+```yaml
+- /data/meslogs/dev/systemlogs/*FABsrv.log*
+- /data/meslogs/dev/systemlogs/*COMM_RCVsrv*.log*
+- /data/meslogs/dev/systemlogs/*COMM_SNDsrv*.log*
+```
 
-| input id | 采什么 | 多行合并 | 状态 |
+`ENV` 只是事件字段，与目录名不必同名；组内注释掉的服务族清单、UAT 组的 `paths` 一并换前缀，免得以后放开时还指向旧目录。改完用 `ls` 核对真实文件名（Linux 区分大小写）。
+
+**③ 放开 UAT**：UAT 两组 `mes-uat-plain` / `mes-uat-comm-snd` 整组注释着，逐行去掉行首 `#` 即可启用，`ENV: UAT` 和 id 别改。注意 `mes-uat-plain` 里列了 10 条路径，比 DEV 同组生效的 2 条多 8 个服务族，把不采的行删掉。改完先跑第 3 步的 `test config`。
+
+`input id` 一律别改：改了等于换采集器、registry 从头重读。
+
+## 2. 一台机器采多个环境
+
+同一台业务机上 DEV 和 UAT 的日志都存在时，**四组 input 同时启用**即可 —— DEV 两组保持原样，UAT 两组取消注释。配置里已经把 UAT 那两组写好了：
+
+| input id | `ENV` | `paths` 前缀 | 多行合并 |
 |---|---|---|---|
-| `mes-dev-plain` | DEV 的 `*FABsrv.log*` / `*COMM_RCVsrv*.log*` | 否 | 启用 |
-| `mes-dev-comm-snd` | DEV 的 `*COMM_SNDsrv*.log*` | **是** | 启用 |
-| `mes-uat-plain` / `mes-uat-comm-snd` | UAT 对应两类 | 同左 | 整组注释 |
+| `mes-dev-plain` | DEV | `/mes/dev/systemlogs/` | 否 |
+| `mes-dev-comm-snd` | DEV | 同上 | 是 |
+| `mes-uat-plain` | UAT | `/mes/uat/systemlogs/` | 否 |
+| `mes-uat-comm-snd` | UAT | 同上 | 是 |
 
----
+例：这台机器上 DEV 日志在 `/data/meslogs/dev/systemlogs/`、UAT 在 `/data/meslogs/uat/systemlogs/`，就按第 1 节 ② 把四组各自的 `paths` 换掉，`ENV` 仍是 DEV / UAT —— 两套事件靠 `ENV` 区分，落到同一个管道里不会混。
 
-## 第二步：拷 + 自检
+还要加第三个环境时，**照 DEV 那一对整组复制两组**，只改三处：`id`（换个不重复的名字，如 `mes-sit-plain`）、`fields.ENV`、每组 `paths` 前缀。`COMM_SND` 那组必须连 `parsers` 一并复制，否则报文不合并；id 重复会让两组共用一份 registry、互相抢读。
+
+## 3. 拷 + 自检
 
 ```bash
 sudo cp filebeat.yml /etc/filebeat/filebeat.yml
-sudo vi /etc/filebeat/filebeat.yml                          # 改上面那行 hosts
-
 sudo filebeat test config -c /etc/filebeat/filebeat.yml     # 期望 Config OK
 sudo filebeat test output -c /etc/filebeat/filebeat.yml     # 期望 talk to server... OK
 ```
 
-`-c` 不能省 —— 不带它读的是默认路径，可能跟你手上这份不是同一个文件。
+`-c` 不能省，不带它读的是默认路径。起服务前先用 `du -sh` 估一下日志目录大小：`ignore_older: 0` + `tail_files: false` 会让首启把现存滚动件全部回灌；`ulimit -n` 至少 4096（用 systemd override 设 `LimitNOFILE=65536`）。
 
-**起服务之前先做两件事**：
-
-1. **估数据量** —— `du -sh /mes/*/systemlogs/`。配置里 `ignore_older: 0` + `tail_files: false` 是**有意的**：首次启动会把现存的滚动件**全部回灌**。历史量大时加工层会先吃到一波集中写入，必要时先开一个环境、稳了再开另一个。
-2. **放开文件句柄** —— 要求 `ulimit -n ≥ 4096`，官方 systemd unit 不一定给。加一段覆盖：
-
-   ```ini
-   # /etc/systemd/system/filebeat.service.d/override.conf
-   [Service]
-   LimitNOFILE=65536
-   ```
-
-   然后 `sudo systemctl daemon-reload`。
-
----
-
-## 第三步：起服务 + 验证
+## 4. 起服务 + 验证
 
 ```bash
 sudo systemctl enable --now filebeat
 ```
 
-**只有一条判据：`registry` 的 mtime 在不在动。**
+判据只有一条：`/var/lib/filebeat/registry` 的 mtime 在动。不动就核 `paths` 与 `ls` 出来的真实文件名；mtime 动但加工层 `events.in` 不涨，回第 3 步看 `test output`。
 
-| 现象 | 含义 | 下一步 |
-|---|---|---|
-| mtime 在爬 | 真在采 | —— |
-| mtime 不动 | 路径没匹配上 | 核 `paths` 与 `ls /mes/*/systemlogs/` 里的真实文件名（Linux 区分大小写） |
-| mtime 在动，但加工层 `events.in` 不涨 | 采到了、送不出去 | 回第二步看 `test output` |
-
----
-
-## 常见故障
-
-| 现象 | 原因 | 处置 |
-|---|---|---|
-| **漏行**（滚动之后丢一段） | `close.on_state_change.renamed` 被设成 `true`，改名即关 harvester | 必须 `false`；文件身份走 9.x 默认的 fingerprint，改名后指纹不变、继续读完 |
-| 采到归档件（`.log.1.gz`） | 通配把压缩件匹配进来了 | `prospector.scanner.exclude_files` 里要有压缩与改名两类 |
-| `HOSTIP` 为空、锁流三元组缺一段 | `add_host_metadata.netinfo.enabled` 是 `false` | 改 `true`。这个开关管的就是往事件里带不带 `host.ip` |
-| `too many open files` | `harvester_limit` 或 `ulimit -n` 太小 | 见第二步第 2 条 |
-| 重启后重复投递 | registry flush 后重读（正常） | 不用管：行文档按 `LOG_LINE_ID` 做 `_id`，重复投递覆盖同一篇。**纯文本行除外** —— 它取不到行首时间戳、时间改用采集时刻，重投会多出一篇 |
-| 采集明显滞后 | 文件滚太快，harvester 跟不上 | 确认 `check_interval: 5s`，再看是不是被 `harvester_limit` 排队挡住 |
-
-**升级与回滚**：动之前先 `sudo tar czf /root/filebeat-registry-$(date +%F).tgz /var/lib/filebeat`。丢了 registry 会**全量重读**（不丢数据，靠幂等覆盖，但会灌一批重复事件）。多台机器**滚动升级**，不要一次全停 —— 采集是幂等的（**纯文本行除外**，会被重复投递）。
+**改配置前**先备份 registry：`sudo tar czf /root/filebeat-registry-$(date +%F).tgz /var/lib/filebeat`；多台机器滚动升级，不要一次全停。
