@@ -14,18 +14,18 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 **配置分两张表**：
 
-- **表一 `FabViewerLogMonitorCfg`**（§2.1）—— 监控规则本身：环境 + 规则名 + 关键字 + 三道检查的名单 + 报警等级 + 关联的通知配置；
-- **表二 `FabViewerAlarmCfg`**（§2.2）—— 通知配置：收件人（邮件 / 飞书）+ 汇总发送间隔。**随规则走、不单独维护**：在规则弹框里就地配置，保存时同事务写入，一条规则对应一份（1:1）。
+- **表一 `FvLogMonitorCfg`**（§2.1）—— 监控规则本身：环境 + 规则名 + 关键字 + 三道检查的名单 + 报警等级 + 关联的通知配置；
+- **表二 `FvAlarmCfg`**（§2.2）—— 通知配置：收件人（邮件 / 飞书）+ 汇总发送间隔。**随规则走、不单独维护**：在规则弹框里就地配置，保存时同事务写入，一条规则对应一份（1:1）。
 
 > **一条配置 = 一个规则 = 一个关键字**：`Item + Environment` 唯一。要监控多个关键字就建多条配置（规则名各不相同）。旧口径「一条规则下挂多行关键字」随唯一索引一并作废。
 
-> 收件人（邮件 / 飞书）**不在规则表里**，落在 `FabViewerAlarmCfg` 靠 `AlarmCfgId` 关联；但**没有独立的配置页和接口** —— 它是规则的附属，在规则弹框的「通知」区块里一起编辑、一起提交。
+> 收件人（邮件 / 飞书）**不在规则表里**，落在 `FvAlarmCfg` 靠 `AlarmCfgId` 关联；但**没有独立的配置页和接口** —— 它是规则的附属，在规则弹框的「通知」区块里一起编辑、一起提交。
 
-### 2.1 表一 · `FabViewerLogMonitorCfg`（监控规则）
+### 2.1 表一 · `FvLogMonitorCfg`（监控规则）
 
 | 字段 | 列名 | 长度 | 可空 | 说明 |
 |---|---|---|---|---|
-| 主键 | `ID` | ≤50 | 否 | 按全项目表规范，长度对齐 `FabViewerAlarmCfg.ID`；不出参、不进 Ro |
+| 主键 | `ID` | ≤50 | 否 | 按全项目表规范，长度对齐 `FvAlarmCfg.ID`；不出参、不进 Ro |
 | 规则名称 | `Item` | ≤30 | 否 | 规则标识名，如 `PROD-ORA-EXCEPTION`；**仅允许下划线 `_`、中划线 `-`、大小写字母、数字**（`^[A-Za-z0-9_-]{1,30}$`）；汇总表按「环境名 + 规则名称」分组 → **一条规则占一行** |
 | 环境名 | `Environment` | ≤30 | 否 | 下拉，候选来自 Misc `mes.global.environments` |
 | 关键字 | `Keyword` | ≤30 | 否 | **一条配置一个关键字**；不限字符类型 |
@@ -34,13 +34,13 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 关注 Rule Name | `FollowRuleNames` | ≤4000 | 是 | JSON 数组，**Rule 级**白名单 —— 配了则**只有**命中名单内的 Rule Name 才告警 |
 | 排除 Rule Name | `ExcludeRuleNames` | ≤4000 | 是 | JSON 数组，**Rule 级**黑名单 |
 | 报警等级 | `Priority` | ≤20 | 否 | `P1` ~ `P4`；**值域来自 Misc `system.global.priority`**（后端读 Misc 校验，前端走 `/api/v1/sys_misc/priority/list` 取候选，见 §4.1-6） |
-| 通知配置 | `AlarmCfgId` | ≤50 | 否 | 关联 `FabViewerAlarmCfg.ID` |
+| 通知配置 | `AlarmCfgId` | ≤50 | 否 | 关联 `FvAlarmCfg.ID` |
 
 - **唯一索引**：`Item + Environment`。
 - **不设 `enabled`**（配置即启用）；审计字段 `createdAt` / `createdBy` / `updatedAt` / `updatedBy` 由底层统一赋值。
 - 三个 JSON 数组字段的**长度按字符**校验（≤4000），元素个数不单独卡上限；空/未配置存 `NULL`。
 
-### 2.2 表二 · `FabViewerAlarmCfg`（通知配置）
+### 2.2 表二 · `FvAlarmCfg`（通知配置）
 
 **它不设名称字段** —— 不是独立业务实体，而是各类监控配置（关键字监控、Hang 监控等）**共用的通知扩展子集**，靠引用它的配置来辨识。
 
@@ -72,7 +72,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 场景 | 口径 |
 |---|---|
-| 新建规则 | 先插 `FabViewerAlarmCfg` 拿 `ID`，再插规则，**同一事务** |
+| 新建规则 | 先插 `FvAlarmCfg` 拿 `ID`，再插规则，**同一事务** |
 | 修改规则 | 按其 `AlarmCfgId` 更新通知配置，再更新规则，**同一事务** |
 | 删除规则 | **连带删除**其 `AlarmCfg`（无独立入口，留着就是孤儿）；**已产生的 Alarm 不删** —— 历史报警是证据，不随配置消失 |
 | 复用已有配置 | **不允许** —— 一条规则一份，页面不提供「选择已有配置」 |
@@ -146,7 +146,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 **底部（Tab 1）**：`取消` + `Next`（右）。点 `Next` **先校验本页**（必填 / 长度 / Item 字符集 / 两条交叉校验），通过才切到 Tab 2；不通过就地红字、**停在当前页**。
 
-**Tab 2 · Alarm 配置**（落 `FabViewerAlarmCfg`，随规则一起提交）
+**Tab 2 · Alarm 配置**（落 `FvAlarmCfg`，随规则一起提交）
 
 内容区直接嵌入**通知配置公共组件 `AlarmCfgEditor`**（定义见 §3.4），无 Tab 2 专属控件。
 
@@ -194,7 +194,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 > **除「通知间隔」外全部可空** —— 邮件两栏都空、飞书两栏都空也允许保存（等于这条配置只落库、不发通知）。
 > 飞书群字段下方常驻灰字提示：「**@ 的人必须在对应群里**，否则 @ 不生效（消息照发）」。
 > 校验全部**内聚在组件里**（必填、范围、邮箱格式、webhook 格式），消费方只负责取值 / 回填，不重复写校验。
-> 组件的值模型即 `AlarmCfgRo` / `AlarmCfgDto`（§4.2），两个消费方同构 —— 落同一张 `FabViewerAlarmCfg`，无独立通知接口。
+> 组件的值模型即 `AlarmCfgRo` / `AlarmCfgDto`（§4.2），两个消费方同构 —— 落同一张 `FvAlarmCfg`，无独立通知接口。
 
 ---
 
@@ -223,7 +223,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 **1 · `page`（GET）** 入参：`pageIndex`、`pageSize`（分页组件默认值）、`keyword`（可空；对 `item` / `description` / `environment` / `keyword` 四栏位 contains，任一命中即返回）。出参 `data` = `Pageable<LogMonitorCfgDto>`。
 
-**SQL 取数**：主表 `FabViewerLogMonitorCfg` **LEFT JOIN** `FabViewerAlarmCfg` ON 主表.`ALARM_CFG_ID` = `FabViewerAlarmCfg`.`ID`。两表 1:1（或 1:0），理论上一条规则一行；但出参仍**以主表行为准做去重**，防止连接意外产生重复行（主表数据不重复是前提，AlarmCfg 侧异常不放大到列表）。
+**SQL 取数**：主表 `FvLogMonitorCfg` **LEFT JOIN** `FvAlarmCfg` ON 主表.`ALARM_CFG_ID` = `FvAlarmCfg`.`ID`。两表 1:1（或 1:0），理论上一条规则一行；但出参仍**以主表行为准做去重**，防止连接意外产生重复行（主表数据不重复是前提，AlarmCfg 侧异常不放大到列表）。
 
 **2 · `detail`（GET）** 入参 `item` + `environment`，查不到 ⇒ 拒。出参 `data` = **单个 `LogMonitorCfgDto`**（含嵌套 `alarmCfg`），供编辑弹框回填。
 
@@ -343,7 +343,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 |---|---|
 | ① | 分页参数（`pageIndex` / `pageSize`）**直接交给底层 `PageRequest`**，默认值、越界兜底全由底层负责，**业务侧不写这段判断** |
 | ② | `keyword` `trim` 后空 ⇒ 不加条件；非空 ⇒ `%` `_` `\` **转义**后 **`LIKE '%kw%'`（前后模糊）**，四栏位 `OR` 拼，**比较前统一 `UPPER()`（列与入参都转）—— 不区分大小写**，`ora-` 与 `ORA-` 行为一致（列上函数导致索引失效，当前表量级可接受） |
-| ③ | 主 SQL：`FabViewerLogMonitorCfg m LEFT JOIN FabViewerAlarmCfg a ON m.ALARM_CFG_ID = a.ID`，**`ORDER BY m.ENVIRONMENT ASC, m.ITEM ASC`**（先按环境聚拢、再按规则名） |
+| ③ | 主 SQL：`FvLogMonitorCfg m LEFT JOIN FvAlarmCfg a ON m.ALARM_CFG_ID = a.ID`，**`ORDER BY m.ENVIRONMENT ASC, m.ITEM ASC`**（先按环境聚拢、再按规则名） |
 | ④ | 计数用主表单表 + 同一 `WHERE`（**不 JOIN**），避免 1:N 异常把 `totalSize` 放大 |
 | ⑤ | 行映射：主表字段直出；JSON 列反序列化为 `List<string>`，**解析失败按空数组**（脏数据不炸列表）；**没有通知行（1:0）⇒ `alarmCfg = null`** |
 
@@ -363,7 +363,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30 且 `^[A-Za-z0-9_-]{1,30}$`、`keyword` ≤30、`description` ≤255、`notifyInterval`（整数 **1~99999**，缺省补 **5**）、**邮箱 / webhook 逐个格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
 | ② | **值域校验（走 Misc 的 By Item 查询 Txn）**：分别以 `mes.global.environments`、`system.global.priority` 调 Misc 模块提供的**按 `item` 查询 Txn**，取该行 `VALUE` / `DEFAULT_VALUE` 按 Misc §6.1~§6.3 解析成候选集合后比对 —— **不直连 Misc 表、不复刻解析逻辑**；不在值域（含 Misc 未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
 | ③ | **存在性校验**：调 `FvFetchObjectLockTxn`（`item + environment`，**不加锁模式**）—— POST 只判断对象是否已存在、不持锁；已存在 ⇒ **不允许创建**（`LogMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突**转同一业务码**（防并发穿透） |
-| ④ | 事务：**先建通知对象**——生成 `AlarmCfg.ID` → INSERT `FabViewerAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建监控对象**——生成规则 `ID` → INSERT `FabViewerLogMonitorCfg`（带该 `ALARM_CFG_ID`）→ 提交 |
+| ④ | 事务：**先建通知对象**——生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建监控对象**——生成规则 `ID` → INSERT `FvLogMonitorCfg`（带该 `ALARM_CFG_ID`）→ 提交 |
 | ⑤ | 回参：按 `detail` 逻辑重查一次并映射（**不回显入参**，保证与库内真实值一致，含默认值补全） |
 
 **4 · `PUT`**
@@ -382,7 +382,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 |---|---|
 | ① | `item` / `environment` 必填；缺失 ⇒ `RequireParameterMissing` |
 | ② | **加锁查对象**：调 `FvFetchObjectLockTxn`（`item + environment`，**加锁模式**）—— 与 `PUT` 同一把键锁、同键串行；查不到 ⇒ **未创建不允许删除**（`LogMonitorCfgNotFound`） |
-| ③ | 事务：**通知行与监控行一起删**——按本行 `ALARM_CFG_ID` 删 `FabViewerAlarmCfg` → 删 `FabViewerLogMonitorCfg` → 提交 |
+| ③ | 事务：**通知行与监控行一起删**——按本行 `ALARM_CFG_ID` 删 `FvAlarmCfg` → 删 `FvLogMonitorCfg` → 提交 |
 | ④ | **已产生的 Alarm 一律不动**（运行时的历史数据与本表无外键关系） |
 | ⑤ | 回参：`data` 为空 |
 
@@ -436,7 +436,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 2 | 配置页挂 **`config` 模块 → 系统配置** 下，菜单名 `MES Log Monitor Config` / `MES日志监控配置`，走**菜单级权限管控**（无权限则入口不可见、接口不可调） |
 | 3 | 报警等级 `P1`~`P4` 配在**规则级**；**值域来自 Misc `system.global.priority`** —— 后端读 Misc 校验、前端走 `/api/v1/sys_misc/priority/list` 取候选（该接口**归属 Misc 模块**，规格写在本篇 §4.1-6） |
 | 4 | 「规则名称」= 一条规则的标识名（如 `PROD-ORA-EXCEPTION`）；`Item + Environment` 是定位键，**编辑态锁定不可改** —— 要换就删了重建 |
-| 5 | **配置分两张表**：`FabViewerLogMonitorCfg`（规则，§2.1）+ `FabViewerAlarmCfg`（通知，§2.2）；通知配置**随规则走**（1:1、同事务写、不单独维护、页面不提供复用），**无名称字段** |
+| 5 | **配置分两张表**：`FvLogMonitorCfg`（规则，§2.1）+ `FvAlarmCfg`（通知，§2.2）；通知配置**随规则走**（1:1、同事务写、不单独维护、页面不提供复用），**无名称字段** |
 | 6 | 飞书走**群自定义机器人 webhook**：一份配置可填多个群（`FeishuWebhooks` JSON 数组），逐群各发一条；@ 人用 `open_id` 且须在该群才生效 |
 | 7 | `NotifyInterval` **默认 5 分钟，取值范围 `1 ~ 99999`**（整数，单位分钟） |
 | 8 | **不设 `enabled`**（配置即启用）；`createdAt` / `createdBy` / `updatedAt` / `updatedBy` 由底层统一赋值 |

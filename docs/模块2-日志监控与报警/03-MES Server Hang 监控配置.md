@@ -33,9 +33,9 @@
 
 ---
 
-## 2. 配置表 `FabViewerSrvHangMonitorCfg`（环境级阈值）
+## 2. 配置表 `FvSrvHangMonitorCfg`（环境级阈值）
 
-**表规范（全项目）**：自维护表一律 `FabViewer` 前缀；代理主键 `ID`（不拿业务字段当自然键）；四审计字段由底层赋值；字符串长度**按字符**校验。
+**表规范（全项目）**：自维护表一律 `Fv` 前缀；代理主键 `ID`（不拿业务字段当自然键）；四审计字段由底层赋值；字符串长度**按字符**校验。
 
 | 字段 | 类型 | 可空 | 说明 |
 |---|---|---|---|
@@ -44,13 +44,13 @@
 | `MaxDelay` | 整数 | 否 | 最大 delay（秒），**`1 ~ 65535`**（§5-4 上限与运行时跨层约束的关系仍待确认） |
 | `MaxRuleCost` | 整数 | 否 | 最大耗时（秒），**`1 ~ 65535`** |
 | `Priority` | ≤20 | 否 | 报警等级；值域来自 Misc `system.global.priority`（§5-2 已定） |
-| `AlarmCfgId` | ≤50 | 否 | 通知配置，**复用功能 1 的 `FabViewerAlarmCfg`**（邮件 / 飞书 + 通知间隔），随配置 1:1 |
+| `AlarmCfgId` | ≤50 | 否 | 通知配置，**复用功能 1 的 `FvAlarmCfg`**（邮件 / 飞书 + 通知间隔），随配置 1:1 |
 
 - 审计字段 `createdAt` / `createdBy` / `updatedAt` / `updatedBy` 由底层统一赋值。
 - **不设 `Enabled`**：字段清单未含，对齐功能 1「**配置即启用**」口径（§5-6）。
-- ~~`AlarmItems`~~ 已废弃：通知目标改由 `AlarmCfgId` 指向 `FabViewerAlarmCfg` 承载（§5-5）。
+- ~~`AlarmItems`~~ 已废弃：通知目标改由 `AlarmCfgId` 指向 `FvAlarmCfg` 承载（§5-5）。
 
-**通知配置落点（已定）**：复用 `FabViewerAlarmCfg`，界面层用**公共组件 `AlarmCfgEditor`**（定义归 `01-MES关键字监控配置` §3.4），写操作随配置在同一事务内完成，**无独立通知接口**。
+**通知配置落点（已定）**：复用 `FvAlarmCfg`，界面层用**公共组件 `AlarmCfgEditor`**（定义归 `01-MES关键字监控配置` §3.4），写操作随配置在同一事务内完成，**无独立通知接口**。
 
 ---
 
@@ -156,17 +156,17 @@
 
 | # | 口径 |
 |---|---|
-| 1 | 表名 **`FabViewerSrvHangMonitorCfg`**；`Environment` 为唯一键（一环境一行） |
+| 1 | 表名 **`FvSrvHangMonitorCfg`**；`Environment` 为唯一键（一环境一行） |
 | 2 | `Priority` 值域来自 Misc `system.global.priority` |
 | 3 | `MaxDelay` / `MaxRuleCost` 为配置的正整数秒数，**取值范围 `> 0` 且 `≤ 65535`**（2026-11-10 确认：上限 65535、下限不含 0） |
 | 4 | 接口 4 个：`list`（不分页无条件）/ `POST` / `PUT` / `DELETE`（以 `Environment` 定位）；入参 `ServerHangMonitorCfgRo`、出参 `ServerHangMonitorCfgDto` |
-| 5 | 通知复用 `FabViewerAlarmCfg`（`AlarmCfgId` 外联，1:1，无独立通知接口） |
+| 5 | 通知复用 `FvAlarmCfg`（`AlarmCfgId` 外联，1:1，无独立通知接口） |
 | 6 | 不设 `Enabled`，配置即启用 |
 | 7 | 接口前缀 **`/api/v1/srv_hang_monitor`**；`ServerHangMonitorCfgRo` 内**嵌套 `AlarmCfgRo`**（对齐功能 1）（2026-11-10 确认） |
 | 8 | 配置页 **`MES Server Hang Monitor Config`**（`config` → 系统配置、菜单级权限）；主界面 = 表格卡片 + **页内编辑卡片**（不用弹窗，与功能 1 不同） |
 | 9 | 编辑卡片默认**全部禁用**（仅 `取消` 可用）：`新增` 清空并解除禁用、`修改` 回显并解除禁用、`查看` 只回显不解除；`取消` 清空并回初始态；`确认` 校验后提交并重拉 `list` 回显 |
 | 10 | **修改态 `Environment` 锁定不可改**（定位键）；`Max Delay` / `Max Rule Cost` 输入限整数 `1~65535` |
-| 11 | **通知配置是公共组件 `AlarmCfgEditor`**（定义归 `01-MES关键字监控配置` §3.4：Interval / Mail / 飞书三段，校验内聚）；本功能编辑卡片右侧直接嵌入，落同一张 `FabViewerAlarmCfg`，无独立通知接口 |
+| 11 | **通知配置是公共组件 `AlarmCfgEditor`**（定义归 `01-MES关键字监控配置` §3.4：Interval / Mail / 飞书三段，校验内聚）；本功能编辑卡片右侧直接嵌入，落同一张 `FvAlarmCfg`，无独立通知接口 |
 
 ## 6. 待确认（配置侧）
 

@@ -28,11 +28,13 @@
 !/docs/模块1-日志检索与分析/prototype/MES-Rule信息检索-annotated-prototype.html
 !/docs/模块1-日志检索与分析/prototype/build.mjs
 
-# ── 模块 2：日志监控与报警（01 关键字监控配置 / 03 Server Hang 配置已定稿；02 / 04 运行时未定稿不收录） ──
+# ── 模块 2：日志监控与报警（只放行下面逐条列出的文件） ──
 !/docs/模块2-日志监控与报警/
 /docs/模块2-日志监控与报警/*
 !/docs/模块2-日志监控与报警/01-MES关键字监控配置.md
+!/docs/模块2-日志监控与报警/02-MES关键字监控与告警.md
 !/docs/模块2-日志监控与报警/03-MES Server Hang 监控配置.md
+!/docs/模块2-日志监控与报警/05-MES关键字告警展示.md
 
 # ── 模块 5：Server Hang Reason Config（已定稿） ──
 !/docs/模块5-系统管理/
