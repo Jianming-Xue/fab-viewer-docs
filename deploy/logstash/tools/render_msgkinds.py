@@ -125,7 +125,8 @@ def build_rule(rule: dict, first: bool) -> str:
     if cap and rule.get("match_all"):
         # 一行可多个匹配，全部收进同一字段（多值）
         pattern = esc_in_string(rule["regex"])
-        lines.append('    ruby { code => "event.set(\'%s\', event.get(\'LOG_BODY\').to_s.scan(/%s/).flatten)" }' % (cap, pattern))
+        scan_pat = esc_in_string(rule.get("scan_regex") or rule["regex"])   # scan_regex：捕获与判据分离（CALL_ERR 判据只取前缀）
+        lines.append('    ruby { code => "event.set(\'%s\', event.get(\'LOG_BODY\').to_s.scan(/%s/).flatten.compact)" }' % (cap, scan_pat))
     elif isinstance(cap, str) and cap:
         pat = to_logstash_grok(name_first_group(rule["regex"], cap))
         lines.append("    grok {")

@@ -47,13 +47,29 @@ msg_kinds:
   - kind: SERVER_START
     prefix: '^DTPFsrv$'              # 行首必须是框架名
     regex: 'Command mailbox name:'   # 两个条件都命中，才打标签、才修正 SERVER_ID
-  # 调用通道两对
+  # 调用通道两对 + XML 的等待行 / 出错行（CALL_WAIT / CALL_ERR，04 §3.2.3）
   - kind: CALL_REQ
     regex: 'IntUtil::sendMessage:### xmlData for sending to (\S+)'
     capture: CALL_SYS
   - kind: CALL_RSP
     regex: 'IntUtil::sendMessage:### Received Message from (\S+)'
     capture: CALL_SYS
+  # XML 通道的等待行 / 出错行（04 §3.2.3）。有 req 无 rsp 是两类合法现象：wait=0 不等回复、
+  #   出错走 ERROR 行。CALL_ERR 判据只取前缀 —— 错误形态会变（当前见到 Timeout(175-5)），不抓全；
+  #   行上不带 CALL_SYS 的 CALL_ERR 同理，派生层配对时继承行序上最近一条 CALL_REQ 的系统名；错误码顺手落 ERR_CODE（不参与判据）。
+  #   等待秒数不落字段：等 / 不等用 CALL_NOWAIT（:0，行尾锚定，先判）/ CALL_WAIT（>0）两个标签表达。
+  #   RTD / SPC 通道永远等待对方处理结束（无 NOWAIT），其错误 / 超时行形态待现场样料后补规则：同一 kind 加 regex 即可。
+  - kind: CALL_NOWAIT
+    regex: 'IntUtil::sendMessage:### Waiting time for (\S+):0$'
+    capture: CALL_SYS
+  - kind: CALL_WAIT
+    regex: 'IntUtil::sendMessage:### Waiting time for (\S+):\d+'
+    capture: CALL_SYS
+  - kind: CALL_ERR
+    regex: 'IntUtil::sendMessage:ERROR -'
+    capture: ERR_CODE
+    match_all: true
+    scan_regex: 'Error\(([^)]+)\)'
   - kind: CALL_REQ
     regex: 'FabApfUtilImpl::callRtdDispatchRule:RTD: Return Format is:'
     set: {CALL_SYS: RTD}             # 这对锚点里没有系统名可捕，写常量
