@@ -39,11 +39,11 @@ deploy/
 |---|---|---|
 | 1 | `50-output.conf` 第 23 行 `hosts` | `["https://os-node-01:9200", ...03]` → 现场 OS 地址 |
 | 2 | 同上第 24–25 行 `user` / `password` | `fvdev` → 真实账号密码，**只改本地副本、不进仓库** |
-| 3 | `10-input.conf` 第 15 行 `port` | `5045`，与采集机输出同值 |
-| 4 | `40-derive-fields.conf` 第 102 行 `cidrs` | `['10.0.0.0/8']` → 现场内网网段 |
+| 3 | `10-input.conf` 第 15 行 `port` | `5048`，与采集机输出同值 |
+| 4 | `40-derive-fields.conf` 第 102 行 `cidrs` | `['10.18.0.0/16']` → 现场内网网段 |
 | 5 | 同文件第 142 行 `prefix` | `'dev-'` → 现场索引前缀，与存储层三处一致 |
 
-采集层 2 处（`filebeat/filebeat.yml`）：输出段 `hosts`；每组 `paths` 的目录前缀（挂点不固定 `/home/ad300w/systemlog`，切 Mailbox 换文件名前缀那一段）。Docker 方案另有 1 处：输出改 `host.docker.internal:5045` 并删 `loadbalance`。细节见对应方案文档。
+采集层 2 处（`filebeat/filebeat.yml`）：输出段 `hosts`；每组 `paths` 的目录前缀（挂点不固定 `/home/ad300w/systemlog`，切 Mailbox 换文件名前缀那一段）。Docker 方案另有 1 处：输出改 `host.docker.internal:5048` 并删 `loadbalance`。细节见对应方案文档。
 
 ## 4. 存储层：装入模板与 ISM（两套方案共用，一次性）
 
@@ -82,5 +82,6 @@ NODE_PATH=<playwright-core 所在 node_modules> node shot.js ls.html ..
 ## 6. 口径
 
 - 真实地址与凭据不进仓库，仓库用示例值占位；不读环境变量、不用 keystore。
+- 部署机上本链路文件统一放 `/etc/logstash/conf.d/mes-conf/`（`pipeline/`、`patterns/`、`fabviewer.yaml`、`tools/` 均在其下），RHEL 裸机与 Docker 容器内路径一致。
 - 配置注释只写自包含的配置事实，不引用设计文档。
 - 设计文档里的 PIRUN / PROD 是正式环境口径，`deploy/` 的 DEV / UAT 是开发测试环境部署口径，两套并存，不互相替换。

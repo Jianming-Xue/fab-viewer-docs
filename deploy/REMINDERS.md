@@ -9,7 +9,7 @@
 
 ## 必须做对的点（做错 = 静默失败，无报错）
 
-2. `pipeline.ecs_compatibility: disabled` 不能省，且只能写在 `logstash.yml` / `pipelines.yml` —— 行索引模板 `dynamic: strict`，ECS 开着会补元字段，**整篇写入失败**。
+2. ECS 兼容口径写在 `50-output.conf`（`ecs_compatibility => disabled`），DLQ 开关 `dead_letter_queue.enable: true` 写在 `pipelines.yml` 的 mes-lines 节点里；`logstash.yml` 只留实例级兜底（`pipeline.ecs_compatibility`、`dead_letter_queue.max_bytes`）。行索引模板 `dynamic: strict`，ECS 开着会补元字段，**整篇写入失败**。
 3. 输出插件必须是 **logstash-output-opensearch 2.x**（1.x 不支持 Logstash 8+）；Docker 构建装插件默认 1G 堆会 OOM，Dockerfile 已固化 `LS_JAVA_OPTS=-Xmx2g`，别去掉。
 4. filebeat 的 `system.name` 常量必须与守门哨判据一致（`MES-300Works`）—— 不一致时守门哨**静默 drop 全部事件**，症状是 `filtered` 涨、`out` 恒 0、DLQ 空、无报错。
 5. `40-derive-fields.conf` 的 `cidrs` 必须能命中业务机（或容器）IP —— 取不到 `HOSTIP` 则行身份串拼不全，所有行文档 `_id` 退化、互相覆盖。
@@ -30,5 +30,5 @@
 
 ## RHEL 特有
 
-14. 加工机 firewalld 放行 `5045/tcp`；采集机日志目录 `/home/ad300w/systemlog` 在非标准路径，需 SELinux fcontext（`var_log_t`）+ `restorecon`，否则 filebeat 读不到、registry 不动。
+14. 加工机 firewalld 放行 `5048/tcp`；采集机日志目录 `/home/ad300w/systemlog` 在非标准路径，需 SELinux fcontext（`var_log_t`）+ `restorecon`，否则 filebeat 读不到、registry 不动。
 15. filebeat 句柄：systemd override `LimitNOFILE=65536`（要求 `ulimit -n ≥ 4096`）。

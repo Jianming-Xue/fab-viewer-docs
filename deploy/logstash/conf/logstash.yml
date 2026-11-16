@@ -28,7 +28,8 @@ pipeline.batch.delay: 50
 # pipeline.buffer.type: direct
 pipeline.ordered: false         # 不要求保序：行文档写一次不再改，日志顺序由派生层按二级重排还原
 # 关键：关掉 ECS 兼容。开着的话 Logstash 会给事件补 ecs / host 等元字段，
-# 而行索引模板是 dynamic: strict，多一个字段整篇写入失败
+# 而行索引模板是 dynamic: strict，多一个字段整篇写入失败。
+# 管道级口径写在 50-output.conf；这里只是实例级兜底（会影响别的管道）
 pipeline.ecs_compatibility: disabled
 
 # ---- 队列 ----
@@ -39,6 +40,6 @@ queue.max_bytes: 8gb
 queue.checkpoint.writes: 1024
 
 # ---- 死信队列 ----
-# 写不进索引的事件落这里（映射不符、字段类型错），不静默丢
-dead_letter_queue.enable: true
+# 开关 dead_letter_queue.enable 已移到 conf/pipelines.yml 的 mes-lines 节点；
+# 这里只留实例级容量。写不进索引的事件落这里（映射不符、字段类型错），不静默丢
 dead_letter_queue.max_bytes: 1gb

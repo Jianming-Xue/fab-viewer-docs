@@ -6,7 +6,7 @@
 ## 1. 链路与目录
 
 ```
-MES 日志 → filebeat 容器 ──host.docker.internal:5045──→ logstash 容器 ──https──→ OpenSearch
+MES 日志 → filebeat 容器 ──host.docker.internal:5048──→ logstash 容器 ──https──→ OpenSearch
             采集层                                    加工层 mes-lines           行索引 dev-mes-log-line-*
 ```
 
@@ -32,14 +32,14 @@ compose 用相对路径 `../../logstash/...` 直接挂仓库目录，所以 `log
 |---|---|---|---|
 | 1 | `logstash/pipeline/50-output.conf` 第 23 行 `hosts` | `["https://os-node-01:9200", "https://os-node-02:9200", "https://os-node-03:9200"]` | 现场 OS 地址，几个节点写几个 |
 | 2 | 同上第 24–25 行 `user` / `password` | `fvdev` / `fvdev` | 真实账号密码，**只改本地副本，不进仓库** |
-| 3 | `docker/filebeat/filebeat.yml` 输出段 | `hosts: ["logstash-01:5045", "logstash-02:5045"]` + `loadbalance: true` | `["host.docker.internal:5045"]`，删 `loadbalance` |
+| 3 | `docker/filebeat/filebeat.yml` 输出段 | `hosts: ["logstash-01:5048", "logstash-02:5048"]` + `loadbalance: true` | `["host.docker.internal:5048"]`，删 `loadbalance` |
 
-凭据按仓库口径写在 `50-output.conf` 里，**不读环境变量、不用 keystore**；compose 里也不注入 `OS_USER` / `OS_PASSWORD`。自签证书时按 `50-output.conf` 第 30 行注释带 `cacert`，公有 CA 不用。
+凭据按仓库口径写在 `50-output.conf` 里，**不读环境变量、不用 keystore**；compose 里也不注入 `OS_USER` / `OS_PASSWORD`。证书校验按仓库默认关（`50-output.conf` 第 27 行 `ssl_certificate_verification => false`），自签 / 公有 CA 都不用装 CA；现场要开校验再改 `true` 并按第 30 行注释带 `cacert`。
 
 另外两项按现场网络核一下：
 
-- `10-input.conf` 第 15 行端口 `5045`，filebeat 输出必须同值。
-- `40-derive-fields.conf` 第 102 行 `cidrs = ['10.0.0.0/8']`：容器 IP 是 `172.x`，改成 `['10.0.0.0/8','172.16.0.0/12','192.168.0.0/16']` 才取得到 `HOSTIP`，否则行身份串拼不全、所有行文档 `_id` 退化互相覆盖。
+- `10-input.conf` 第 15 行端口 `5048`，filebeat 输出必须同值。
+- `40-derive-fields.conf` 第 102 行 `cidrs = ['10.18.0.0/16']`：容器 IP 是 `172.x`，改成 `['10.18.0.0/16','172.16.0.0/12','192.168.0.0/16']` 才取得到 `HOSTIP`，否则行身份串拼不全、所有行文档 `_id` 退化互相覆盖。
 - 同文件第 142 行 `prefix = 'dev-'` 默认即用；换前缀要与 OS 侧模板、ISM、读别名三处同步，见 [README.md](README.md) 的存储层一节。
 
 `filebeat.yml` 的日志路径已经是 `/home/ad300w/systemlog/` 下的 `UAT_MBX.<族>srv_log*` 与 `*COMM_*srv*.log*`，日志拷进 `systemlogs/` 就采，不用改路径。业务族靠 `UAT_MBX.` / `DEV_MBX.` 前缀区分环境；COMM 两族不带环境段，**同目录别同时启用 DEV 和 UAT 的 COMM 组**，否则同一批文件采两遍。
@@ -84,7 +84,7 @@ docker logs filebeat 2>&1 | grep -i established
 
 | 位置 | 命令 | 判据 |
 |---|---|---|
-| filebeat | `docker logs filebeat` | `Connection to backoff(async(tcp://host.docker.internal:5045)) established` |
+| filebeat | `docker logs filebeat` | `Connection to backoff(async(tcp://host.docker.internal:5048)) established` |
 | logstash | `curl -s localhost:9600/_node/stats/pipelines \| jq '.pipelines["mes-lines"].events'` | `in` 与 `out` 同步涨 |
 | OS | `GET dev-mes-log-line-read/_count`（带凭据） | 文档数在涨 |
 | DLQ | `docker exec logstash-mes ls /usr/share/logstash/data/dead_letter_queue/main/` | 空；有文件 = 有写入被拒 |

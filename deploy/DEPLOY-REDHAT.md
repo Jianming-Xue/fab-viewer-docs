@@ -4,7 +4,7 @@
 > 真实地址与凭据只写在部署机本地文件；仓库里用 `os-node-01:9200`、`fvdev` 等示例值占位。
 
 ```
-业务机 filebeat（每台一份，恒为新装）──5045──→ 加工机 logstash（mes-lines 管道）──https──→ OpenSearch
+业务机 filebeat（每台一份，恒为新装）──5048──→ 加工机 logstash（mes-lines 管道）──https──→ OpenSearch
 ```
 
 **上线顺序：存储 → 加工 → 采集** —— 加工层没起来就开采集，事件会堵在 filebeat 内存队列。命令均以 `root` / `sudo` 执行，`<repo>` 指 clone 下来的仓库目录。
@@ -56,24 +56,24 @@ cp <repo>/deploy/logstash/conf/jvm.options /etc/logstash/jvm.options   # 堆大�
 ### 1.3 拷文件（最小集）
 
 ```bash
-mkdir -p /etc/logstash-mes/pipeline /etc/logstash-mes/tools
-cp <repo>/deploy/logstash/pipeline/*.conf              /etc/logstash-mes/pipeline/
-cp <repo>/deploy/logstash/fabviewer.yaml                /etc/logstash-mes/
-cp <repo>/deploy/logstash/tools/render_msgkinds.py      /etc/logstash-mes/tools/
-cp <repo>/deploy/logstash/patterns/mes                  /etc/logstash/patterns/mes
-chown -R logstash:logstash /etc/logstash-mes
+mkdir -p /etc/logstash/conf.d/mes-conf/pipeline /etc/logstash/conf.d/mes-conf/patterns /etc/logstash/conf.d/mes-conf/tools
+cp <repo>/deploy/logstash/pipeline/*.conf              /etc/logstash/conf.d/mes-conf/pipeline/
+cp <repo>/deploy/logstash/fabviewer.yaml                /etc/logstash/conf.d/mes-conf/
+cp <repo>/deploy/logstash/tools/render_msgkinds.py      /etc/logstash/conf.d/mes-conf/tools/
+cp <repo>/deploy/logstash/patterns/mes                  /etc/logstash/conf.d/mes-conf/patterns/mes
+chown -R logstash:logstash /etc/logstash/conf.d/mes-conf
 ```
 
-`/etc/logstash/patterns` 已有同名 `mes` 就改名（如 `mes-fab`），并同步改 `20-parse.conf` 两处 `patterns_dir`。**首次部署不需要 Python** —— `30-msgkind.conf` 已是成品；`fabviewer.yaml` 与渲染脚本只是以后改标签规则用。
+本链路文件**全在 `/etc/logstash/conf.d/mes-conf/` 下**：`patterns/mes` 拷进同目录的 `patterns/`（这是自有目录，不碰现场现有目录），`20-parse.conf` 两处 `patterns_dir` 写死 `/etc/logstash/conf.d/mes-conf/patterns`。**首次部署不需要 Python** —— `30-msgkind.conf` 已是成品；`fabviewer.yaml` 与渲染脚本只是以后改标签规则用。
 
 ### 1.4 现场化 5 项
 
 | # | 位置 | 仓库值 → 现场值 |
 |---|---|---|
-| 1 | `50-output.conf` 第 23 行 `hosts` | `["https://os-node-01:9200", ...03]` → 现场 OS 地址，几个节点写几个；公有 CA 证书保持 `ssl` / 校验开，自签按第 30 行注释带 `cacert` |
+| 1 | `50-output.conf` 第 23 行 `hosts` | `["https://os-node-01:9200", ...03]` → 现场 OS 地址，几个节点写几个；证书校验按仓库默认关（第 27 行 `false`），自签 / 公有 CA 都不用装 CA；现场要开校验再改 `true` 并按第 30 行注释带 `cacert` |
 | 2 | 同上第 24–25 行 `user` / `password` | `fvdev` / `fvdev` → 真实账号密码。**按仓库口径写在配置文件里，不读环境变量、不用 keystore**；只改本地副本、真值不进仓库，文件权限设 `640 logstash:logstash` |
-| 3 | `10-input.conf` 第 15 行 `port` | `5045` 默认即用；换值须与所有采集机的 filebeat 输出同值 |
-| 4 | `40-derive-fields.conf` 第 102 行 `cidrs` | `['10.0.0.0/8']` → 按现场内网网段，如 `['10.0.0.0/8','172.16.0.0/12','192.168.0.0/16']`；命中不到业务机 IP 则 `HOSTIP` 为空、行进不了流 |
+| 3 | `10-input.conf` 第 15 行 `port` | `5048` 默认即用；换值须与所有采集机的 filebeat 输出同值 |
+| 4 | `40-derive-fields.conf` 第 102 行 `cidrs` | `['10.18.0.0/16']` → 按现场内网网段，如 `['10.18.0.0/16','172.16.0.0/12','192.168.0.0/16']`；命中不到业务机 IP 则 `HOSTIP` 为空、行进不了流 |
 | 5 | 同文件第 142 行 `prefix` | `'dev-'` 默认即用；须与 [README.md](README.md) 存储层装入的模板 / ISM pattern、读别名一致 |
 
 换前缀只改第 5 项那一处，另 3 处文字顺手同步：`40-derive-fields.conf` 第 127 行注释、`50-output.conf` 第 4 行举例、[README.md](README.md) 的必改表。
@@ -84,21 +84,21 @@ chown -R logstash:logstash /etc/logstash-mes
 
 ```yaml
 - pipeline.id: mes-lines
-  path.config: "/etc/logstash-mes/pipeline/*.conf"
+  path.config: "/etc/logstash/conf.d/mes-conf/pipeline/*.conf"
   pipeline.workers: 4
   pipeline.batch.size: 500
-  pipeline.ecs_compatibility: disabled
+  dead_letter_queue.enable: true
   queue.type: persisted
 ```
 
-`pipeline.ecs_compatibility: disabled` 不能省：行索引模板 `dynamic: strict`，开着 ECS 会补元字段、整篇写入失败。
+ECS 兼容口径移到 `50-output.conf`（本段不再声明 `pipeline.ecs_compatibility`）：行索引模板 `dynamic: strict`，开着 ECS 会补元字段、整篇写入失败。`dead_letter_queue.enable: true` 写在 mes-lines 节点内，DLQ 只收这条管道写不进索引的事件。
 
-实例级设置：路线 A 逐项确认 `/etc/logstash/logstash.yml`、**缺才加**（整实例生效，会影响别的管道）—— `dead_letter_queue.enable: true`、`config.reload.automatic: true`、`config.reload.interval: 3s`；路线 B 第 1.1 节已整份用仓库版，无需再动。
+实例级设置：路线 A 逐项确认 `/etc/logstash/logstash.yml`、**缺才加**（整实例生效，会影响别的管道）—— `config.reload.automatic: true`、`config.reload.interval: 3s`；DLQ 开关已写在上面的 mes-lines 节点里，实例级只留 `dead_letter_queue.max_bytes`。路线 B 第 1.1 节已整份用仓库版，无需再动。
 
 ### 1.6 系统项、校验、启动
 
 ```bash
-firewall-cmd --permanent --add-port=5045/tcp && firewall-cmd --reload   # 加工机放行 beats 口
+firewall-cmd --permanent --add-port=5048/tcp && firewall-cmd --reload   # 加工机放行 beats 口
 sudo -u logstash /usr/share/logstash/bin/logstash -t                    # Configuration OK
 systemctl enable --now logstash
 curl -s localhost:9600/_node/stats/pipelines | jq '.pipelines["mes-lines"].events'
@@ -123,7 +123,7 @@ cp <repo>/deploy/filebeat/filebeat.yml /etc/filebeat/filebeat.yml
 vi /etc/filebeat/filebeat.yml
 ```
 
-- **输出**：`output.logstash.hosts` 示例 `["logstash-01:5045", "logstash-02:5045"]` → 现场加工层地址，端口与 `10-input.conf` 同值；多节点保留 `loadbalance: true`。
+- **输出**：`output.logstash.hosts` 示例 `["logstash-01:5048", "logstash-02:5048"]` → 现场加工层地址，端口与 `10-input.conf` 同值；多节点保留 `loadbalance: true`。
 - **日志路径**：每组 `paths` 是绝对路径 glob，不要求固定挂点。默认 `/home/ad300w/systemlog/` 下 `UAT_MBX.<族>srv_log*`（当前启用 FAB / QUERY / LIST / OCAP / XSITE 5 个业务族，其余候选族在组内注释、按需放开）与 `*COMM_RCVsrv*.log*` / `*COMM_SNDsrv*.log*`；日志盘挂别处只换目录前缀，切 Mailbox 只换文件名里 `UAT_MBX` 那一段（**Mailbox 名与服务族之间是点，不是下划线**）。改完用 `ls` 核对真实文件名（Linux 区分大小写）。
 - **DEV 两组整组注释**，放开时逐行去掉行首 `#`；`ENV: DEV` 和 input id **别改**（id 一改 registry 从头重读）。DEV / UAT 共用同一目录，业务族靠 `UAT_MBX.` / `DEV_MBX.` 区分；**COMM 两族 glob 完全相同，同目录同时启用两套会把同一批文件各采一遍**，只留一套 COMM 组或让现场分目录。
 
@@ -159,9 +159,9 @@ systemctl daemon-reload && systemctl enable --now filebeat
 ## 3. 规则热改（加工机，不重启进程）
 
 ```bash
-vi /etc/logstash-mes/fabviewer.yaml
-python3 /etc/logstash-mes/tools/render_msgkinds.py          # 重渲染 30-msgkind.conf
-python3 /etc/logstash-mes/tools/render_msgkinds.py --check  # 校生成物一致
+vi /etc/logstash/conf.d/mes-conf/fabviewer.yaml
+python3 /etc/logstash/conf.d/mes-conf/tools/render_msgkinds.py          # 重渲染 30-msgkind.conf
+python3 /etc/logstash/conf.d/mes-conf/tools/render_msgkinds.py --check  # 校生成物一致
 # config.reload.automatic: 3s 自动生效
 ```
 
@@ -178,6 +178,6 @@ python3 /etc/logstash-mes/tools/render_msgkinds.py --check  # 校生成物一致
 |---|---|
 | `filtered` 涨、`out` 恒 0、DLQ 空 | 守门哨静默 drop：核 `filebeat.yml` 的 `system.name` 是否 `MES-300Works` |
 | `_id` / 索引名成字面量 `%{[@metadata][...]}` | ruby 滤器崩、行身份串没拼上：核 `cidrs` 是否命中业务机 IP、`LOG_FINGERPRINT` 是否有值 |
-| filebeat 连不上 5045 | 加工机 `firewall-cmd --list-ports`；`test output` 定位 |
+| filebeat 连不上 5048 | 加工机 `firewall-cmd --list-ports`；`test output` 定位 |
 | 读别名查询 400 `index_closed` | 别名下有索引被 close：重开或摘除；查询带 `ignore_unavailable=true` 绕过 |
 | 日志行没落对应日期的索引 | 索引按行内 `LOG_TIME` 落天；解析不出的纯文本行按采集时刻落当天，重采会变 |

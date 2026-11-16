@@ -4,11 +4,12 @@
 # path.config 用 glob：目录内文件**按文件名顺序**加载与拼接，
 #   10-input → 15-guard（守门哨） → 20-parse → 30-msgkind → 40-derive-fields → 50-output
 #   其中 30-msgkind.conf 是**生成物**（tools/render_msgkinds.py），别手改
+#   DLQ 开关写在 mes-lines 节点内；ECS 兼容口径移到 50-output.conf
 # ==============================================================================
 
 - pipeline.id: mes-lines
-  path.config: "/etc/logstash-mes/pipeline/*.conf"
+  path.config: "/etc/logstash/conf.d/mes-conf/pipeline/*.conf"
   pipeline.workers: 4
   pipeline.batch.size: 500
-  pipeline.ecs_compatibility: disabled
+  dead_letter_queue.enable: true
   queue.type: persisted

@@ -13,7 +13,7 @@
 # 业务族文件名 = <Mailbox 名>.<服务族>srv_log*（Mailbox 名与服务族之间是点，不是下划线）；通信族文件名 = *COMM_*srv*.log*，两套规则不同。
 # Mailbox 名：UAT → UAT_MBX，DEV → DEV_MBX；在文件名里、不在目录里，换 Mailbox 时改各组 paths 里每条业务族的文件名前缀。
 # 环境标识：ENV 值大写（DEV / UAT），只是事件字段；同目录同时启用两套时业务族靠文件名前缀区分，COMM 两族文件名不带环境段。
-# 输出目标：logstash-01:5045 / logstash-02:5045（MES 管道 beats 口，与 10-input.conf 同值）
+# 输出目标：logstash-01:5048 / logstash-02:5048（MES 管道 beats 口，与 10-input.conf 同值）
 # 归档件：只采活动件；原地压缩或改名的由每组 exclude_files 挡掉
 # ==============================================================================
 
@@ -202,7 +202,7 @@ queue.mem:
 
 output.logstash:
   # 端口 = Logstash MES 管道（mes-lines）的专用 beats 口，与 10-input.conf 一致
-  hosts: ["logstash-01:5045", "logstash-02:5045"]
+  hosts: ["logstash-01:5048", "logstash-02:5048"]
   loadbalance: true
   worker: 2
   bulk_max_size: 2048

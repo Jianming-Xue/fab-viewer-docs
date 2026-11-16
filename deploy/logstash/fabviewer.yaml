@@ -78,9 +78,9 @@ msg_kinds:
     regex: 'Error\(([^)]+)\)'
     capture: ERR_CODE
     match_all: true                  # 一行可多个 ⇒ 全部收进多值字段
-  # 业务结果行：判据整串，等号之后的值原样落字段
+  # 业务结果行：判据只取执行器方法名的共同后缀，等号之后的值原样落字段
   - kind: RULE_REPLY
-    regex: 'FwSrvExecuteRuleTxn::store:rule reply =\s*(\S+)\s*$'
+    regex: 'ExecuteRuleTxn::store:rule reply =\s*(\S+)\s*$'
     capture: RULE_RESULT
   # 内部 Rule 调用起止：名字进 INNER_RULE_NAME、不进标签。
   #   注意前缀是小写 f 开头的 fwsrvExecServerRule，与大写 F 的 FwSrvExecuteRuleTxn 不是同一个方法名。
