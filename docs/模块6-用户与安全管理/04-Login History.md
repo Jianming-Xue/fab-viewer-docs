@@ -15,10 +15,10 @@
 | 项 | 内容 |
 |---|---|
 | 干什么 | 记录并查询每次登录：谁、何时、从哪个 IP、成功与否、失败原因 |
-| 形态 | 查询页（条件 + 只读列表）＋ Oracle 表 `FabViewerLoginHistory` |
+| 形态 | 查询页（条件 + 只读列表）＋ Oracle 表 `FvLoginHistory` |
 | 写入方 | 登录链路（security-management 微服务内）；本页面**只读** |
 
-## 二、表 `FabViewerLoginHistory`（只写不删）
+## 二、表 `FvLoginHistory`（只写不删）
 
 | 字段 | 说明 |
 |---|---|

@@ -19,11 +19,11 @@
 | 配了干什么 | 派生服务按配置在该 Rule 的块内瞄定开始 / 结束行，时差 > 0 产出 Hang 记录（含本配置的 `hangReason`），供模块 1 展示 |
 | 环境 | **不分环境** —— PIRUN / PROD 共用同一套配置 |
 
-## 二、配置表 `FabViewerSrvHangConfig`
+## 二、配置表 `FvSrvHangConfig`
 
 | 字段 | 配置视角说明 |
 |---|---|
-| `id` | 技术主键（全项目表规范：`FabViewer` 前缀 + `id` 主键 + `enabled` + `updatedAt`/`updatedBy`） |
+| `id` | 技术主键（全项目表规范：`Fv` 前缀 + `id` 主键 + `enabled` + `updatedAt`/`updatedBy`） |
 | `ruleName` | 瞄准的 Rule Name —— **精确匹配，不吃 `%`**；块 `RULENAME` 业务上单值（块不允许出现多 Rule Name） |
 | `startLineLike` | 开始行标志 —— 支持前后 `%` 模糊（四式语义见 §三） |
 | `endLineLike` | 结束行标志 —— 同上 |
