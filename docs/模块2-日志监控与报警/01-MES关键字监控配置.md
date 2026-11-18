@@ -1,12 +1,12 @@
 # MES 关键字监控 · 配置文档
 
-> 模块 2 · 日志监控与报警 ｜ 功能 1 ｜ 状态：**配置侧定稿**（2026-11-09 两张配置表 / 出入参闭环；2026-11-10 接口收为 6 个、`PUT` 定位键并入 Ro、`priority/list` **归属 Misc 模块**、规格写在本篇；页面规格定稿：菜单位于 `config` → 系统配置、查询卡片 + 表格卡片、两 Tab 弹框）。判定 / 扫描 / 通知等**运行时**内容见 [`02-MES关键字监控与告警.md`](02-MES关键字监控与告警.md)；**报警展示与处置**见 [`05-MES关键字告警展示.md`](05-MES关键字告警展示.md)。
+> 模块 2 · 日志监控与报警 ｜ 功能 1 ｜ 状态：**配置侧定稿**（2026-11-09 两张配置表 / 出入参闭环；2026-11-10 接口收为 6 个（后补 `state` 为第 7 条）、`PUT` 定位键并入 Ro、`priority/list` **归属 Misc 模块**、规格写在本篇；页面规格定稿：菜单位于 `config` → 系统配置、查询卡片 + 表格卡片、两 Tab 弹框；2026-11-18 增 `enabled` 启停开关与 `state` 接口、确认统一改 Warning 提示框）。判定 / 扫描 / 通知等**运行时**内容见 [`02-MES关键字监控与告警.md`](02-MES关键字监控与告警.md)；**报警展示与处置**见 [`05-MES关键字告警展示.md`](05-MES关键字告警展示.md)。
 
 ## 1. 功能定位
 
-MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Oracle 报错。这类错误散在海量日志里，靠人翻看不现实。本功能**定时扫描日志**，命中预设关键字就生成 Alarm 并通知到人（扫描与判定逻辑见运行时文档 §2 / §4）。
+MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Oracle 报错。这类错误散在海量日志里，靠人翻看不现实。本功能**定时扫描日志**，命中预设关键字就生成 Alarm 并通知到人（扫描与判定逻辑见运行时文档，不在本篇展开）。
 
-本篇只管**配置侧**：定义「扫什么、按什么等级、通知给谁」。
+本篇只管**配置侧**：定义「扫什么、按什么等级、通知给谁、启不启用」。
 
 ## 2. 配置表
 
@@ -14,7 +14,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 **配置分两张表**：
 
-- **表一 `FvLogMonitorCfg`**（§2.1）—— 监控规则本身：环境 + 规则名 + 关键字 + 三道检查的名单 + 报警等级 + 关联的通知配置；
+- **表一 `FvLogMonitorCfg`**（§2.1）—— 监控规则本身：环境 + 规则名 + 关键字 + 三个检查名单 + 报警等级 + 启用状态 + 关联的通知配置；
 - **表二 `FvAlarmCfg`**（§2.2）—— 通知配置：收件人（邮件 / 飞书）+ 汇总发送间隔。**随规则走、不单独维护**：在规则弹框里就地配置，保存时同事务写入，一条规则对应一份（1:1）。
 
 > **一条配置 = 一个规则 = 一个关键字**：`Item + Environment` 唯一。要监控多个关键字就建多条配置（规则名各不相同）。旧口径「一条规则下挂多行关键字」随唯一索引一并作废。
@@ -26,7 +26,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 字段 | 列名 | 长度 | 可空 | 说明 |
 |---|---|---|---|---|
 | 主键 | `ID` | ≤50 | 否 | 按全项目表规范，长度对齐 `FvAlarmCfg.ID`；不出参、不进 Ro |
-| 规则名称 | `Item` | ≤30 | 否 | 规则标识名，如 `PROD-ORA-EXCEPTION`；**仅允许下划线 `_`、中划线 `-`、大小写字母、数字**（`^[A-Za-z0-9_-]{1,30}$`）；汇总表按「环境名 + 规则名称」分组 → **一条规则占一行** |
+| 规则名称 | `Item` | ≤30 | 否 | 规则标识名，如 `PROD-ORA-EXCEPTION`；汇总表按「环境名 + 规则名称」分组 → **一条规则占一行** |
 | 环境名 | `Environment` | ≤30 | 否 | 下拉，候选来自 Misc `mes.global.environments` |
 | 关键字 | `Keyword` | ≤30 | 否 | **一条配置一个关键字**；不限字符类型 |
 | 描述 | `Description` | ≤255 | 是 | 这条规则是干什么的，给人看 |
@@ -34,10 +34,11 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 关注 Rule Name | `FollowRuleNames` | ≤4000 | 是 | JSON 数组，**Rule 级**白名单 —— 配了则**只有**命中名单内的 Rule Name 才告警 |
 | 排除 Rule Name | `ExcludeRuleNames` | ≤4000 | 是 | JSON 数组，**Rule 级**黑名单 |
 | 报警等级 | `Priority` | ≤20 | 否 | `P1` ~ `P4`；**值域来自 Misc `system.global.priority`**（后端读 Misc 校验，前端走 `/api/v1/sys_misc/priority/list` 取候选，见 §4.1-6） |
+| 启用状态 | `Enabled` | — | 否 | 布尔；`true` 生效、`false` 停用；**新建默认 `true`**；只由列表开关改（`state` 接口），不进 Ro |
 | 通知配置 | `AlarmCfgId` | ≤50 | 否 | 关联 `FvAlarmCfg.ID` |
 
 - **唯一索引**：`Item + Environment`。
-- **不设 `enabled`**（配置即启用）；审计字段 `createdAt` / `createdBy` / `updatedAt` / `updatedBy` 由底层统一赋值。
+- **新增 `Enabled`**：只有 `true` 的规则生效，`false` 停用但配置保留；启停走列表开关（§3.2 / §4.1-7 `state` 接口）。审计字段 `createdAt` / `createdBy` / `updatedAt` / `updatedBy` 由底层统一赋值。
 - 三个 JSON 数组字段的**长度按字符**校验（≤4000），元素个数不单独卡上限；空/未配置存 `NULL`。
 
 ### 2.2 表二 · `FvAlarmCfg`（通知配置）
@@ -111,21 +112,31 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 |---|---|---|
 | 1 | Environment | 原样显示 |
 | 2 | Item | 加粗；超 **30 字符**省略 + hover 看全 |
-| 3 | Description | 超长省略 + hover 看全；空显示灰色 `-` |
-| 4 | Keyword | 等宽字体；超 **30 字符**省略 + hover 看全 |
-| 5 | Follow Rule Name | **多值栏位**：多个值并排展示，溢出省略 + hover 看全；空显示灰色 `-`（= 不限 Rule） |
-| 6 | Exclude Keywords | 同上（多值栏位） |
-| 7 | Exclude Rule Names | 同上（多值栏位） |
-| 8 | Priority | `P1`~`P4` 色标（P1 红 / P2 橙 / P3 黄 / P4 灰） |
-| 9 | Last Updated User | 取 `page` 出参 `lastUpdatedUser` |
-| 10 | Last Updated Time | `yyyy-MM-dd HH:mm:ss`，取 `page` 出参 `lastUpdatedTime` |
-| 11 | 操作 | `编辑` / `删除` |
+| 3 | **Enabled** | **开关**，取行 `enabled`；紧接在 `Environment` / `Item` 两栏位之后 |
+| 4 | Description | 超长省略 + hover 看全；空显示灰色 `-` |
+| 5 | Keyword | 等宽字体；超 **30 字符**省略 + hover 看全 |
+| 6 | Follow Rule Name | **多值栏位**：多个值并排展示，溢出省略 + hover 看全；空显示灰色 `-`（= 不限 Rule） |
+| 7 | Exclude Keywords | 同上（多值栏位） |
+| 8 | Exclude Rule Names | 同上（多值栏位） |
+| 9 | Priority | `P1`~`P4` 色标（P1 红 / P2 橙 / P3 黄 / P4 灰） |
+| 10 | Last Updated User | 取 `page` 出参 `lastUpdatedUser` |
+| 11 | Last Updated Time | `yyyy-MM-dd HH:mm:ss`，取 `page` 出参 `lastUpdatedTime` |
+| 12 | 操作 | `编辑` / `删除` |
+
+**启用开关（第 3 列）**
+
+| 项 | 口径 |
+|---|---|
+| 呈现 | 开关，取行 `enabled`；紧跟在 `Environment` / `Item` 两栏位之后 |
+| 点击 | **先弹 Warning 提示框**（确认 / 取消），不直接改状态；确认才调 `POST /api/v1/log_monitor/cfg/state?item=&environment=&enabled=<目标值>`（§4.1-7） |
+| 取消 / 失败 | **开关回弹、该行不动**；失败按错误码清单提示 |
+| 成功 | 返回单个 `LogMonitorCfgDto`，按 `item + environment` **原地刷新该行**（含开关与两个更新时间列），不重跑 `page`、不跳页 |
+| 生效 | 运行时每轮重读配置，**下一轮生效**；提示框不再写「不会立即生效」 |
 
 > 分页条沿用分页组件默认值；列表按 `Environment + Item` 升序（§4.1-1）。
 >
-> **删除**：二次确认，提示必须点明「**不是立即生效** —— 告警服务在下一次加载配置后才停止扫描（通常 1 个扫描周期内），期间仍可能产生少量报警；已产生的报警一律保留」。
+> **删除**：与启用开关同一套 **Warning 提示框**（确认 / 取消）；确认才调 `DELETE`、取消关闭。提示框**不再写「不是立即生效」**（运行时下一轮生效）；已产生的 Alarm 一律保留。
 >
-> 空态 / 加载态 / 无权限态一律沿用 `05-视觉与交互规范`。
 
 ### 3.3 规则弹框（新增 / 修改同一组件 · **Tab 两页**）
 
@@ -153,8 +164,8 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 **底部（Tab 2）**：`Previous`（位于 `取消` **之前**）+ `取消` + `确认`（占据 Tab 1 里 `Next` 的位置）。
 
 - `Previous`：回 Tab 1（`Keyword 配置`），**保留已填值、不重复校验**；回到 Tab 1 后底部按钮组**恢复为 `取消` + `Next`**（`Previous` / `确认` 不再出现）。`取消`：关弹框，有改动时二次确认丢弃。
-- `确认`：校验本页（**通知间隔 1~99999**、**邮箱格式逐个校验**、webhook 格式，校验规则由组件自带）后提交 —— **新增走 `POST`、修改走 `PUT`**；成功后关弹框，新增刷新回第 1 页、修改原地替换该行。
-- 提交**不是立即生效**：保存成功后 toast 提示「配置已保存，告警服务将在下次加载配置后生效（通常 1 个扫描周期内）」。
+- `确认`：校验本页（**通知间隔 1~99999**、**邮箱格式逐个校验**、webhook 格式，校验规则由组件自带）后，与开关 / 删除一样**先弹 Warning 提示框**（确认 / 取消）—— 确认才提交（**新增走 `POST`、修改走 `PUT`**）、取消关闭不动；成功后关弹框，新增刷新回第 1 页、修改原地替换该行。
+- 保存成功后 **toast 不再提示「不会立即生效」** —— 运行时每轮重读配置，删改与启停都**下一轮生效**（口径见 `02` §6.2）。
 
 > 两条交叉校验**前端先做一遍**（在 Tab 1 即时红字，不等 Next），后端再兜一次，两者同源（§4.3「写接口的交叉校验」）。
 
@@ -202,7 +213,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 ### 4.1 接口清单
 
-服务内前缀 `/api/v1/log_monitor`（第 1 ~ 5 条），前端调用加网关前缀 `telemetry-hub`；响应外壳与分页结构沿用整体库（`模块6/05-后端设计`）。
+服务内前缀 `/api/v1/log_monitor`（第 1 ~ 5、7 条），前端调用加网关前缀 `telemetry-hub`；响应外壳与分页结构沿用整体库（`模块6/05-后端设计`）。
 
 > 第 6 条 `priority/list` **不属本功能前缀** —— 它归 **Misc 模块**（`/api/v1/sys_misc`），只读 Misc 表；**接口规格写在本篇**（§4.1-6），不在模块 5 的文档里重复一遍。
 
@@ -214,9 +225,10 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 4 | `/api/v1/log_monitor/cfg` | `PUT` | 修改规则（**定位键在 body 的 Ro 里**，同事务更新通知配置） |
 | 5 | `/api/v1/log_monitor/cfg?item=&environment=` | `DELETE` | 删除规则（连带删通知配置） |
 | 6 | `/api/v1/sys_misc/priority/list` | `GET` | 报警等级候选（**归属 Misc 模块**，本功能只消费，规格见本节 6） |
+| 7 | `/api/v1/log_monitor/cfg/state?item=&environment=&enabled` | `POST` | 启用 / 停用单条规则（列表开关，规格见本节 7） |
 
 > **定位键统一是 `item + environment`**（唯一索引），不用 `id`：
-> - `detail` / `DELETE` 用 **query 参数**（无 body，只能走 URL）；
+> - `detail` / `DELETE` / `state` 用 **query 参数**（无 body，只能走 URL）；
 > - `PUT` **不收 query 参数**，定位键 `item` / `environment` 就在 `LogMonitorCfgRo` 里（与 `POST` 同一对象），后端按这两个字段找记录、且**不改这两个字段的值**（改了等于换一条，不允许）。
 >
 > **通知配置没有独立接口** —— 不收 `alarmCfgId` 入参，也不暴露 `/alarm_cfg/*`，全部随规则的写操作在同一事务内完成。权限走**菜单级**（§3.1）：有该菜单权限即具备本功能全部读写能力，不再单独区分只读 / 编辑角色；`priority/list` 的权限随 Misc 模块走。
@@ -239,16 +251,17 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 - 数据源是 Misc 表 `item = system.global.priority`（`List<string>` 形态）：`value` 为空 ⇒ 回落 `defaultValue`；两者皆空 ⇒ `[]`；解析规则与 Misc 候选接口同一套（`模块5/02-System Misc` §6.1 ~ §6.3）。
 - **只读 Misc 表、不改**；供规则弹框的「报警等级」下拉取值，接口异常时下拉空、不阻断页面其他部分。
 
-**后端校验（8 条，前后端同源）**
+**7 · `state`（POST）** 入参走 query：`item` + `environment`（定位键）+ `enabled`（布尔，目标状态）。按定位键加锁查对象，查不到 ⇒ `LogMonitorCfgNotFound`；事务内**只更新主表 `ENABLED` 一列**，不动 `FvAlarmCfg`。出参 `data` = **单个 `LogMonitorCfgDto`**（与 `page` 行同构，含 `enabled` 与两个展示字段），供列表原地刷新该行。权限随菜单级（§3.1）。
+
+**后端校验（7 条，前后端同源）**
 
 1. `environment` 必须存在于 Misc `mes.global.environments`；
 2. `priority` 必须存在于 Misc `system.global.priority`；
 3. `item + environment` 唯一（仅 `POST` 校验 —— `PUT` 不可改这两项，天然不冲突）；
 4. 三个 JSON 数组**序列化后**各 ≤4000 字符；
 5. `notifyInterval` 为整数且落在 **`1 ~ 99999`**；
-6. `item` ≤30 字符且只含 `_` `-` 字母数字（`^[A-Za-z0-9_-]{1,30}$`）；`keyword` ≤30 字符、不限字符类型；
-7. 两条交叉校验：排除词不得是 `keyword` 子串（含相等）、关注名单与排除名单不得有交集（详见 §4.3「写接口的交叉校验」）；
-8. 通知格式：`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式、`feishuWebhooks` **逐个**校验机器人地址格式，任一不合规 ⇒ `ParameterInvalid`（这三项均可为空，空则跳过校验）。
+6. 两条交叉校验：排除词不得是 `keyword` 子串（含相等）、关注名单与排除名单不得有交集（详见 §4.3「写接口的交叉校验」）；
+7. 通知格式：`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式、`feishuWebhooks` **逐个**校验机器人地址格式，任一不合规 ⇒ `ParameterInvalid`（这三项均可为空，空则跳过校验）。
 
 ### 4.2 出入参对象
 
@@ -257,7 +270,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 字段 | 类型 | 必填 | 约束 |
 |---|---|---|---|
 | `environment` | string | 是 | ≤30，须在 Misc 值域内 |
-| `item` | string | 是 | ≤30；`^[A-Za-z0-9_-]{1,30}$` |
+| `item` | string | 是 | ≤30，不限字符类型 |
 | `keyword` | string | 是 | ≤30，不限字符类型 |
 | `description` | string | 否 | ≤255 |
 | `excludeKeywords` | `List<string>` | 否 | 序列化 ≤4000 |
@@ -267,6 +280,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `alarmCfg` | `AlarmCfgRo` | 是 | 嵌套，见下 |
 
 > `item` / `environment` 是**定位键**：`POST` 用它俩做唯一性校验，`PUT` 用它俩定位记录；两列**都不会被改**。
+> **`enabled` 不在 Ro 里** —— 新建默认 `true`，之后只由 `state` 接口改；弹框新增 / 修改都不碰这一列。
 
 **`AlarmCfgDto` / `AlarmCfgRo`（嵌套出参 / 入参，同形）**
 
@@ -278,7 +292,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `feishuAtUsers` | `List<string>` | 否 | `open_id` 列表，序列化 ≤4000 |
 | `notifyInterval` | int | 是 | **1 ~ 99999**，默认 5 |
 
-**`LogMonitorCfgDto`（出参，字段与 `LogMonitorCfgRo` 同形，另加两个展示字段）**
+**`LogMonitorCfgDto`（出参，字段与 `LogMonitorCfgRo` 同形，另加 `enabled` 与两个展示字段）**
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
@@ -290,15 +304,16 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `followRuleNames` | `List<string>` | 空 ⇒ `[]` |
 | `excludeRuleNames` | `List<string>` | 空 ⇒ `[]` |
 | `priority` | string | `P1` ~ `P4` |
+| `enabled` | boolean | `true` 生效 / `false` 停用 |
 | `alarmCfg` | `AlarmCfgDto` | 嵌套通知配置 |
 | `lastUpdatedTime` | string | 审计 `updatedAt` 有值取它，为空取 `createdAt` |
 | `lastUpdatedUser` | string | 审计 `updatedBy` 有值取它，为空取 `createdBy` |
 
 > **不带 `id` / `alarmCfgId` / 四个审计字段**（`createdAt`·`createdBy`·`updatedAt`·`updatedBy`）—— 技术键不出参，通知配置的定位完全在后端（按规则的 `AlarmCfgId` 就地更新）；更新时间只以 `lastUpdatedTime` / `lastUpdatedUser` 两个字段对外。
 
-> `lastUpdatedTime` / `lastUpdatedUser` **只在 `page` 出参里填**（列表「更新时间」列用，`lastUpdatedUser` 作悬浮提示）；`detail` / `POST` / `PUT` 回的单条对象保留字段结构，值为空也允许。
+> `lastUpdatedTime` / `lastUpdatedUser` **在 `page` 与 `state` 出参里填**（列表「更新时间」列用、`state` 成功后原地刷新该行时用，`lastUpdatedUser` 作悬浮提示）；`detail` / `POST` / `PUT` 回的单条对象保留字段结构，值为空也允许。
 
-**响应示例（单条，`detail` / `POST` / `PUT` 的 `data` 同形）**
+**响应示例（单条，`detail` / `POST` / `PUT` / `state` 的 `data` 同形）**
 
 ```json
 {
@@ -312,6 +327,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
     "followRuleNames": ["EAPReqJobInEx"],
     "excludeRuleNames": [],
     "priority": "P1",
+    "enabled": true,
     "alarmCfg": {
       "mailToUsers": ["ops@fab.com", "dba@fab.com"],
       "mailCCUsers": ["lead@fab.com"],
@@ -333,8 +349,8 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 2. `ID` 与四个审计字段**全部由底层赋值**，不进任何 Ro；`updatedAt` / `updatedBy` 每次写操作无条件刷新。
 3. 字符串长度一律**按字符**校验（先校验、再落库，避免 `VARCHAR2` 字节语义抛 `ORA-12899`）；`trim` 后为空视同未传。
 4. 三个 JSON 数组字段（`ExcludeKeywords` / `FollowRuleNames` / `ExcludeRuleNames`）处理一致：元素 `trim` → 去空串 → **去重（保持原顺序）** → 序列化为 JSON 存；空数组存 `NULL`。
-5. 事务边界：一条写接口 = 一个事务（规则表 + 通知表同提交同回滚）；`AlarmCfg` 的 ID 在同一事务内生成。
-6. **存在性判断统一走 `FvFetchObjectLockTxn`**（按 `item + environment` 取对象）：`POST` 走**不加锁**模式、只判断是否存在；`PUT` / `DELETE` 走**加锁**模式（查到即持有该键的锁，同键写操作串行）。
+5. 事务边界：一条写接口 = 一个事务（涉及规则表与通知表时**同提交同回滚**；`state` 只动规则表、`POST` / `PUT` / `DELETE` 带通知表）；`AlarmCfg` 的 ID 在同一事务内生成。
+6. **存在性判断统一走 `FvFetchObjectLockTxn`**（按 `item + environment` 取对象）：`POST` 走**不加锁**模式、只判断是否存在；`PUT` / `DELETE` / `state` 走**加锁**模式（查到即持有该键的锁，同键写操作串行）。
 7. 权限：走**菜单级权限管控**（§3.1）—— 有该菜单权限即可读写本功能全部接口，无权限则连接口都调不通；`priority/list` 随 Misc 模块权限。
 
 **1 · `page`**
@@ -360,7 +376,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 步骤 | 动作 |
 |---|---|
-| ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30 且 `^[A-Za-z0-9_-]{1,30}$`、`keyword` ≤30、`description` ≤255、`notifyInterval`（整数 **1~99999**，缺省补 **5**）、**邮箱 / webhook 逐个格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
+| ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30、`keyword` ≤30、`description` ≤255、`notifyInterval`（整数 **1~99999**，缺省补 **5**）、**邮箱 / webhook 逐个格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
 | ② | **值域校验（走 Misc 的 By Item 查询 Txn）**：分别以 `mes.global.environments`、`system.global.priority` 调 Misc 模块提供的**按 `item` 查询 Txn**，取该行 `VALUE` / `DEFAULT_VALUE` 按 Misc §6.1~§6.3 解析成候选集合后比对 —— **不直连 Misc 表、不复刻解析逻辑**；不在值域（含 Misc 未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
 | ③ | **存在性校验**：调 `FvFetchObjectLockTxn`（`item + environment`，**不加锁模式**）—— POST 只判断对象是否已存在、不持锁；已存在 ⇒ **不允许创建**（`LogMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突**转同一业务码**（防并发穿透） |
 | ④ | 事务：**先建通知对象**——生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建监控对象**——生成规则 `ID` → INSERT `FvLogMonitorCfg`（带该 `ALARM_CFG_ID`）→ 提交 |
@@ -396,6 +412,15 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | ④ | 去重 + **字符串升序**排序后输出 `List<string>` |
 | ⑤ | 不缓存：单行主键查询，开销可忽略；Misc 改完即时生效 |
 
+**7 · `state`**
+
+| 步骤 | 动作 |
+|---|---|
+| ① | `item` / `environment` / `enabled` 缺失或空白 ⇒ `RequireParameterMissing`；`enabled` 非布尔 ⇒ `ParameterInvalid` |
+| ② | 按 `item + environment` **加锁查对象**（`FvFetchObjectLockTxn`，与 `PUT` / `DELETE` 同一把键锁）；查不到 ⇒ `LogMonitorCfgNotFound` |
+| ③ | 事务：只 `UPDATE FvLogMonitorCfg SET ENABLED = :enabled`（**不动通知表、不动定位键**），审计列由底层刷新 → 提交 |
+| ④ | 按 `detail` 同一映射函数重查一次，回单个 `LogMonitorCfgDto`（含 `enabled` 与两个展示字段）；前端按定位键原地替换该行 |
+
 **写接口的交叉校验（`POST` / `PUT` 共用，位置在值域校验之后、开事务之前）**
 
 | # | 规则 | 判定方式 | 失败码 |
@@ -420,7 +445,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `RequireParameterMissing` | 必填项缺失 / 空白 | 定位到字段的红字提示 |
 | `ParameterInvalid` | 长度超限、`notifyInterval` 非整数或超出 `1~99999`、邮箱 / webhook 格式不合规、JSON 序列化超长 | 定位到字段的红字提示 |
 | `LogMonitorCfgExists` | `item + environment` 已存在（创建时） | 提示「同环境下该规则名已存在」 |
-| `LogMonitorCfgNotFound` | `detail` 查不到；`PUT` / `DELETE` 时该 `item + environment` 未创建 | 提示后刷新列表 |
+| `LogMonitorCfgNotFound` | `detail` 查不到；`PUT` / `DELETE` / `state` 时该 `item + environment` 未创建 | 提示后刷新列表 |
 | `EnvironmentNotAllowed` / `PriorityNotAllowed` | 值不在 Misc 值域内（含 Misc 未配） | 提示去 System Misc 先配候选值 |
 | `RuleNameConflict` | 关注名单与排除名单有重复的 Rule Name | 提示重复项，定位到两个名单行 |
 | `ExcludeKeywordInvalid` | 存在「排除词是 keyword 子串（含相等）」的配置 | 提示该排除词会让规则永不生效，定位到排除关键字行 |
@@ -439,7 +464,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 5 | **配置分两张表**：`FvLogMonitorCfg`（规则，§2.1）+ `FvAlarmCfg`（通知，§2.2）；通知配置**随规则走**（1:1、同事务写、不单独维护、页面不提供复用），**无名称字段** |
 | 6 | 飞书走**群自定义机器人 webhook**：一份配置可填多个群（`FeishuWebhooks` JSON 数组），逐群各发一条；@ 人用 `open_id` 且须在该群才生效 |
 | 7 | `NotifyInterval` **默认 5 分钟，取值范围 `1 ~ 99999`**（整数，单位分钟） |
-| 8 | **不设 `enabled`**（配置即启用）；`createdAt` / `createdBy` / `updatedAt` / `updatedBy` 由底层统一赋值 |
+| 8 | **新增 `Enabled`**（布尔，新建默认 `true`）：只有 `true` 的规则生效，`false` 停用但配置保留；列表开关调 `state` 接口改、不进 Ro；运行时每轮读配置时过滤（`02` §6.2）。`createdAt` / `createdBy` / `updatedAt` / `updatedBy` 由底层统一赋值 |
 | 9 | 三个 JSON 数组字段按**字符**校验 ≤4000；空 / 未配置存 `NULL` |
 | 10 | 接口定位键统一 `item + environment`（不用 `id`）：`detail` / `DELETE` 走 query 参数，`PUT` 的定位键收在 `LogMonitorCfgRo` body 里、不额外传 query；定位键只用于查记录，不参与更新 |
 | 11 | 「特殊 Rule Name」已更名为「**关注 Rule Name**」（字段 `FollowRuleNames`），**白名单语义不变**：配了则只有命中名单内 Rule Name 才告警；三个名单统一用**多字符串输入控件**（回车成条、可逐条删） |
@@ -447,9 +472,9 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 13 | **存在性判断统一走 `FvFetchObjectLockTxn`**（入参 `item + environment`）：`POST` 走**不加锁**模式、只判断是否存在，已存在则拒；`PUT` / `DELETE` 走**加锁**模式、同键串行，未创建则拒 |
 | 14 | **通知对象的写语义**：创建先建 `AlarmCfg` 再建规则；修改**原地 UPDATE 通知行**、不删不新建；删除时两表一起删 |
 | 15 | **三名单两条交叉校验**（`POST` / `PUT` 同源、前后端同源）：① 排除关键字**不得是 `keyword` 的子串（含相等）**——否则规则永不生效；② **关注名单与排除名单不得有交集**，否则该 Rule 必被排除。比较口径与运行时「包含」判定一致（区分大小写） |
-| 16 | `Item` **≤30 字符**且只允许 `_` `-` 大小写字母数字（`^[A-Za-z0-9_-]{1,30}$`）；`Keyword` **≤30 字符**、不限字符类型；`Description` ≤255 支持多行 |
+| 16 | `Item` **≤30 字符**（后端只校长度）；字符集只允许 `_` `-` 大小写字母数字（`^[A-Za-z0-9_-]{1,30}$`）**仅在前端输入框限制，后端不校**；`Keyword` **≤30 字符**、不限字符类型；`Description` ≤255 支持多行 |
 | 17 | 规则弹框**两个 Tab**（`Keyword 配置` → `Alarm 配置`），**底部按钮组随 Tab 切换**：Tab 1 为 `取消` + `Next`；Tab 2 为 `Previous` + `取消` + `确认`；`Previous` 回 Tab 1 并恢复成 `取消` + `Next`；`Next` 先校验本页，`确认` 校验后提交（新增 `POST` / 修改 `PUT`） |
-| 18 | 配置的保存与删除**不是立即生效** —— 告警服务下次加载配置后才按新配置执行（通常 1 个扫描周期内），页面须明确提示 |
+| 18 | 新增 / 修改 / 删除 / 启停切换**统一走 Warning 提示框**（确认才提交、取消不动）；**不再提示「不会立即生效」** —— 运行时每轮重读配置，删改与启停都下一轮生效（`02` §6.2） |
 | 19 | `Alarm 配置` Tab 用**分割符**分三段（通知间隔 → 邮件通知 → 飞书通知）：**只有「通知间隔」必填且限 `1~99999` 整数**，其余（To / CC / 飞书群 / @ 人）全部可空；**邮箱格式在提交时逐个校验，不过则报错、不允许提交**（后端同源兜一次） |
 | 20 | **邮件只在 `MailToUsers` 非空时发送** —— 只填 CC 不填 To ⇒ 邮件不发（CC 不顶替收件人），飞书不受影响 |
 
