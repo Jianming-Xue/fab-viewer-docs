@@ -47,19 +47,21 @@
 
 ## 2. OS 索引模板 · 结果索引 `mes-log-monitor-issue`
 
-**结论：只新增一个索引模板，不放进现有行 / 块索引；`dynamic: strict`；文档 `_id` = `LineId|Item`，不算字段。**
+**结论：只新增一个索引模板，不放进现有行 / 块索引；`dynamic: strict`；文档 `_id` = `LineId|Item`（本功能），不算字段；多存一个 `issueType` 字段，本功能恒为 `Keyword`，留给 Server hang monitor 复用同一份索引。**
 
 ### 2.1 命名与写入
 
 | 项 | 口径 |
 |---|---|
-| 索引名 | `mes-log-monitor-issue-{env}-{yyyy.MM}`，**按月**一个，与块索引同粒度 |
-| `{env}` | **小写**（`prod` / `pirun`）；字段值 `ENV` 仍是大写 `PROD` / `PIRUN`（`09` §一） |
+| 索引名 | `mes-log-monitor-issue-{yyyy.MM}` —— **不带环境段**，**按月**一个，与块索引同粒度 |
+| 环境区分 | 由**框架 `prefix` 配置**前置在同一索引名上区分，**不按 `ENV` 拼**：`PRD` / `PIRUN` 默认都算 **Production**、索引名相同；本文各表写的是去掉 `prefix` 后的**基名** |
 | 选索引 | 按 **`issueTime` 所属月份**选，不按生成墙钟 —— 崩溃重扫跨月时同一 issue 仍落同一索引，幂等才稳 |
 | 读别名 | `mes-log-monitor-issue-read`，写在模板里，新索引一建自带 |
 | 写别名 | **不设**；写入直接指定月索引名（`09` §一 / `04` §5.2.1） |
 | 模板名 / PUT 路径 | `mes-log-monitor-issue` / `_index_template/mes-log-monitor-issue` |
 | `index_patterns` | `mes-log-monitor-issue-*`；`priority` 200 |
+
+> **`prefix` 的作用面**：索引名、读别名 `mes-log-monitor-issue-read`、模板 `index_patterns`、ISM 的 `ism_template` 都由框架 `prefix` 前置**同一前缀**（四者要一致，否则别名读不到、ISM 也挂不上）；本服务**不读 `ENV` 决定索引名**、不自己拼环境段。
 
 > **`_id` 的幂等只在同一个索引内生效**，按月选索引必须按 `issueTime`，不能按扫描时刻 —— 这是本节最要紧的一条。
 
@@ -73,15 +75,17 @@
 | `index.codec` | best_compression | 同上 |
 | `policy_id` setting | **不写** | `plugins.index_state_management.policy_id` 已弃用，写进 3.x 可能被 unknown setting 拒掉（`09` §一） |
 
-### 2.3 mapping 字段（共 3 个）
+### 2.3 mapping 字段（共 4 个）
 
 | 字段 | 类型 | 取自 | 用途 |
 |---|---|---|---|
 | `issueMessage` | text | 命中行 `LOG_BODY` | 问题日志原文，唯一分词字段 |
 | `blockId` | keyword | 块 `_id`（`REQUEST_EXEC_ID`） | 查询时回块取业务字段的锚点 |
 | `issueTime` | date（`yyyy/MM/dd HH:mm:ss.SSS\|\|epoch_millis`） | 命中行 `LOG_TIME` | 选索引、按时间检索、ISM 排序 |
+| `issueType` | keyword | 写入时给定；**本功能恒写 `Keyword`** | 区分 issue 来源 —— 同一份索引后续也收 Server hang monitor 写的其他类型 |
 
-- 文档 `_id` = `LineId|Item`，兼作对外 `issueId`；**文档内不冗余存**，`05` 出参由 `_id` 映射。
+- 文档 `_id` **按功能各自拼接**，兼作对外 `issueId`；**文档内不冗余存**，`05` 出参由 `_id` 映射：**本功能恒为 `LineId|Item`**（同一条日志行可被多条规则各自命中，不带 `Item` 会互相覆盖）；**Server hang monitor 用 `LineId|issueType`**（该功能自己保证这个组合唯一）。
+- `issueType` 是**写死的入参**，不是从日志里解析出来的：本功能在 `10` 的写入处固定传 `Keyword`，不读配置、不按规则变。
 - `dynamic: strict` 硬约束：写进任何表外字段整篇拒写；后续加字段必须同时改本模板与 `10` 写入代码。
 - date 格式沿用行 / 块模板，因为 `issueTime` 直接取行文档的 `LOG_TIME`。
 
@@ -296,7 +300,7 @@ COMMIT;
 | 步 | 做什么 | 打在哪 | 口径 |
 |---|---|---|---|
 | 1 | 抢 `MONITOR` 行锁；抢不到整轮跳过、游标不动 | Oracle | **已写** §5.3 ① / §4.3 |
-| 2 | **读配置**：全量重读规则表 + 通知表，`Environment` 去重成集合；System Misc 名单在**服务启动时**另读一次 | Oracle + System Misc | §6.2 |
+| 2 | **读配置**：每轮重读规则表 + 通知表（**只取 `Enabled = true` 的规则**），`Environment` 去重成集合；System Misc 名单在**服务启动时**另读一次 | Oracle + System Misc | §6.2 |
 | 3 | **查块清单**：按 §4.3 窗口查 `mes-log-exec-read`，**配置只嵌 `terms ENV`**；再按启动时名单排除 ServerCategory | 块索引 | §6.2 |
 | 4 | **定候选块**：第一波 = 3 的全量清单；第二波起 = `(Flag='N' ∪ 窗口新块) − 已闭合块` | 进度表 + 块索引 | §6.3 |
 | 5 | **逐块判块**：过 5 项检查 1~3；块分已闭合 / 未闭合（含超时封口）两种 | 块文档 | §6.4 |
@@ -313,12 +317,12 @@ COMMIT;
 | 项 | 口径 |
 |---|---|
 | 时点 | 抢到行锁**之后**、算窗口**之前**，一轮读一次；一轮之内不会有两个实例各按不同版本跑 |
-| 读什么 | `FvLogMonitorCfg` 全量（`Environment` / `Item` / `Keyword` / `ExcludeKeywords` / `FollowRuleNames` / `ExcludeRuleNames` / `Priority`）+ `FvAlarmCfg` 按 `AlarmCfgId` 关联 |
+| 读什么 | `FvLogMonitorCfg` **只取 `Enabled = true` 的行**（字段 `Environment` / `Item` / `Keyword` / `ExcludeKeywords` / `FollowRuleNames` / `ExcludeRuleNames` / `Priority` / `Enabled`）+ `FvAlarmCfg` 按 `AlarmCfgId` 关联 |
 | 分组 | `Environment` 去重成集合；**一行 = 一条规则 = 一个关键字**，`Item + Environment` 唯一 |
-| 生效 | 不缓存、不热加载；删改**下一轮生效**，本轮读到的版本跑到底 |
+| 生效 | 不缓存、不热加载；删改**与启停**都**下一轮生效**，本轮读到的版本跑到底 |
 | 通知配置 | 本轮只读不用，`NotifyInterval` 与渠道由通知器在 `COMMIT` 后独立驱动（§5.4） |
 
-- 不设 `enabled`，有行即生效；三个名单是 JSON 数组，未配存 `NULL` ⇒ 该项检查跳过。
+- **只有 `Enabled = true` 的规则进本轮** —— 有行不等于生效；停用规则不参与检查、不进环境集合（启停口径见 `01` §4.1-7）。三个名单是 JSON 数组，未配存 `NULL` ⇒ 该项检查跳过。
 - 环境值域以 Misc `mes.global.environments` 为准，与 Filebeat `fields.ENV` 大写值不齐会全落空**且不报错** ⇒ 启动时打印读到的环境集合。
 
 **启动时读一次 · ServerCategory 排除名单（新加）**
@@ -370,8 +374,8 @@ COMMIT;
 
 | 动作 | 口径 |
 |---|---|
-| 判行 | `LOG_BODY` 原文过 `Keyword`（检查 4）+ `ExcludeKeywords`（检查 5），区分大小写；**一命中行一条 issue**，`issueId = LineId\|Item` |
-| 写两源 | OS 结果索引按 `_id` 幂等写（§2.3 三字段）+ Oracle 状态行按 UK 冲突跳过；**先写事实、后推进度**，同事务 |
+| 判行 | `LOG_BODY` 原文过 `Keyword`（检查 4）+ `ExcludeKeywords`（检查 5），区分大小写；**一命中行一条 issue**，`issueId = LineId\|Item`（`issueType` 恒写 `Keyword`） |
+| 写两源 | OS 结果索引按 `_id` 幂等写（§2.3 四字段）+ Oracle 状态行按 UK 冲突跳过；**先写事实、后推进度**，同事务 |
 | 写 Block Scan | **每块都写**：正常闭合 ⇒ `Y`；未闭合 / 超时封口 ⇒ `N`，保留到下一轮由第 4 步带回 |
 | 刷 `LastScanTime` | 只在「本行写入 / Flag 变更 / 块重开」时刷；**每轮复查不刷** —— 否则 `now − LastScanTime` 永远不到阈值，封口块永远清不掉 |
 
