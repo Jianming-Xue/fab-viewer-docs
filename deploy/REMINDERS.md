@@ -13,7 +13,7 @@
 3. 输出插件必须是 **logstash-output-opensearch 2.x**（1.x 不支持 Logstash 8+）；Docker 构建装插件默认 1G 堆会 OOM，Dockerfile 已固化 `LS_JAVA_OPTS=-Xmx2g`，别去掉。
 4. filebeat 的 `system.name` 常量必须与守门哨判据一致（`MES-300Works`）—— 不一致时守门哨**静默 drop 全部事件**，症状是 `filtered` 涨、`out` 恒 0、DLQ 空、无报错。
 5. `40-derive-fields.conf` 的 `cidrs` 必须能命中业务机（或容器）IP —— 取不到 `HOSTIP` 则行身份串拼不全，所有行文档 `_id` 退化、互相覆盖。
-6. 索引前缀（`prefix = 'dev-'`）必须与 OS 侧模板 pattern、ISM pattern、读别名**三处一致**，换前缀三处同步改；索引名中间那段 env 随采集配置的 `ENV` 变化（当前 `UAT`）。
+6. 索引前缀（`prefix = 'dev-'`）必须与 OS 侧模板 pattern、ISM pattern、读别名**三处一致**，换前缀三处同步改；**索引名不带环境段**，环境差异只靠前缀区分（每个环境一套前缀；`PRD` / `PIRUN` 同属 Production），`ENV` 仍只是字段值（当前 `UAT`）。
 
 ## 离线环境
 

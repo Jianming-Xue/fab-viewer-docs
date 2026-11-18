@@ -8,13 +8,13 @@
 
 | 索引 | 命名 | 模板名 | 分片 | 副本 | `refresh_interval` | `codec` | `dynamic` | 读别名 | ISM 策略 | 到期 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 行 | `mes-log-line-{env}-{yyyy.MM.dd}` | `mes-log-line` | 1 | 1 | 5s | `best_compression` | `strict` | `mes-log-line-read` | `mes-log-line-360d` | 360 天删除 |
-| 块 | `mes-log-exec-{env}-{yyyy.MM}` | `mes-log-exec` | 1 | 1 | 5s | `best_compression` | `strict` | `mes-log-exec-read` | `mes-log-exec-keep` | 不删除 |
+| 行 | `mes-log-line-{yyyy.MM.dd}` | `mes-log-line` | 1 | 1 | 5s | `best_compression` | `strict` | `mes-log-line-read` | `mes-log-line-360d` | 360 天删除 |
+| 块 | `mes-log-exec-{yyyy.MM}` | `mes-log-exec` | 1 | 1 | 5s | `best_compression` | `strict` | `mes-log-exec-read` | `mes-log-exec-keep` | 不删除 |
 
 | 项 | 口径 |
 |---|---|
 | 写别名 | **不设**（04 §5.2.1）。写入侧直接指定当天索引名；块文档写「**块首行时刻**」那个月的索引，因为闭口 UPSERT 要按 `_id` 定位 |
-| `{env}` | 取**小写**（`prod` / `pirun`）；字段值 `ENV` 仍是大写 `PROD` / `PIRUN`，两者不是一回事 |
+| 环境区分 | **索引名不带环境段**：`PRD` / `PIRUN` 默认都算 **Production**、写进同一套索引；环境由**框架 `prefix`** 前置区分 —— 索引名、读别名、`index_patterns`、ISM `ism_template` 四处用**同一前缀**；本文写的是去 `prefix` 的**基名** |
 | 读别名 | 写在模板里，**新索引一建就自带**，查询侧只认别名 |
 | 分片副本 1 / 1 | 「按天索引 + 中等偏下量级」的起步值，压测后回填（§六） |
 | ISM 不是 ILM | 接口 `_plugins/_ism/policies/{id}`；**策略不写进索引模板**，靠策略自带的 `ism_template` 按索引模式自动挂（官方唯一推荐路径）。旧的 `plugins.index_state_management.policy_id` 已弃用、3.x 下还可能让索引创建被 unknown setting 拒掉。04 里沿用「ILM」这个习惯叫法，落到配置上按 ISM 写 |
@@ -105,7 +105,7 @@
 
 ## 四、块索引模板
 
-`deploy/opensearch/12-template-exec.json`，`mes-log-exec-{env}-{yyyy.MM}`，按月切、永久归档不删。
+`deploy/opensearch/12-template-exec.json`，`mes-log-exec-{yyyy.MM}`（基名，环境前缀由框架 `prefix` 加），按月切、永久归档不删。
 
 字段含义（`properties` 33 个，其中 4 组 `nested`）：
 
@@ -165,7 +165,7 @@
 |---|---|
 | 行文档字段清单 | 04 §5.3.1 |
 | 块文档字段清单 | 04 §5.3.2 |
-| 索引划分、读/写别名、`{env}` 大小写 | 04 §5.2.1 |
+| 索引划分、读/写别名、环境前缀（框架 `prefix`） | 04 §5.2.1 |
 | 保留策略三档与「归档不删」 | 04 §5.2.5 |
 
 两条**没做**，留到压测或部署阶段：
