@@ -26,7 +26,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 |---|---|---|---|---|
 | 主键 | `ID` | ≤50 | 否 | 按全项目表规范，长度对齐 `FvAlarmCfg.ID`；不出参、不进 Ro |
 | 规则名称 | `Item` | ≤30 | 否 | 规则标识名，如 `PROD-ORA-EXCEPTION`；汇总表按「环境名 + 规则名称」分组 → **一条规则占一行** |
-| 环境名 | `Environment` | ≤30 | 否 | 下拉，候选来自 Misc `mes.global.environments` |
+| 环境名 | `Environment` | ≤30 | 否 | 下拉，候选来自 Misc `mes.global.environments`，前端调 **`GET /api/v1/sys_misc/env/list`**（归属 Misc 模块，本篇只消费） |
 | 关键字 | `Keyword` | ≤30 | 否 | **一条配置一个关键字**；不限字符类型 |
 | 描述 | `Description` | ≤255 | 是 | 这条规则是干什么的，给人看 |
 | 排除关键字 | `ExcludeKeywords` | ≤4000 | 是 | JSON 数组，**词级**黑名单 |
@@ -147,7 +147,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 字段 | 控件 | 校验 |
 |---|---|---|
-| Environment | 下拉 | 必填；候选来自 Misc `mes.global.environments`；**编辑态锁定**（与 Item 共同构成定位键） |
+| Environment | 下拉 | 必填；候选来自 Misc `mes.global.environments`，前端调 **`GET /api/v1/sys_misc/env/list`**；**编辑态锁定**（与 Item 共同构成定位键） |
 | Item | 输入框 | 必填 **≤30 字符**；**只允许下划线 `_`、中划线 `-`、大小写字母、数字**（`^[A-Za-z0-9_-]{1,30}$`）；**编辑态锁定不可改** —— 要换就删了重建 |
 | Keyword | 输入框 | 必填 **≤30 字符**；**不限字符类型** |
 | Description | **多行文本域** | ≤255，可空 |
@@ -160,7 +160,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 **Tab 2 · Alarm 配置**（落 `FvAlarmCfg`，随规则一起提交）
 
-内容区直接嵌入**通知配置公共组件 `AlarmCfgEditor`**（定义见 §3.4），无 Tab 2 专属控件。
+内容区直接嵌入**通知配置公共组件 `AlarmCfgEditor`**（定义见 §3.4），无 Tab 2 专属控件；**字段校验与取值基于该组件，回填按组件定义回写**（§3.4）。
 
 **底部（Tab 2）**：`Previous`（位于 `取消` **之前**）+ `取消` + `确认`（占据 Tab 1 里 `Next` 的位置）。
 
@@ -205,7 +205,8 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 > **除「通知间隔」外全部可空** —— 邮件两栏都空、飞书两栏都空也允许保存（等于这条配置只落库、不发通知）。
 > 飞书群字段下方常驻灰字提示：「**@ 的人必须在对应群里**，否则 @ 不生效（消息照发）」。
-> 校验全部**内聚在组件里**（必填、范围、邮箱格式、webhook 格式），消费方只负责取值 / 回填，不重复写校验。
+> 校验全部**内聚在组件里**（必填、范围、邮箱格式、webhook 格式），消费方只负责取值 / 回填，不重复写校验。**前端已实现**，消费方基于 `AlarmCfgEditor` 完成字段校验与取值。
+> **回填按组件定义回写**：`notifyInterval` 回写到**通知间隔输入框**；`mailToUsers` / `mailCCUsers` 回写到**各自对应的字符串集合组件**；飞书内容（`feishuWebhooks` / `feishuAtUsers`）按 **Key Value 组件**的定义回写。
 > 组件的值模型即 `AlarmCfgRo` / `AlarmCfgDto`（§4.2），两个消费方同构 —— 落同一张 `FvAlarmCfg`，无独立通知接口。
 
 ---
@@ -249,7 +250,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 **6 · `priority/list`（GET）** 无入参；出参 `data` = **`List<string>`**（去重 + 字符串升序，如 `["P1","P2","P3","P4"]`）。
 
 - **归属 Misc 模块**（服务内路径 `/api/v1/sys_misc/priority/list`），本功能只是**消费方**；规格写在本篇，模块 5 的 Misc 文档不再重复（那里只列通用候选接口）。
-- 数据源是 Misc 表 `item = system.global.priority`（`List<string>` 形态）：`value` 为空 ⇒ 回落 `defaultValue`；两者皆空 ⇒ `[]`；解析规则与 Misc 候选接口同一套（`模块5/02-System Misc` §6.1 ~ §6.3）。
+- **后端实现调 `shared-business-lib` 库 utility 中的 `FetchPriorityFromSystemMisc()`**：**输入为空、输出为字符串数组（`string[]`）**；**不直连 Misc 表、不复刻解析逻辑**（方法内部取值与回落不在本篇展开）；返回空数组 ⇒ `[]`。
 - **只读 Misc 表、不改**；供规则弹框的「报警等级」下拉取值，接口异常时下拉空、不阻断页面其他部分。
 
 **7 · `state`（POST）** 入参走 query：`item` + `environment`（定位键）+ `enabled`（布尔，目标状态）。按定位键加锁查对象，查不到 ⇒ `LogMonitorCfgNotFound`；事务内**只更新主表 `ENABLED` 一列**，不动 `FvAlarmCfg`。出参 `data` = **单个 `LogMonitorCfgDto`**（与 `page` 行同构，含 `enabled` 与两个展示字段），供列表原地刷新该行。权限随菜单级（§3.1）。
@@ -351,7 +352,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 3. 字符串长度一律**按字符**校验（先校验、再落库，避免 `VARCHAR2` 字节语义抛 `ORA-12899`）；`trim` 后为空视同未传。
 4. 三个 JSON 数组字段（`ExcludeKeywords` / `FollowRuleNames` / `ExcludeRuleNames`）处理一致：元素 `trim` → 去空串 → **去重（保持原顺序）** → 序列化为 JSON 存；空数组存 `NULL`。
 5. 事务边界：一条写接口 = 一个事务（涉及规则表与通知表时**同提交同回滚**；`state` 只动规则表、`POST` / `PUT` / `DELETE` 带通知表）；`AlarmCfg` 的 ID 在同一事务内生成。
-6. **存在性判断统一走 `FvFetchObjectLockTxn`**（按 `item + environment` 取对象）：`POST` 走**不加锁**模式、只判断是否存在；`PUT` / `DELETE` / `state` 走**加锁**模式（查到即持有该键的锁，同键写操作串行）。
+6. **存在性与锁**：`POST` 需**校验对象是否已存在**（不加锁）；`PUT` / `DELETE` / `state` 需**校验对象存在并对 `item + environment` 加锁**（查到即持锁，同键写操作串行）。**不指定具体公共方法名**，实现层按此语义选型。
 7. 权限：走**菜单级权限管控**（§3.1）—— 有该菜单权限即可读写本功能全部接口，无权限则连接口都调不通；`priority/list` 随 Misc 模块权限。
 
 **1 · `page`**
@@ -378,8 +379,8 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 步骤 | 动作 |
 |---|---|
 | ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30、`keyword` ≤30、`description` ≤255、`notifyInterval`（整数 **1~99999**，缺省补 **5**）、**邮箱 / webhook 逐个格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
-| ② | **值域校验（走 Misc 的 By Item 查询 Txn）**：分别以 `mes.global.environments`、`system.global.priority` 调 Misc 模块提供的**按 `item` 查询 Txn**，取该行 `VALUE` / `DEFAULT_VALUE` 按 Misc §6.1~§6.3 解析成候选集合后比对 —— **不直连 Misc 表、不复刻解析逻辑**；不在值域（含 Misc 未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
-| ③ | **存在性校验**：调 `FvFetchObjectLockTxn`（`item + environment`，**不加锁模式**）—— POST 只判断对象是否已存在、不持锁；已存在 ⇒ **不允许创建**（`LogMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突**转同一业务码**（防并发穿透） |
+| ② | **值域校验（调 `shared-business-lib` 库 utility 的公共方法）**：环境候选调 **`FetchEnvFromSystemMisc()`**、等级候选调 **`FetchPriorityFromSystemMisc()`**，两者**均输入为空、输出为字符串数组 `string[]`**；**不直连 Misc 表、不复刻解析逻辑**；不在值域（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
+| ③ | **存在性校验**：按 `item + environment` 校验对象是否已存在（**不加锁**）—— 已存在 ⇒ **不允许创建**（`LogMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突**转同一业务码**（防并发穿透） |
 | ④ | 事务：**先建通知对象**——生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建监控对象**——生成规则 `ID` → INSERT `FvLogMonitorCfg`（带该 `ALARM_CFG_ID`）→ 提交 |
 | ⑤ | 回参：按 `detail` 逻辑重查一次并映射（**不回显入参**，保证与库内真实值一致，含默认值补全） |
 
@@ -388,7 +389,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 步骤 | 动作 |
 |---|---|
 | ① | `item` / `environment` 必填（**定位键**）；缺失 ⇒ `RequireParameterMissing` |
-| ② | **加锁查对象**：调 `FvFetchObjectLockTxn`（`item + environment`，**加锁模式**）—— 与 `DELETE` 同一把键锁、同键串行；查不到 ⇒ **未创建不允许修改**（`LogMonitorCfgNotFound`） |
+| ② | **加锁查对象**：按 `item + environment` 校验存在并**加锁** —— 与 `DELETE` / `state` 同一把键锁、同键串行；查不到 ⇒ **未创建不允许修改**（`LogMonitorCfgNotFound`） |
 | ③ | 必填（4 项）与值域校验同 `POST` ①②，**并做同一套三名单交叉校验**（**跳过唯一性** —— 两个定位键不可改，天然不冲突） |
 | ④ | 事务：取本行 `ALARM_CFG_ID` → **UPDATE 通知行**（按该 ID 原地改全字段，**不删不新建**；仅当该 ID 为空 / 通知行缺失的历史脏数据才补插一行并回写）→ UPDATE 规则行（`SET` 不含 `ITEM` / `ENVIRONMENT` / `ID` / 审计）→ 提交 |
 | ⑤ | 回参：同 `POST` ⑤，重查后映射 |
@@ -398,7 +399,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 步骤 | 动作 |
 |---|---|
 | ① | `item` / `environment` 必填；缺失 ⇒ `RequireParameterMissing` |
-| ② | **加锁查对象**：调 `FvFetchObjectLockTxn`（`item + environment`，**加锁模式**）—— 与 `PUT` 同一把键锁、同键串行；查不到 ⇒ **未创建不允许删除**（`LogMonitorCfgNotFound`） |
+| ② | **加锁查对象**：按 `item + environment` 校验存在并**加锁** —— 与 `PUT` / `state` 同一把键锁、同键串行；查不到 ⇒ **未创建不允许删除**（`LogMonitorCfgNotFound`） |
 | ③ | 事务：**通知行与监控行一起删**——按本行 `ALARM_CFG_ID` 删 `FvAlarmCfg` → 删 `FvLogMonitorCfg` → 提交 |
 | ④ | **已产生的 Alarm 一律不动**（运行时的历史数据与本表无外键关系） |
 | ⑤ | 回参：`data` 为空 |
@@ -407,18 +408,18 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 步骤 | 动作 |
 |---|---|
-| ① | 无入参；按 `ITEM = 'system.global.priority'` 读 Misc 一行 |
-| ② | 取 `VALUE` 按 Misc §6.2 判形态并展平成字符串集合；**解析为空 / 结构不认** ⇒ 回落 `DEFAULT_VALUE`，同样方式解析 |
-| ③ | 两者皆空 ⇒ 返回 `[]`（**不报错**，前端下拉空、不阻断页面） |
+| ① | 无入参；调 `shared-business-lib` 库 utility 中的 **`FetchPriorityFromSystemMisc()`**：**输入为空、输出 `string[]`** |
+| ② | 方法内部如何取值 / 回落**不在本篇展开**，本篇只消费返回的 `string[]`；**不直连 Misc 表、不复刻解析逻辑** |
+| ③ | 返回空数组 ⇒ 出参 `[]`（**不报错**，前端下拉空、不阻断页面） |
 | ④ | 去重 + **字符串升序**排序后输出 `List<string>` |
-| ⑤ | 不缓存：单行主键查询，开销可忽略；Misc 改完即时生效 |
+| ⑤ | 不缓存：每次调用公共方法取当前值，Misc 改完即时生效 |
 
 **7 · `state`**
 
 | 步骤 | 动作 |
 |---|---|
 | ① | `item` / `environment` / `enabled` 缺失或空白 ⇒ `RequireParameterMissing`；`enabled` 非布尔 ⇒ `ParameterInvalid` |
-| ② | 按 `item + environment` **加锁查对象**（`FvFetchObjectLockTxn`，与 `PUT` / `DELETE` 同一把键锁）；查不到 ⇒ `LogMonitorCfgNotFound` |
+| ② | 按 `item + environment` 校验存在并**加锁**（与 `PUT` / `DELETE` 同一把键锁）；查不到 ⇒ `LogMonitorCfgNotFound` |
 | ③ | 事务：只 `UPDATE FvLogMonitorCfg SET ENABLED = :enabled`（**不动通知表、不动定位键**），审计列由底层刷新 → 提交 |
 | ④ | 按 `detail` 同一映射函数重查一次，回单个 `LogMonitorCfgDto`（含 `enabled` 与两个展示字段）；前端按定位键原地替换该行 |
 
@@ -452,7 +453,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `ExcludeKeywordInvalid` | 存在「排除词是 keyword 子串（含相等）」的配置 | 提示该排除词会让规则永不生效，定位到排除关键字行 |
 
 > 前 4 个是整体库既有码，直接复用；`EnvironmentNotAllowed` / `PriorityNotAllowed` / `RuleNameConflict` / `ExcludeKeywordInvalid` 为本模块新增，需在 `模块6/05` §十的错误码表登记。
-> 值域校验逻辑**只实现一份**（`POST` / `PUT` 共用的校验函数），内部统一调 Misc 的 By Item 查询 Txn。
+> 值域校验逻辑**只实现一份**（`POST` / `PUT` 共用的校验函数），内部统一调 `shared-business-lib` utility 的 `FetchEnvFromSystemMisc()` / `FetchPriorityFromSystemMisc()`（均输入为空、输出 `string[]`）。
 
 ## 5. 已确认口径（配置侧）
 
@@ -460,7 +461,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 |---|---|
 | 1 | **一条配置 = 一个规则 = 一个关键字**：`Item + Environment` 唯一；要监控多个关键字就建多条配置（规则名各不相同） |
 | 2 | 配置页挂 **`monitor-alarm` 模块 → 一级菜单 `Monitor & Alarm` → 二级菜单 `MES Log Keyword Monitor`**（本页 `Config`，与查看处置页 `View & Resolve` 同属该二级菜单），走**菜单级权限管控**（无权限则入口不可见、接口不可调） |
-| 3 | 报警等级 `P1`~`P4` 配在**规则级**；**值域来自 Misc `system.global.priority`** —— 后端读 Misc 校验、前端走 `/api/v1/sys_misc/priority/list` 取候选（该接口**归属 Misc 模块**，规格写在本篇 §4.1-6） |
+| 3 | 报警等级 `P1`~`P4` 配在**规则级**；**值域来自 Misc `system.global.priority`** —— 后端调 `shared-business-lib` utility 的 `FetchPriorityFromSystemMisc()` 校验、前端走 `/api/v1/sys_misc/priority/list` 取候选（该接口归属 Misc 模块，规格写在本篇 §4.1-6） |
 | 4 | 「规则名称」= 一条规则的标识名（如 `PROD-ORA-EXCEPTION`）；`Item + Environment` 是定位键，**编辑态锁定不可改** —— 要换就删了重建 |
 | 5 | **配置分两张表**：`FvLogMonitorCfg`（规则，§2.1）+ `FvAlarmCfg`（通知，§2.2）；通知配置**随规则走**（1:1、同事务写、不单独维护、页面不提供复用），**无名称字段** |
 | 6 | 飞书走**群自定义机器人 webhook**：一份配置可填多个群（`FeishuWebhooks` JSON 数组），逐群各发一条；@ 人用 `open_id` 且须在该群才生效 |
@@ -469,8 +470,8 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 9 | 三个 JSON 数组字段按**字符**校验 ≤4000；空 / 未配置存 `NULL` |
 | 10 | 接口定位键统一 `item + environment`（不用 `id`）：`detail` / `DELETE` 走 query 参数，`PUT` 的定位键收在 `LogMonitorCfgRo` body 里、不额外传 query；定位键只用于查记录，不参与更新 |
 | 11 | 「特殊 Rule Name」已更名为「**关注 Rule Name**」（字段 `FollowRuleNames`），**白名单语义不变**：配了则只有命中名单内 Rule Name 才告警；三个名单统一用**多字符串输入控件**（回车成条、可逐条删） |
-| 12 | **值域与存在性校验统一走 Misc 的 By Item 查询 Txn**（`mes.global.environments` / `system.global.priority`）：取行值后按 Misc §6.1~§6.3 解析比对，不直连 Misc 表、不复刻解析逻辑；`environment` / `item` / `keyword` / `priority` 四项必填 |
-| 13 | **存在性判断统一走 `FvFetchObjectLockTxn`**（入参 `item + environment`）：`POST` 走**不加锁**模式、只判断是否存在，已存在则拒；`PUT` / `DELETE` 走**加锁**模式、同键串行，未创建则拒 |
+| 12 | **值域校验统一调 `shared-business-lib` 库 utility 的公共方法**：`FetchEnvFromSystemMisc()` / `FetchPriorityFromSystemMisc()`，**均输入为空、输出 `string[]`**；不直连 Misc 表、不复刻解析逻辑；`environment` / `item` / `keyword` / `priority` 四项必填（§4.3 POST②） |
+| 13 | **存在性与锁**：`POST` 校验对象是否已存在（不加锁）、已存在则拒；`PUT` / `DELETE` / `state` 校验存在并**对 `item + environment` 加锁**、同键串行，未创建则拒；**不指定具体公共方法名**（§4.3 共性 6） |
 | 14 | **通知对象的写语义**：创建先建 `AlarmCfg` 再建规则；修改**原地 UPDATE 通知行**、不删不新建；删除时两表一起删 |
 | 15 | **三名单两条交叉校验**（`POST` / `PUT` 同源、前后端同源）：① 排除关键字**不得是 `keyword` 的子串（含相等）**——否则规则永不生效；② **关注名单与排除名单不得有交集**，否则该 Rule 必被排除。比较口径与运行时「包含」判定一致（区分大小写） |
 | 16 | `Item` **≤30 字符**（后端只校长度）；字符集只允许 `_` `-` 大小写字母数字（`^[A-Za-z0-9_-]{1,30}$`）**仅在前端输入框限制，后端不校**；`Keyword` **≤30 字符**、不限字符类型；`Description` ≤255 支持多行 |
@@ -478,6 +479,8 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 18 | 新增 / 修改 / 删除 / 启停切换**统一走 Warning 提示框**（确认才提交、取消不动）；**不再提示「不会立即生效」** —— 运行时每轮重读配置，删改与启停都下一轮生效（`02` §6.2） |
 | 19 | `Alarm 配置` Tab 用**分割符**分三段（通知间隔 → 邮件通知 → 飞书通知）：**只有「通知间隔」必填且限 `1~99999` 整数**，其余（To / CC / 飞书群 / @ 人）全部可空；**邮箱格式在提交时逐个校验，不过则报错、不允许提交**（后端同源兜一次） |
 | 20 | **邮件只在 `MailToUsers` 非空时发送** —— 只填 CC 不填 To ⇒ 邮件不发（CC 不顶替收件人），飞书不受影响 |
+| 21 | 环境下拉候选前端调 **`GET /api/v1/sys_misc/env/list`**（归属 Misc 模块，本篇只消费）；`priority/list` 后端实现调 `FetchPriorityFromSystemMisc()`（§2.1 / §4.1-6） |
+| 22 | 通知配置**基于 `AlarmCfgEditor` 组件**做字段校验与取值（前端已实现）；**回填按组件定义回写**：`notifyInterval` → 通知间隔输入框，`mailToUsers` / `mailCCUsers` → 各自对应的字符串集合组件，飞书内容按 **Key Value 组件**定义回写（§3.4） |
 
 ## 6. 待确认
 

@@ -180,12 +180,12 @@
 | 区块 | 呈现 |
 |---|---|
 | **Rule Message 全文** | 完整 `ruleMessage` 用 **Label** 形式显示（纯展示，不可编辑） |
-| **解析后的请求参数** | 前端用 **API 工具类中的请求参数解析方法**把 `ruleMessage` 里的参数解析出来，**逐行显示**；配一个**展开 / 折叠按钮**控制该区块展开或收起；**滚动只发生在参数行区域**，Label 区与其余区块不滚动 |
+| **解析后的请求参数** | 前端调 **API 组件中原有的 `mesRuleMessageParser` 方法**把 `ruleMessage` 里的参数解析出来，**逐行显示**；配一个**展开 / 折叠按钮**控制该区块展开或收起；**滚动只发生在参数行区域**，Label 区与其余区块不滚动 |
 | **Resolved Time** | **时间组件**，**禁用** |
 | **Resolved User** | **输入框组件**，**禁用** |
 
 - 两个 Resolved 字段的**显示顺序**：**Time 在前、User 在后**；两者均**禁用**。
-- **展示字段与 Rule Message 原文均取自当前行对象**，不另调接口；参数解析在**前端工具类完成**，不新增后端接口。
+- **展示字段与 Rule Message 原文均取自当前行对象**，不另调接口；参数解析用 **API 组件中原有的 `mesRuleMessageParser` 方法**完成，不新增后端接口。
 - **按钮**：More Info 弹框**只有一个「关闭」按钮**，无「确认」/「保存」等其它操作按钮；与 §2.4 输入 `Resolved Comment` 的对话框（含「确认」提交）不是同一个弹框。
 
 ## 3. 数据口径
@@ -207,12 +207,14 @@
 | 3 | `/api/v1/log_monitor/resolve` | **`POST`** | 解决提交 | 「解决」权限点 | §4.3 |
 | 4 | `/api/v1/log_monitor/log/download` | **`POST`** | Alarm Log 下载（选中行原始日志） | 功能级 | §4.5 |
 
+>  Environment 下拉另消费一个 **Misc 模块**的接口 **`GET /api/v1/sys_misc/env/list`**，**不属本功能前缀**；**本篇只消费、不复刻规格**（与 `01` 对 Misc 接口的消费口径一致），接口异常时下拉空、不阻断页面其他部分。
+
 **全局约定**（引用既有后端设计，本篇不另立）
 
 | 项 | 约定 | 来源 |
 |---|---|---|
 | 响应外壳 | `list` / `detail_info/page` / `resolve` **三条 REST 统一走全局响应包**：`code` / `success` / `errMsg` / `data` / `txId`，业务数据一律放 `data`；成功 `code = OK`、`success` 输出 `0` / `1`；**业务类失败 HTTP 恒 200**。`log/download` **成功为文件流、不走外壳**，仅**错误时**以框架标准接口返回错误信息（§4.5） | [`../模块6-用户与安全管理/05-后端设计.md`](../模块6-用户与安全管理/05-后端设计.md) §1.4；`01` §4.3 共性约定 1 |
-| 分页 | `detail_info/page` **有分页**，出参为**分页对象 `Pageable`**；分页细节由底层提供，本篇不展开 | 同上 §1.5 |
+| 分页 | `detail_info/page` **有分页** | 同上 §1.5 |
 | 对象命名 | API 入参 `Ro`、出参 `Dto`；**#2 `detail_info/page` 入参为 URL 拼接参数、不定义 `Ro`**（§4.2） | 同上 §1.6 |
 | 定位键 | 汇总 / 明细按 `item + environment` 定位；单条 issue 按 `issueId` 定位 | §2.1 / §2.3 |
 
@@ -685,13 +687,17 @@ GET /mes-log-exec-2026.08.11/_search
 }
 ```
 
-**④ 按块捞整块行（调公共方法，不自拼 DSL）**
+**④ 按块捞整块行（`FetchMESRuleFullLogs()`）**
 
-- 每个块**调既有公共方法**做「捞一个块的全部行」——口径即 `04` §5.2.2：六条件粗筛 + `LOG_TIME` 闭区间上界 + `LOG_FINGERPRINT` / 文件时序 / `LOG_OFFSET` 三级重排 + 取 `[START_LINE_ID, END_LINE_ID]` 这一段。**本接口不重写这段查询**，翻页、重排、截断都在方法内部完成。
+- 每个块调 `shared-business-lib` 库的 **`FetchMESRuleFullLogs()`**：**输入＝块信息对象**（③ 取回的块，含四个 `term` 条件 + `START_TIME` / `END_TIME` + `START_LINE_ID` / `END_LINE_ID`）、**输出＝该块全部行日志对象集合**（已还原块内写入顺序）。粗筛 / 重排 / 截断都在方法内部（口径 `04` §5.2.2：六条件 + `LOG_TIME` 闭区间上界 + `LOG_FINGERPRINT` / 文件时序 / `LOG_OFFSET` 三级重排 + `[START_LINE_ID, END_LINE_ID]` 截断），**本接口不自拼 DSL、不自己重排**。
 - 拿回来的行序**就是写入顺序**，直接照序写文件，不再排序。
 - **块与块串行**：一个块写完再下一个，10 个块也不并发拉行（避免同时开 10 条重查询把 OS 打满）。
 
-**⑤ 生成 `.log` 与目录**
+**⑤ 组织文件与内容（IO 交工具方法）**
+
+**业务侧只负责组织文件和文件内容** —— 目录名、文件名、每行内容、zip 包名；**文件夹组织 / 写入 / 删除 / 下载输出等一律调 `common-lib` 库的工具方法**（方法提供文件夹组织、写入、删除、下载输出等能力）：
+
+> 工具方法内部的落盘顺序、重名处理、清理实现**不在本篇展开**；本篇只规定业务侧组织什么、何时清理。
 
 | 项 | 规则 |
 |---|---|
@@ -701,16 +707,15 @@ GET /mes-log-exec-2026.08.11/_search
 | 不加料 | **不写表头、不写分隔线、不写块元信息注释** —— 下载件是原始日志，加了东西就没法直接比对了 |
 | zip | **`meslog_{yyyyMMddHHmmss}.zip`**，含 `meslog_20261118125234/` 与其中 N 个 `.log` |
 | 时间戳取值 | **整个请求只取一次**（进 ⑤ 时取），目录名与 zip 名共用同一个值，不会出现两者不一致 |
-| 重名 | **业务侧不判重、不加随机后缀、不做存在性检查** —— 目录与文件的创建、重名、并发冲突一律交给共享文件库处理（本节只管「在给定目录下按规则生成文件」） |
-| 内存 | **逐块、逐行流式写入**，一个块写完即落盘，**不把 10 个块的行同时攒在内存里** |
+| 重名 | 目录 / 文件的创建、重名、并发冲突由 **`common-lib` 工具方法**处理，业务侧**不判重、不加随机后缀、不检查存在性** |
+| 内存 / 写入方式 | 由 **`common-lib` 工具方法**负责（流式写入等），**不在本篇展开**；业务侧只把每块内容组织好交给工具方法 |
 
-**⑥ 先落盘再回传（关键）**
+**⑥ 输出与清理（交工具方法）**
 
-1. **先在服务端临时目录生成完整 `.zip`**，全部块成功后才打开输出流回传。
-2. 理由：响应体一旦开始写，HTTP 状态码与响应外壳就已经发出去了，此时再出错只能**返回半个 zip**——用户拿到一个打不开的文件，比收到一条错误还糟。落盘完成后回传，才能保证「要么完整包、要么标准错误包」。
-3. 任何一步失败（OS 失败、块缺失、打包含 IO 异常）⇒ **删掉本次生成的全部文件与目录 → 抛框架标准错误**，走全局响应外壳 `code` / `success` / `errMsg` / `data` / `txId`，**不自定错误结构**。
-4. **回传结束后主动清理**：输出流关闭（下载完成）**和**接口失败**两条路径都在 `finally` 里删掉本次生成的整个 `meslog_{yyyyMMddHHmmss}` 目录（含 `.log` 与 `.zip`），**不依赖临时目录过期回收、不留残留**。
-5. **清理失败不影响响应**：`finally` 里的删除异常只记 WARN，不覆盖已成功的下载、也不改写已发出的错误包。
+1. **写入 / 打包 / 输出 / 删除一律调 `common-lib` 的工具方法**；业务侧不自己写文件 IO。
+2. 业务口径：**要么给出完整 zip、要么给出错误包**，不给半个 zip。
+3. **下载完成（输出流关闭）与接口失败两条路径都清理**：调 `common-lib` 的工具方法删掉本次 `meslog_{yyyyMMddHHmmss}` 整个目录（含 `.log` 与 `.zip`），不留残留。
+4. 工具方法抛错 ⇒ **拿方法的 error 输出**，走接口报错格式；清理异常不改写已发出的响应。
 
 **⑦ 错误码清单（全部复用框架与本节已定义的码，不新造格式）**
 
@@ -721,7 +726,7 @@ GET /mes-log-exec-2026.08.11/_search
 | 去重后块数 > 10 | `LogMonitorDownloadBlockLimitExceeded` |
 | `blockId` 全取不到、块取不到 | `LogMonitorIssueNotFound` |
 | OS 连接 / 超时 / 5xx | `LogMonitorSourceUnavailable`（同 §4.2） |
-| 临时文件 / 打包 IO 异常 | **框架通用内部错误码**，不自定 |
+| 文件写入 / 输出 / 删除异常 | **取工具方法的 error 输出** |
 
 **⑧ 响应头**
 
@@ -769,10 +774,10 @@ GET /mes-log-exec-2026.08.11/_search
 | 28 | `dailyCnt` 中文列名 = **今日问题数量**（Daily Count） |
 | 29 | More Info 弹框展示 **3 个字段**：Rule Message / Resolved Time / Resolved User；**`issueId` 不展示** |
 | 30 | Resolved Time 用**时间组件**、Resolved User 用**输入框组件**；**Time 在前、User 在后**，两者**均禁用** |
-| 31 | Rule Message 完整原文用 **Label** 显示；请求参数由前端 **API 工具类方法**解析后**逐行显示**、带**展开 / 折叠按钮**，**滚动只发生在参数行区域** |
+| 31 | Rule Message 完整原文用 **Label** 显示；请求参数由前端调 **API 组件中原有的 `mesRuleMessageParser` 方法**解析后**逐行显示**、带**展开 / 折叠按钮**，**滚动只发生在参数行区域** |
 | 32 | More Info 弹框**只有一个「关闭」按钮**，无其它操作按钮（与 §2.4 的 comment 对话框不同） |
 | 33 | **4 条端点均归属 `telemetry-hub`**（与 `01` §4 的 6 条配置接口同服务）；服务内前缀 `/api/v1/log_monitor` |
-| 34 | `list` / `detail_info/page` / `resolve` **三条 REST 统一走全局响应外壳**（业务数据放 `data`）；明细分页**有分页**、出参为**分页对象 `Pageable`**，分页细节由底层提供、本篇不展开 |
+| 34 | `list` / `detail_info/page` / `resolve` **三条 REST 统一走全局响应外壳**（业务数据放 `data`）；明细**有分页**（§4.0） |
 | 35 | **初始态 / 空态**：进入界面未点「查看」、当前查看行无 issue、未解决开关打开后全已解决 —— 明细表格**只显示一个表头**，无数据行，不隐藏卡片 |
 | 36 | **点操作列「查看」是触发 detail 的唯一动作**；**行选中不起作用**，不触发加载、也不作为前置条件 |
 | 37 | **切换查看行**：点另一行「查看」后 detail **自动回第 1 页、清空明细多选选中**，再按新行的 `item + environment` 查询 |
@@ -789,7 +794,7 @@ GET /mes-log-exec-2026.08.11/_search
 | 48 | `LogMonitorAlarmDetailDto` 字段类型：`issueTime` / `reportTime` / `resolvedTime` 为时间类型、`alarmed` 为 `boolean`、其余 10 个字段为 `string`；**输出字段仍 14 个、不含 `resolved`**，`resolvedTime` 时间类型与 §2.5 时间组件一致（§4.4） |
 | 49 | **行状态布尔 `resolved` 是前端由 `resolvedTime` 是否为空计算出的派生值**（为空 → `false`、不为空 → `true`），**不在任何接口出入参中**；界面过程判断（Resolve 按钮可用性、批量提交只取未解决行）一律用它，不必每处再判 `resolvedTime`。与 §4.2 同名入参 `resolved`（「只过滤未解决」开关的查询条件）不是同一个东西（§2.4 / §4.4） |
 | 50 | 汇总卡片顶部工具栏**三个元素**：**Environment 下拉** + **Previous Days 输入框** + **Refresh 按钮**（§2.1） |
-| 51 | Environment 候选来自 Misc `mes.global.environments`，前端调 **`GET /api/v1/sys_misc/env/list`**（归属 Misc 模块）；**可为空，空＝不限环境** |
+| 51 | Environment 候选来自 Misc `mes.global.environments`，前端调 **`GET /api/v1/sys_misc/env/list`**（归属 Misc 模块，本篇只消费、不复刻规格）；**可为空，空＝不限环境** |
 | 52 | Previous Days **只接受 1~60 的正整数、可为空**，**空＝按默认 30 天**（不提供「不限 / 全部历史」口径），越界 / 非整数前端阻断、后端同样按 1~60 校验 |
 | 53 | 进入界面默认 **Environment 空 / Previous Days 30**，首调 `list` 即 `environment` 空 + `previousDays=30` |
 | 54 | `list` **通过 query 传 `environment` + `previousDays`**（不定义 `Ro`）；点 **Refresh** 按当前两值重查汇总，且不触发下方 detail 重查（§4.1 / §2.4） |
@@ -816,11 +821,11 @@ GET /mes-log-exec-2026.08.11/_search
 | 75 | **单次最多 10 个块，按 `blockId` 去重后计数**（不是 `issueIds` 个数，多个 issue 落同一块只算 1 个）；超限报 **`LogMonitorDownloadBlockLimitExceeded`**，**不截断降级**（§4.5 ②） |
 | 76 | **单个 `issueId` 取不到 `blockId` ⇒ 只记 WARN 日志并跳过该条**，其余块照常打包、不阻断；**一个 `blockId` 都取不到** ⇒ `LogMonitorIssueNotFound`（不返回空包）；**块文档取不到** ⇒ **算失败**、整批不下载（§4.5 ②③） |
 | 77 | 块信息只取捞行必需的 **8 个字段**（`ENV` / `HOSTIP` / `SERVER_ID` / `system.name` / `START_TIME` / `END_TIME` / `START_LINE_ID` / `END_LINE_ID`），**按 `blockId` 末段 17 位毫秒定日索引、分组请求**（§4.5 ③） |
-| 78 | 捞整块行**调既有公共方法**（口径 `04` §5.2.2：六条件 + 闭区间上界 + 三级重排 + `[START_LINE_ID, END_LINE_ID]` 截断），**本接口不自拼 DSL**；**块与块串行**，行序即写入顺序、照序写不再排（§4.5 ④） |
+| 78 | 捞整块行**调 `shared-business-lib` 的 `FetchMESRuleFullLogs()`**：**输入＝块信息对象、输出＝该块全部行日志对象集合**；粗筛 / 重排 / 截断都在方法内部（口径 `04` §5.2.2），**本接口不自拼 DSL**；**块与块串行**，行序即写入顺序、照序写不再排（§4.5 ④） |
 | 79 | 下载件结构：文件夹 **`meslog_{yyyyMMddHHmmss}`** / 每块 **`{blockId}.log`** / 包 **`meslog_{yyyyMMddHHmmss}.zip`**；**不拼 `txId`**，时间戳由服务端在进 ⑤ 时取一次、目录与 zip 共用；文件内容＝该块行按写入顺序的 **`LOG_RAW`**（行原文含前缀），一行一条、`\n` 结尾、UTF-8 无 BOM，**不加表头 / 分隔线 / 块元信息**（§4.5 ⑤） |
-| 80 | **先在服务端临时目录生成完整 zip、全部成功后才开流回传**：响应体一旦开始写就无法再改错误包，否则只能给出半个 zip；**下载完成或接口失败都在 `finally` 里主动删掉本次的 `meslog_{yyyyMMddHHmmss}` 整个目录**（清理异常只记 WARN）；成功不走外壳、失败必走外壳（§4.5 ⑥⑧） |
-| 81 | **目录重名 / 并发冲突交给共享文件库**：业务侧只管「按规则生成文件并下载」，**不判重、不加随机后缀、不检查目录是否已存在**（§4.5 ⑤） |
-| 82 | 下载的错误码全部复用：`IssueIdsRequired` / `IssueIdInvalid` / `LogMonitorDownloadBlockLimitExceeded` / `LogMonitorIssueNotFound` / `LogMonitorSourceUnavailable`（OS 失败），IO 异常用**框架通用内部码**；**不自定错误包结构、不自定错误码格式**（§4.5 ⑦） |
+| 80 | 文件夹组织 / 写入 / 删除 / 下载输出一律调 **`common-lib` 的工具方法**（方法提供文件夹组织、写入、删除、下载输出等能力，不写具体方法名），**业务侧只组织文件和内容**；口径：**要么完整 zip 要么错误包**；**下载完成和接口失败两条路径都清理**本次 `meslog_{yyyyMMddHHmmss}` 整个目录；工具方法内部不展开（§4.5 ⑤⑥） |
+| 81 | 目录 / 文件的创建、重名、并发冲突由 **`common-lib` 工具方法**处理：业务侧**不判重、不加随机后缀、不检查存在性**（§4.5 ⑤） |
+| 82 | 下载的业务错误码全部复用：`IssueIdsRequired` / `IssueIdInvalid` / `LogMonitorDownloadBlockLimitExceeded` / `LogMonitorIssueNotFound` / `LogMonitorSourceUnavailable`（OS 失败）；**文件 IO 类错误直接拿工具方法的 error 输出**，不自定错误包结构、不自定错误码格式（§4.5 ⑦） |
 
 > 只留生效口径，按编号追加，不留作废说明。
 
