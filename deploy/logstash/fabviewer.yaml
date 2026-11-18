@@ -107,6 +107,14 @@ msg_kinds:
   - kind: INNER_RULE_END
     regex: 'fwsrvExecServerRule:finish executing rule (\S+)'
     capture: INNER_RULE_NAME
+  # 发布小消息发送识别点：FwPublication::sendSmall 固定开头，间隔字节数，
+  #   byte msg / reply is 为固定锚点，中间目标名与括号地址可变；只打标签，取值不落字段
+  #   prefix 护栏：server_id 必须非空、且不以 COMM_ 开头（只挡 COMM，POLL 放开照打）。
+  #   COMM_RCV / COMM_SND 若从文件名取 id 则是 COMM_xxxsrv.N。
+  #   （COMM 行本就无 server_id、dir_flag 又被最前面三条抢走，这里再显式挡一层，不依赖隐性行为）
+  - kind: PUB_SEND_SMALL
+    prefix: '^(?!COMM_).+'
+    regex: 'FwPublication::sendSmall:\d+ byte msg .*? reply is \S+'
 
 # 第 2 段：派生层消费。耗时项由哪一对 MSG_KIND 界定
 cost_items:
@@ -149,7 +157,7 @@ derive:
   max_scan_span: 1h                  # 单轮最多推进的扫描区间
   cold_lookback: 1h                  # 冷启动回看宽度 W
   replay_watermark_seconds: 32       # 重放水位线 L，必须 ≥ 快轮次周期
-  silence_minutes: 5                 # 静默期 N
+  silence_minutes: 10                # 静默期 N：兜底用（人为杀进程），封口即终局、不解封
   heartbeat_seconds: 10              # 心跳间隔 T
   dead_threshold_seconds: 30         # 判死阈值 = 3 × T
   pending_stale_seconds: 30          # 摘环判据：名下最早 Pending 超过这么久

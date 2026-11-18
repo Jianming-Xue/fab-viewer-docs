@@ -27,15 +27,6 @@
         "LAST_LINE_TIME":   { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
         "CLOSE_TIME":       { "type": "date", "format": "strict_date_optional_time||epoch_millis" },
         "EXEC_STATUS":      { "type": "keyword" },
-        "REOPEN_LOG": {
-          "type": "nested",
-          "properties": {
-            "PREV_END_TIME": { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
-            "FIRST_TIME":    { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
-            "GAP_MS":            { "type": "long" },
-            "REOPENED_AT":       { "type": "date", "format": "strict_date_optional_time||epoch_millis" }
-          }
-        },
         "TOTAL_COST_MS":       { "type": "long" },
         "COST_SUM_MS":         { "type": "long" },
         "UNACCOUNTED_COST_MS": { "type": "long" },
@@ -90,7 +81,7 @@
   },
   "_meta": {
     "index": "mes-log-exec-{yyyy.MM}，每月一个，不带环境段（环境由部署前缀区分）；块文档按块首行时刻选索引；读别名 mes-log-exec-read（不设写别名）",
-    "mapping": "33 个字段、dynamic: strict；4 个 nested：REOPEN_LOG / COST_BREAKDOWN / INNER_RULES / HANG_LIST",
-    "fields": "RULENAME / LOTID / EQPID / PORTID / CARRIERID / USERID / TID / ERR_CODE 可多值（keyword 数组）；@timestamp、CLOSE_TIME、REOPEN_LOG.REOPENED_AT 用 ISO 墙钟，其余时间字段用日志格式 yyyy/MM/dd HH:mm:ss.SSS"
+    "mapping": "32 个字段、dynamic: strict；3 个 nested：COST_BREAKDOWN / INNER_RULES / HANG_LIST",
+    "fields": "RULENAME / LOTID / EQPID / PORTID / CARRIERID / USERID / TID / ERR_CODE 可多值（keyword 数组）；@timestamp、CLOSE_TIME 用 ISO 墙钟，其余时间字段用日志格式 yyyy/MM/dd HH:mm:ss.SSS"
   }
 }

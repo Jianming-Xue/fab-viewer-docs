@@ -59,7 +59,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -u "$AUTH" "$OS/_index_template/dev-mes
 curl -s -o /dev/null -w '%{http_code}\n' -u "$AUTH" "$OS/_plugins/_ism/policies/dev-mes-log-line-policy" # 200
 ```
 
-删数据索引不影响模板 / ISM / 别名。行索引按天 `dev-mes-log-line-{yyyy.MM.dd}`，360 天删；块索引按月 `dev-mes-log-exec-{yyyy.MM}`，由派生服务创建、360 天转冷不删。**索引名不带环境段**：`ENV`（当前 `UAT`）只是文档字段值，环境靠 `prefix` 区分 —— 每个环境一套部署、各配各的前缀，`PRD` 与 `PIRUN` 同属 Production 共用一套。Logstash 写**物理索引名**，读走别名 `dev-mes-log-line-read`（模板 `aliases` 段自带）。模板 `dynamic: strict`，多一个字段整篇写入失败。
+删数据索引不影响模板 / ISM / 别名。行索引按月 `dev-mes-log-line-{yyyy.MM}`，360 天删；块索引按月 `dev-mes-log-exec-{yyyy.MM}`，由派生服务创建、360 天转冷不删。**索引名不带环境段**：`ENV`（当前 `UAT`）只是文档字段值，环境靠 `prefix` 区分 —— 每个环境一套部署、各配各的前缀，`PRD` 与 `PIRUN` 同属 Production 共用一套。Logstash 写**物理索引名**，读走别名 `dev-mes-log-line-read`（模板 `aliases` 段自带）。模板 `dynamic: strict`，多一个字段整篇写入失败。
 
 ## 5. 部署截图
 

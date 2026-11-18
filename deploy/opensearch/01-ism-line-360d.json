@@ -1,6 +1,6 @@
 {
   "policy": {
-    "description": "行索引 mes-log-line-* 生命周期：0~30d 热（可写）；30d 起转温（只读、副本 1、force merge 单段）；180d 起转冷；360d 删除。按天建索引、不用 rollover，min_index_age 按索引创建时间算。",
+    "description": "行索引 mes-log-line-* 生命周期：0~30d 热（可写）；30d 起转温（只读、副本 1、force merge 单段）；180d 起转冷；360d 删除。按月建索引、不用 rollover，min_index_age 按索引创建时间算。",
     "default_state": "hot",
     "states": [
       {
