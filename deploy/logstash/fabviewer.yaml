@@ -1,23 +1,19 @@
 # ==============================================================================
-# fabviewer.yaml —— 加工层与派生层共用的外置配置
+# fabviewer.yaml —— 加工层外置配置
 #
 # 消费方：
-#   第 1 段 msg_kinds  → 加工层（Logstash）。由 tools/render_msgkinds.py 渲染成
-#                        pipeline/30-msgkind.conf，**不直接读这个文件**
-#   第 2 段 cost_items  → 派生层
-#   第 3 段 biz_fields  → 派生层
-#   第 4 段 derive      → 派生层调度参数
-#   第 5 段 worker_health / 第 6 段 alert → 派生层节点健康与告警出口
+#   msg_kinds → 加工层（Logstash）。由 tools/render_msgkinds.py 渲染成
+#               pipeline/30-msgkind.conf，**不直接读这个文件**
 #
 # 改规则的正确姿势：改本文件 → 重跑 tools/render_msgkinds.py → Logstash 自动重载
 #   （logstash.yml 里 config.reload.automatic: true，检测周期 3s）
 # 加工层加一条标签规则 = 本文件加一条 + 重跑渲染，**不改代码、不重启进程**
 # ==============================================================================
-version: 2026-10-08
+version: 2026-11-19
 
-# 第 1 段：加工层消费。行文本特征 → MSG_KIND
+# 加工层消费：行文本特征 → MSG_KIND
 # 注意：不切块的流（COMM_RCV / COMM_SND / POLL）不加**任何切块用**的标签 ——
-#       派生层在「找活跃流」那一步就按 SERVER_CATEGORY 剔掉它们了。
+#       它们的 SERVER_CATEGORY 不参与块切分。
 #       唯一例外是通信族的三个方向标记 COMM_R / COMM_S / COMM_P：它们只描述行首方向、
 #       不参与切块
 #
@@ -47,16 +43,16 @@ msg_kinds:
   - kind: SERVER_START
     prefix: '^DTPFsrv$'              # 行首必须是框架名
     regex: 'Command mailbox name:'   # 两个条件都命中，才打标签、才修正 SERVER_ID
-  # 调用通道两对 + XML 的等待行 / 出错行（CALL_WAIT / CALL_ERR，04 §3.2.3）
+  # 调用通道两对 + XML 的等待行 / 出错行（CALL_WAIT / CALL_ERR）
   - kind: CALL_REQ
     regex: 'IntUtil::sendMessage:### xmlData for sending to (\S+)'
     capture: CALL_SYS
   - kind: CALL_RSP
     regex: 'IntUtil::sendMessage:### Received Message from (\S+)'
     capture: CALL_SYS
-  # XML 通道的等待行 / 出错行（04 §3.2.3）。有 req 无 rsp 是两类合法现象：wait=0 不等回复、
+  # XML 通道的等待行 / 出错行。有 req 无 rsp 是两类合法现象：wait=0 不等回复、
   #   出错走 ERROR 行。CALL_ERR 判据只取前缀 —— 错误形态会变（当前见到 Timeout(175-5)），不抓全；
-  #   行上不带 CALL_SYS 的 CALL_ERR 同理，派生层配对时继承行序上最近一条 CALL_REQ 的系统名；错误码顺手落 ERR_CODE（不参与判据）。
+  #   行上不带 CALL_SYS 的 CALL_ERR 同理，配对时继承行序上最近一条 CALL_REQ 的系统名；错误码顺手落 ERR_CODE（不参与判据）。
   #   等待秒数不落字段：等 / 不等用 CALL_NOWAIT（:0，行尾锚定，先判）/ CALL_WAIT（>0）两个标签表达。
   #   RTD / SPC 通道永远等待对方处理结束（无 NOWAIT），其错误 / 超时行形态待现场样料后补规则：同一 kind 加 regex 即可。
   - kind: CALL_NOWAIT
@@ -100,7 +96,7 @@ msg_kinds:
     capture: RULE_RESULT
   # 内部 Rule 调用起止：名字进 INNER_RULE_NAME、不进标签。
   #   注意前缀是小写 f 开头的 fwsrvExecServerRule，与大写 F 的 FwSrvExecuteRuleTxn 不是同一个方法名。
-  #   与所属块 RULENAME 同名的是外层自身的执行行，派生层配对时整对放弃
+  #   与所属块 RULENAME 同名的是外层自身的执行行，配对时整对放弃
   - kind: INNER_RULE_START
     regex: 'fwsrvExecServerRule:start executing rule (\S+)'
     capture: INNER_RULE_NAME
@@ -115,64 +111,3 @@ msg_kinds:
   - kind: PUB_SEND_SMALL
     prefix: '^(?!COMM_).+'
     regex: 'FwPublication::sendSmall:\d+ byte msg .*? reply is \S+'
-
-# 第 2 段：派生层消费。耗时项由哪一对 MSG_KIND 界定
-cost_items:
-  - item: LOCK                       # 一条覆盖全部锁对象，不按对象分裂配置
-    cn: 对象锁耗时
-    begin: LOCK_BEGIN
-    end:   LOCK_END
-    group_by: LOCK_OBJ               # 按对象类型分组 ⇒ 一项变 N 项（LOT / CARRIER / EQP）
-  - item: CALL                       # 一条覆盖全部子系统，不按系统分裂配置
-    cn: 调用外部系统耗时
-    begin: CALL_REQ
-    end:   CALL_RSP
-    group_by: CALL_SYS               # 按被调系统分组 ⇒ 一项变 N 项（SPL / R2R / RTD / SPC …）
-
-# 第 3 段：派生层消费。块首行参数解析
-biz_fields:
-  - std: RULENAME
-    source: header                   # 在请求头里，不在 attributes 内
-    regex: 'ruleName="?([^"\s]+)"?'  # 自动 Rule 的 ruleName 带引号，要一并吃得下
-  - std: LOTID
-    source: dynamic_key              # 没有固定键时的兜底：靠「以值锚定键」拿；**本期不启用**（只解析固定键）
-    also: header_key                 # 自动 Rule 的 lotId= 写在请求头里
-  - std: EQPID
-    aliases: [EQPID, EQP, EQUIPMENTID, MACHINEID]
-    also: header_key
-  - std: CARRIERID
-    aliases: [CARRIERID, CARRIER, CASSETTEID, CASSETTE, FOUPID, FOUP]
-  - std: PORTID
-    aliases: [PORTID, PORT, PORTNO]
-    # 无固定键时由动态键条目的 value（`PORTID=…`）带出 ⇒ 本期不收入
-  - std: USERID
-    aliases: [USERID, USER]          # 三个形态写法不同：API2 的 USERID / XML 的 <userId> / 自动 Rule 的 USER
-  - std: TID
-    aliases: [TID, TRACEID, TRANSACTIONID, TRXID, TXID]
-
-# 第 4 段：派生层调度参数（Scheduler / Worker 共用）
-derive:
-  fast_cycle_seconds: 30             # 快轮次周期，cron 对齐 0/30 * * * * *
-  slow_cycle_seconds: 60             # 慢轮次周期，cron 对齐 0 * * * * *
-  max_scan_span: 1h                  # 单轮最多推进的扫描区间
-  cold_lookback: 1h                  # 冷启动回看宽度 W
-  replay_watermark_seconds: 32       # 重放水位线 L，必须 ≥ 快轮次周期
-  silence_minutes: 10                # 静默期 N：兜底用（人为杀进程），封口即终局、不解封
-  heartbeat_seconds: 10              # 心跳间隔 T
-  dead_threshold_seconds: 30         # 判死阈值 = 3 × T
-  pending_stale_seconds: 30          # 摘环判据：名下最早 Pending 超过这么久
-  poll_interval_seconds: 1           # Worker 空闲轮询间隔
-  retry_write_times: 3               # 写块文档的进程内重试次数
-  retry_write_backoff: [1, 2, 4]     # 每次重试的等待秒数
-  unit_rows: 20000                   # 1 单位行的行数上限：一次取行最多这么多、拉满即截
-  replay_page_size: 1000             # 取这个单位行时每页拉多少行
-  reclaim_after_seconds: 300         # 4b 触发①：Processing 超过这么久没进度就放回
-
-# 第 5 段：节点健康。Worker 自报，Scheduler 只读
-worker_health:
-  fail_streak_limit: 3               # 本机累计失败这么多次自降 DEGRADED
-  suicide_after_seconds: 900         # 降级持续这么久未恢复 → 退出进程
-
-# 第 6 段：告警出口。Worker 内部重试到头、节点降级时用
-alert:
-  mail_to: ''                        # 留空则只记日志与指标，不发邮件

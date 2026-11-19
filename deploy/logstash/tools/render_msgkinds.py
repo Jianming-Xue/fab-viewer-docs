@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-把 fabviewer.yaml 的第 1 段 msg_kinds 渲染成 Logstash 的条件块
+把 fabviewer.yaml 的 msg_kinds 段渲染成 Logstash 的条件块
 ==============================================================
 
 为什么要有这一步：
   「新增一个标签 = 加一条配置，不改代码」。
-  规则写在 fabviewer.yaml 里（人类可读、和派生层共用一份），
+  规则写在 fabviewer.yaml 里（人类可读，只给加工层用），
   Logstash 侧只认 conf —— 所以由本脚本把规则翻译成 conf。
   生成物 pipeline/30-msgkind.conf 由 Logstash 自动重载（config.reload.automatic），
   改完规则重跑本脚本即可生效，**不重启进程、不改代码**。
@@ -37,7 +37,7 @@ OUT = ROOT / "pipeline" / "30-msgkind.conf"
 HEADER = """# ==============================================================================
 # 第 3 段：打消息类型标签（MSG_KIND）
 #
-# ⚠ 本文件由 tools/render_msgkinds.py 从 fabviewer.yaml 的第 1 段**自动生成**，
+# ⚠ 本文件由 tools/render_msgkinds.py 从 fabviewer.yaml 的 msg_kinds 段**自动生成**，
 #   不要手改。改规则请改 fabviewer.yaml，然后重跑：
 #       python3 tools/render_msgkinds.py
 #   Logstash 开了 config.reload.automatic（3s），生成后自动重载。

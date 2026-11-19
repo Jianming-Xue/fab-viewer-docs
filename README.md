@@ -57,7 +57,7 @@
 | 文档 | 角色 | 状态 | git |
 |---|---|---|---|
 | `docs/04-后台链路与数据模型.md` | **链路与数据模型唯一权威**：四层各吃吐什么、行/块文档字段、索引与 ILM、§六告警链路口径、§七业务字段解析细则 | 已结项冻结 | ✅ |
-| `docs/06-派生服务工程实现.md` | **派生层实现权威**：Scheduler/Worker、快慢轮次、四路+路5、Oracle 四表、幂等、配置六段、拉行分页、§十逐行重放 | 已结项冻结（有未提交改动） | ✅ |
+| `docs/06-派生服务工程实现.md` | **派生层实现权威**：Scheduler/Worker、快慢轮次、四路+路5、Oracle 四表、幂等、配置参数在本文、拉行分页、§十逐行重放 | 已结项冻结（有未提交改动） | ✅ |
 | `docs/06-附录A-块首行解析方案.md` | 块首行解析**执行细则**（剥壳/切块/合成 KV/XML/TXN 取 TxnName），**派生层与前端两端同一套算法** | 定稿 | ✅ |
 | `docs/09-OpenSearch索引模板.md` | `04` §5.2/§5.3 的**可执行版本**：2 个可组合模板 + 2 个 ISM 策略与取值理由 | 定稿 | ✅ |
 | `deploy/` | **部署操作层**：filebeat / logstash / opensearch 三层配置 + 顶层 README + Docker / RHEL 两套部署方案 + 特别提醒 + 2 张截图；派生层源码**不在**本仓库（自研服务 `tworks-log-int`） | 已交付 | ✅ |
@@ -90,15 +90,15 @@
 | `模块2/01-MES关键字监控与告警.md` | 三道检查、规则/行两级配置、A 方案固定窗口+重叠、限流与通知 | 已收口（23 条口径已确认，3 项待定） | ⬜ |
 | `模块2/02-MES Server Hang 监控与告警.md` | **第二类**（Server Hang / Endless Rule 报警）：判据、Monitor 表、落点；**附第一类判定与运行口径速查**（暂存，动 06 迁出） | 沟通中 | ⬜ |
 | `模块5/01-Server Hang Reason Config.md` | **第一类** Server Hang List 的**配置逻辑**：表结构、四式语义、页面与五接口 | 配置逻辑已定、页面未开工 | ✅ |
-| `模块5/02-System Misc.md` | **全局配置**：`FabViewerMisc`（item 唯一 / value JSON 三类 / 无 enabled）、三模式弹框、四接口；**六个候选 /list 接口的数据源** | 定稿 | ✅ |
+| `模块5/02-System Misc.md` | **全局配置**：`FvMisc`（item 唯一 / value JSON 三类 / 无 enabled）、三模式弹框、四接口；**六个候选 /list 接口的数据源** | 定稿 | ✅ |
 | `模块2/04-原型页面清单.md` | P1/P2/D1/D2（当前仅功能 1） | — | ⬜ |
 
 ### 3.5 权威关系（冲突时以谁为准）
 
 1. **链路与数据模型** → `04` 唯一权威；冻结，动刀先与薛建明确认。
-2. **派生层机制**（四个终态、静默期、水位线、切块重放流程）→ `06`；`04` 只留三样：块文档字段定义（§5.3.2）、不切块名单（§4.2.1）、边界来源（§4.2.2）。
+2. **派生层机制**（四个终态、静默期、水位线、切块重放流程）→ `06`；块索引字段定义 → `09` §四（04 已冻结为纯行文档，不含块字段）。
 3. **块首行解析** → `06-附录A`；派生层（Go）与前端（JS）照同一套伪代码各自实现，产物必须逐字节一致。
-4. **索引模板**：`deploy/opensearch/*.json`（可执行）← `09`（带理由）← `04` §5（权威）；三者冲突以 `04` 为准并回头改齐。
+4. **索引模板**：`deploy/opensearch/*.json`（可执行）← `09`（带理由，行 / 块字段权威分别在 `09` §三 / §四）；`04` §3.3 只讲怎么给行字段赋值。三者冲突按 `09` 回头改齐。
 5. **部署操作** → `deploy/README.md` 总说明 + `DEPLOY-DOCKER.md` / `DEPLOY-REDHAT.md` 两套落地方案；存储层只交 4 个 JSON。链路与字段口径全在 `docs/`。
 6. **视觉与交互** → `05`；模块文档只记「哪个条件触发」，不记呈现。
 7. **字段与取值** → 模块文档一律引用 `04`，不另立字段口径。
@@ -127,7 +127,7 @@ flowchart LR
 | 采集 Filebeat | 逐行读、只加物理定位 | 多行合并只开一处（`COMM_SND`）；环境名写在配置里；归档件不回采 |
 | 加工 Logstash | 单行可判的三件事：粗解析前缀、造两个行键、打 `MSG_KIND` | 不解析业务参数（归派生层）；字段白名单兜 `dynamic: strict` |
 | 派生服务 | 跨行归并 + 解析块首行：切块、闭口、耗时分解 | Scheduler 只做计划（Oracle 调度态），Worker 单线程拉活重放 |
-| 存储 OpenSearch | 行索引按天（360 天删）、汇总索引按月（永久归档） | 读走别名、写走物理索引名；块写进「块首行时刻」那个月 |
+| 存储 OpenSearch | 行索引按月（360 天删）、汇总索引按月（永久归档） | 读走别名、写走物理索引名；块写进「块首行时刻」那个月 |
 | 告警服务 | 定时扫日志 → 报警进 Oracle → 通知外发 | 独立应用层，不在链路四层之内 |
 
 **核心概念速查**（详口径见 `04` / `06` 对应节）：
@@ -136,7 +136,7 @@ flowchart LR
 |---|---|
 | 流（锁流三元组） | `ENV + HOSTIP + SERVER_ID`；一条流固定一个 Worker（哈希环） |
 | 行文档 | 一条物理行一篇，`_id` = 行身份串（不落字段），写一次不改，19 字段 + `@timestamp`（共 20），**不含业务参数** |
-| 块文档 | 一次请求执行一篇，`_id = REQUEST_EXEC_ID`，三批长出来（建块①/重放②/闭口③），33 字段（nested 4 组） |
+| 块文档 | 一次请求执行一篇，`_id = REQUEST_EXEC_ID`，三批长出来（建块①/重放②/闭口③），32 字段（nested 3 组），字段权威见 `09` §四 |
 | 行 `_id` | `ENV_HOSTIP_指纹16_OFFSET_17位毫秒` 五段串，**不落字段**（比对/截断读 `hit._id`）；粗筛与翻页直接打 `LOG_TIME` |
 | 两级重排 | 指纹分堆 → 堆间按首行 `LOG_TIME` → 堆内按 `LOG_OFFSET`；**全系统唯一排序方案**（重放与还原共用） |
 | `MSG_KIND` | 加工层打的行标签；派生层全部跨行判断的唯一输入，规则外置 `fabviewer.yaml` 热加载 |
@@ -158,9 +158,9 @@ flowchart LR
 | 系统名 | `system.name = MES-300Works`（常量，**大小写敏感**，每条查询都带） |
 | 版本矩阵 | OpenSearch **3.8.0**（可组合模板、ISM 靠 `ism_template` 挂）/ Logstash **9.5.0**（`api.http.*`、ECS 关）/ logstash-output-opensearch **2.x** / Filebeat **≥ 9.5**（fingerprint 身份 + `log.file.fingerprint` 输出 定） |
 | 现场形态 | OpenSearch 与 Logstash **已存在、别的系统在用** → 三层全部**追加部署**；上线顺序 **存储 → 加工 → 派生 → 采集**（顺序不能反；**派生层必须先于采集** —— 行文档 `LOG_INODE` 换 `LOG_FINGERPRINT`，旧派生读不到新行的文件身份） |
-| 索引 | 行 `mes-log-line-{env}-{yyyy.MM.dd}`（`{env}` 小写）360 天删；块 `mes-log-exec-{env}-{yyyy.MM}` 永久归档 |
-| Oracle（派生层调度态） | 四表：`FabViewerTurn`（轮次，恒两行）/ `FabViewerTask`（待办，一行一流）/ `FabViewerNode`（心跳）/ `FabViewerStream`（哈希环落点） |
-| 共用配置 | `deploy/logstash/fabviewer.yaml` 六段：`msg_kinds`（加工层唯一消费段）/ `cost_items` / `biz_fields` / `derive` / `worker_health` / `alert` |
+| 索引 | 行 `mes-log-line-{env}-{yyyy.MM}`（`{env}` 小写）360 天删；块 `mes-log-exec-{env}-{yyyy.MM}` 永久归档 |
+| Oracle（派生层调度态） | 四表：`FvTurn`（轮次，恒两行）/ `FvTask`（待办，一行一流）/ `FvNode`（心跳）/ `FvStream`（哈希环落点） |
+| 加工配置 | `deploy/logstash/fabviewer.yaml` 只保留 `msg_kinds` 一段（加工层标签规则）；派生层参数不在此维护，见 `06` |
 | 派生服务部署 | Logstash 服务器同机；起步 **3 台 × 5 Worker**；Worker 容器拉起，`NODE_ID` 由部署层注入 |
 | 关键参数档位 | 心跳 10s ＜ 判死 30s ＝ 摘环 30s ＜ 进度刷新 100s ＜ 回收 300s ＜ 降级退出 900s |
 
@@ -170,7 +170,7 @@ flowchart LR
 
 | 项 | 说明 |
 |---|---|
-| `06` 未提交改动 | §1.3 四路对照表、§1.3.1 各路描述与 mermaid：**路 1 / 路 3 的「翻找单位行」语义细化**（一格一格取、不带 `REQ_BEGIN` 的放弃、只处理命中的那 1 个单位行）+ 路 2 主体压缩界线改为「本行最后一个 `REQ_BEGIN`」。已通读核对，与 §1.3.1 各路、§十分工自洽 —— 待提交 |
+| `06` 取放口径 | §3.3.3 三路取数对照：路 1 / 路 3「翻找单位行」（一格一格取、不带 `REQ_BEGIN` 的放弃、只处理命中的那 1 个单位行）+ 路 2 压缩界线「本行最后一个 `REQ_BEGIN`」；已结项 |
 | git 白名单缺口 | `docs/00~03`、`05`、`模块1/03`、`模块2` 除已收口的 `01` / `03` 外全部**未入白名单**（见 §3.4）；按「收口一份收一份」的节奏补 |
 
 ---
@@ -185,8 +185,8 @@ flowchart LR
 **Server Hang（拆分后）：**
 
 - **拆分**：第一类（Server Hang List）归模块 5 `Server Hang Reason Config`（配置）+ 派生服务（运行）+ 模块 1（展示：Rule Info 检索 §3.6 与 Rule 实效分析）；第二类（Server Hang / Endless Rule 报警）留模块 2 功能 2。
-- **第一类（口径全定；04/06/09/deploy 已动刀完成）**：配置逻辑见模块 5 `01`（`FabViewerSrvHangConfig`：唯一键 ruleName+hangReason、不分环境、四式 `%` 语义、ruleName 精确、页面与五接口定稿）；判定与运行口径速查暂存模块 2 `02` 附录。`HANG_LIST`（8 项）已落 `04` §5.3.2 / `06` §2.2·§2.3·§4.7·§十 / `09` §四 / `12-template-exec.json` —— 块字段 **34→35、nested 3→4**；派生层读 Oracle 新路径落在 `06` §4.7（块级按需查 + 5min 缓存 + Redis 演进）。**存量块不回算**：`HANG_LIST` / `LOCK_SEQ` / `INNER_RULES` 三字段一个口径（`06` §4.7）。余项：上线时给存量块索引 `PUT mapping`（命令由项目后端整理进部署方案）、模块 1 弹框加 Hang Reason 列。
-- **第二类（见模块 2 `02`）**：`FabViewerSrvHangMonitorCfg`（环境级，2026-11-10 定稿）；**Alarm 存 Oracle**（04 §六边界不破）；独立 Alarm Application 定时读块文档。跨层约束（方向已修正）：`maxDelay` 须**严格小于**静默期 5min 并留扫描裕量 —— 或判据 A 扩认超时封口（模块 2 `10` 拍）。待定项见模块 2 `04` §5（`alarmItems` 已废弃，通知复用 `FabViewerAlarmCfg`）。
+- **第一类（口径全定；06/09/deploy 已动刀完成）**：配置逻辑见模块 5 `01`（`FvSrvHangConfig`：唯一键 ruleName+hangReason、不分环境、四式 `%` 语义、ruleName 精确、页面与五接口定稿）；判定与运行口径见 `06` §3.3.3（Hang 配置消费、压缩例外）。`HANG_LIST`（8 项）字段权威在 `09` §四 / 可执行在 `12-template-exec.json`（块 32 字段、3 组 nested）；派生层读 Oracle 新路径落在 `06` §3.3.3（块级按需查 + 5min 缓存 + Redis 演进）。**存量块不回算**：`HANG_LIST` / `LOCK_SEQ` / `INNER_RULES` 三字段一个口径（见模块 2 `04` A.4）。余项：上线时给存量块索引 `PUT mapping`（命令由项目后端整理进部署方案）、模块 1 弹框加 Hang Reason 列。
+- **第二类（见模块 2 `02`）**：`FvSrvHangMonitorCfg`（环境级，2026-11-10 定稿）；**Alarm 存 Oracle**（04 §六边界不破）；独立 Alarm Application 定时读块文档。跨层约束（方向已修正）：`maxDelay` 须**严格小于**静默期 5min 并留扫描裕量 —— 或判据 A 扩认超时封口（模块 2 `10` 拍）。待定项见模块 2 `04` §5（`alarmItems` 已废弃，通知复用 `FvAlarmCfg`）。
 - `04` §六需回补 Server Hang 报警（冻结，动前确认）。
 
 **链路侧（`06` §九，共 18 条编号 1~18）：** 重型项为第 1（扩容阈值压测）、2（L 最终取值）、17（**TXN 参数业务口径 —— 业务方稍后提供材料**）、18（`unit_rows` 取值与「块行数 > 单位行」的原地踏步）；其余多为压测回填与告警抑制策略。
