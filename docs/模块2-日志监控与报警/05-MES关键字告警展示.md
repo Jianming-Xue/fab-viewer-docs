@@ -373,11 +373,11 @@ Oracle 先出行，OS 只负责把 `issueMessage` / `blockId` → `LOTID`·`TID`
 |---|---|---|---|
 | ① 结果 | **`mes-log-monitor-issue-{yyyy.MM}`** | 当页 `issueId` 集合 | `issueMessage`、`blockId` |
 | ② 块 | **`mes-log-exec-{yyyy.MM.dd}`** | ①的 `blockId` 去重 | `LOTID`、`TID`、`HOSTIP`、`START_LINE_ID` |
-| ③ 行 | **`mes-log-line-{yyyy.MM.dd}`** | ②的 `START_LINE_ID` 去重 | `LOG_BODY` → `ruleMessage` |
+| ③ 行 | **`mes-log-line-{yyyy.MM}`** | ②的 `START_LINE_ID` 去重 | `LOG_BODY` → `ruleMessage` |
 
 - **三跳都用 `ids` 查询按 `_id` 精确取**：不搜关键字、不排序、不算分。
-- **索引名算出来、不扫读别名**：① 月取 `IssueTime` 的月份；② ③ 日取 `_id` **末段 17 位毫秒串**（`yyyyMMddHHmmssSSS`）的日期。一个当页可能跨几天，**按索引名分组、一组一次请求**。
-  > 这条来自 `04` §5.2.2 的硬口径：不要拿 `mes-log-line-read` 扫全部日索引（360 天分片全开）。
+- **索引名算出来、不扫读别名**：① 月取 `IssueTime` 的月份；② 按 `_id` **末段 17 位毫秒串**（`yyyyMMddHHmmssSSS`）的日期（块按日索引）、③ 取同段毫秒串的月份（行按月索引）。一个当页可能跨几个月，**按索引名分组、一组一次请求**。
+  > 这条来自 `04` §5.2.2 的硬口径：不要拿 `mes-log-line-read` 扫全部月索引（360 天分片全开）。
 - **索引名不带环境段**，实际由框架 `prefix` 前置；`PRD` / `PIRUN` 写同一套索引（`02` §2.1）。
 
 **第 1 跳 · 结果索引**（一页多条同月，一次请求）
@@ -421,7 +421,7 @@ GET /mes-log-exec-2026.08.11/_search
 **第 3 跳 · 行索引**（只取块首行那一篇的原文）
 
 ```json
-GET /mes-log-line-2026.08.11/_search
+GET /mes-log-line-2026.08/_search
 {
   "size": 200,
   "track_total_hits": false,
@@ -703,7 +703,7 @@ GET /mes-log-exec-2026.08.11/_search
 |---|---|
 | 文件夹 | **`meslog_` + 当前时刻 `yyyyMMddHHmmss`**，如 `meslog_20261118125234`；zip 顶层只有这一个目录 |
 | 文件名 | **`{blockId}.log`**，即块 `_id` 原文（`PROD_10.20.30.40_FABsrv.63_PROD_..._20260811171949380.log`）；块 `_id` 唯一，不会重名 |
-| 文件内容 | 该块行按写入顺序逐行写 **`LOG_RAW`**（行原文，含行首前缀，`04` §5.3.1），**一行一条、行尾 `\n`**，UTF-8 无 BOM |
+| 文件内容 | 该块行按写入顺序逐行写 **`LOG_RAW`**（行原文，含行首前缀，`04` §3.3 / §4.5），**一行一条、行尾 `\n`**，UTF-8 无 BOM |
 | 不加料 | **不写表头、不写分隔线、不写块元信息注释** —— 下载件是原始日志，加了东西就没法直接比对了 |
 | zip | **`meslog_{yyyyMMddHHmmss}.zip`**，含 `meslog_20261118125234/` 与其中 N 个 `.log` |
 | 时间戳取值 | **整个请求只取一次**（进 ⑤ 时取），目录名与 zip 名共用同一个值，不会出现两者不一致 |
@@ -807,7 +807,7 @@ GET /mes-log-exec-2026.08.11/_search
 | 61 | 明细入参校验：`environment` / `item` **必填非空**（≤30），空 ⇒ `EnvironmentRequired` / `ItemRequired`；`pageIndex` 默认 1；`pageSize` **1~200** 默认 20，越界 ⇒ `PageSizeOutOfRange`；`resolved = true` ⇒ `ResolvedTime IS NULL`（§4.2 ⓪） |
 | 62 | 明细**排序＝`ORDER BY ReportTime DESC, ID DESC`**：`ID` 作稳定第二键，避免同毫秒多行在分页时重复 / 漏行；**分页与排序只在 Oracle**，OS 不参与排序、不参与分页（§4.2 ①） |
 | 63 | 明细用**偏移分页**，翻页期间的漂移（新 issue 入库导致后页错位）**接受**，不引入游标；看最新数据由列表刷新回第 1 页（§4.2 ①） |
-| 64 | 明细的 OS 补字段走**三跳 `ids` 查询**（结果 → 块 → 行），**按物理索引名分组请求**：结果按月取 `IssueTime`、块 / 行按天取 `_id` **末段 17 位毫秒串**的日期；**不扫读别名**（`04` §5.2.2）。索引名不带环境段、由框架 `prefix` 前置（§4.2 ③） |
+| 64 | 明细的 OS 补字段走**三跳 `ids` 查询**（结果 → 块 → 行），**按物理索引名分组请求**：结果与行按月（`IssueTime` / `_id` **末段 17 位毫秒串**的月份）、块按日取同段毫秒串的日期；**不扫读别名**（`04` §5.2.2）。索引名不带环境段、由框架 `prefix` 前置（§4.2 ③） |
 | 65 | 明细 14 字段来源：**Oracle 出 9 个**（`environment` / `item` / `ruleName` / `issueTime` / `reportTime` / `resolvedTime` / `resolvedUser` / `alarmed` / `issueId`）+ **OS 出 5 个**（`lotId` / `hostIpAddress` / `ruleMessage` / `issueMessage` / `tId`）；`lotId` / `tId` 是 keyword 多值，**取数组首个**；`ruleName` 用 Oracle 快照、不取块的多值 `RULENAME`（§4.2 ④） |
 | 66 | OS 为**补齐不是过滤**：查不到的字段留空串、**不丢行、不改 `total`**；**OS 请求失败报 `LogMonitorSourceUnavailable`**，不返回半页空字段；行索引 360 天过期只影响 `ruleMessage`（留空，其余照常）（§4.2 ⑤） |
 | 67 | `resolve` 校验：`issueIds` **非空数组且每个元素可拆为 `LineId`+`Item`**（`IssueIdsRequired` / `IssueIdInvalid`）；`resolvedComment` **非空且 ≤512**（`ResolvedCommentRequired` / `ResolvedCommentTooLong`）（§4.3 ⓪） |

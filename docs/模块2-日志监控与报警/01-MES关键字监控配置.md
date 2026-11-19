@@ -177,7 +177,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 消费方 | 嵌入位置 |
 |---|---|
 | 功能 1 · MES Log Keyword Monitor（Config） | 规则弹框 Tab 2 `Alarm 配置`（§3.3） |
-| 功能 2 · MES Server Hang Monitor Config | 编辑卡片右侧通知区（`03-配置文档` §3.2） |
+| 功能 2 · MES Server Hang Monitor（`Config` 页） | 编辑卡片右侧通知区（`03-配置文档` §3.2） |
 
 内容区**从上到下用分割符分成三段**：
 

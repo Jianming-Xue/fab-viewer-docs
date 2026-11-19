@@ -105,7 +105,7 @@
 
 ## 四、块索引模板
 
-`deploy/opensearch/12-template-exec.json`：`mes-log-exec-{yyyy.MM}`（基名，环境前缀由框架 `prefix` 加），按月切、永久归档不删。一块 = 一次请求执行；`_id` = `REQUEST_EXEC_ID`，在块整个生命周期里不变。**本节是块索引字段口径的唯一权威**（04 已冻结为纯行文档，块字段不在 04）；派生侧怎么用这些字段见 `06-派生服务工程实现.md` §二 / §三。
+`deploy/opensearch/12-template-exec.json`：`mes-log-exec-{yyyy.MM}`（基名，环境前缀由框架 `prefix` 加），按月切、永久归档不删。一块 = 一次请求执行；`_id` = `REQUEST_EXEC_ID`，在块整个生命周期里不变。**本节是块索引字段口径的唯一权威**（04 已冻结为纯行文档，块字段不在 04）；派生侧怎么用这些字段见 `06-派生服务工程实现.md` §二（两条写法口径）/ §三（Scheduler）/ §四（Worker 取块、取行与写块）。
 
 ```json
 {
@@ -219,7 +219,7 @@
 | `ERR_CODE` | keyword（多值） | 块内 `RULE_ERR_LINE` 行 `ERR_CODE` 的并集去重；非空不代表块失败 |
 | `LOCK_SEQ` | keyword（多值） | 锁顺序：按重放序列首次出现的 `LOCK_OBJ\|LOCK_ID` 逐个追加，首现定序、同值去重，数组保序；空 `LOCK_ID` 的加锁行不进序列 |
 | `TOTAL_COST_MS` | long | `END_TIME − START_TIME` |
-| `COST_SUM_MS` | long | Σ 各项 `SUM_MS` |
+| `COST_SUM_MS` | long | 三部分之和：① `COST_BREAKDOWN` 全部行 `SUM_MS` 之和；② `INNER_RULES` 全部行 `END_TIME − START_TIME` 的毫秒和（`END_TIME` 为空不计）；③ `HANG_LIST` 全部行 `HANG_COST_MS` 之和 |
 | `UNACCOUNTED_COST_MS` | long | `TOTAL_COST_MS − COST_SUM_MS`，未归因时间 |
 | `COST_BREAKDOWN` | nested | 一项一条（锁对象 / 被调系统各分组）：`ITEM`（`LOCK` / `CALL`）、`GROUP`（keyword）、`COUNT`（integer）、`SUM_MS` / `MAX_MS`（long）、`FIRST_BEGIN_TS` / `LAST_END_TS`（date，日志格式） |
 | `INNER_RULES` | nested | 内部 Rule 调用明细，一次调用一条：`NAME`（keyword）、`START_TIME` / `END_TIME`（date，日志格式）；按 `START_TIME` 升序，**`NAME` 与块 `RULENAME` 同名的整对放弃**（外层自身的执行行不是嵌套调用），未等到 `END` 的 `START` 记下但 `END_TIME` 留空 |
