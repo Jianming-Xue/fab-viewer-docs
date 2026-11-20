@@ -10,7 +10,7 @@
 | **作用** | **把「MES 关键字监控」判出的报警日志展示出来，并在界面上完成解决** |
 | 使用者 | IT 运维 |
 | 界面类型 | **展示类 + 处置类** |
-| 权限 | **采用权限管控方案**：**功能级** + **「解决」权限点**（`Resolved` 开关与 **Resolve** 按钮**共用同一个权限点**）；菜单渲染与接口鉴权同一份权限数据，权限点定义口径同 [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md) §3.1（本页只占「解决」这一点，配置页的新增 / 编辑 / 删除三个点不作用于本页）；粒度见 §2 |
+| 权限 | **采用权限管控方案**：**功能级** + **「解决」`Resolve` 权限点**（`Resolved` 开关与 **Resolve** 按钮**共用同一个权限点**）；菜单渲染与接口鉴权同一份权限数据，权限点定义口径同 [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md) §3.1（本页只占「解决」`Resolve` 这一点，配置页的新增 `Create` / 编辑 `Update` / 删除 `Delete` 三个点不作用于本页）；粒度为 **1 + 1 共 2 个点**，见 §2 |
 | 入口 | 一级菜单 `Monitor & Alarm` → 二级菜单 **`MES Log Keyword Monitor`** → 本页 **`View & Resolve`**（菜单项就显示 `View & Resolve`）；与配置页 `Config` 同属该二级菜单 |
 | 数据来源 | 功能 1 判定生成的 **Alarm**（配规则见 `01`，判定与通知见 `02`，本篇不重跑判定、不发通知） |
 | 与既有文档 | 规则怎么配 → [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md)；怎么判 / 检测时机 / 怎么通知 → [`02-MES关键字监控与告警.md`](02-MES关键字监控与告警.md)；字段与落点边界 → [`../04-后台链路与数据模型.md`](../04-后台链路与数据模型.md) §六 |
@@ -52,13 +52,22 @@
 | 弹框 · More Info | 3 个字段 | **取自当前行对象**；Rule Message（Label 全文 + 参数逐行 + 展开 / 折叠）、Resolved Time（**时间组件**）、Resolved User（**输入框组件**）；Time 在前、两者禁用；**只有「关闭」按钮** | §2.5 |
 | 弹框 · Resolved Comment | 输入框 + 确认 | `Resolved Comment` **不可为空** → 点「确认」提交 | §2.4 |
 | 全局 | Body 布局 | **自上而下**两张卡片 | 本节布局段 |
-| 全局 | 权限 | **功能级 + 「解决」权限点**（共 1 + 1）；`Resolved` 开关与 Resolve 按钮**共用同一权限点**；配置页的三个动作点不作用于本页 | 本节权限段 |
+| 全局 | 权限 | **功能级 + 「解决」`Resolve`**（共 2 个点）；`Resolved` 开关与 Resolve 按钮**共用 `Resolve` 这一点**；配置页的 `Create` / `Update` / `Delete` 三点不作用于本页 | 本节权限段 |
 
 **Body 布局（自上而下）**：上方卡片 = **汇总信息表格**（§2.1）；下方卡片 = **点「查看」后的 detail**（§2.3，行选中不参与），detail 内的**解决动作**见 §2.4、**More Info 弹框**见 §2.5。汇总表格**无关键字搜索框**，卡片顶部工具栏＝**Environment 下拉 + Previous Days 输入框 + Refresh 按钮**（§2.1）；**进入界面即调** `/api/v1/log_monitor/summary_info/list` 取首屏数据，入参 **`environment` 传空**、**`previousDays` 传 30**（§4.1）。视觉与交互一律以 [`../05-视觉与交互规范.md`](../05-视觉与交互规范.md) 为准，本篇只记「哪个条件触发」，不记呈现。
 
-**权限粒度**：**功能级**（菜单渲染与接口鉴权同一份权限数据）+ **「解决」权限点**。`Resolved` 开关与 **Resolve** 按钮**共用同一个权限点**：无该权限则两者均不可操作、`/api/v1/log_monitor/resolve` 接口亦不可调；「查看」不单独控权，随功能级。
+**权限点（共 2 个）**
 
-**与配置页的关系**：两页共属同一二级菜单 `MES Log Keyword Monitor`，权限点写法同 `01` §3.1。该菜单下共 **1 个功能级 + 4 个动作点**：`01` 配置页占「新增」`Create` / 「编辑」`Update` / 「删除」`Delete` 三点，**本页只占「解决」一个点** —— 三点都不作用于本页，本页的「解决」也不给配置页。读类（汇总 / 明细 / Alarm Log 下载）不占动作点，随功能级。
+| # | 权限点 | 标识 | 管控范围（页面元素 + 接口） |
+|---|---|---|---|
+| 1 | **功能级（菜单）** | — | 二级菜单 `MES Log Keyword Monitor` 入口 + 全部 4 条端点的前置校验；只读类 `summary_info/list` / `detail_info/page` / `log/download` 只要求这一点 |
+| 2 | **「解决」** | `Resolve` | `Resolved` 开关（单条）+ **Resolve** 按钮（批量）+ `POST resolve` **共用同一点**（两个入口都是处置已有 issue，不再拆第二点） |
+
+- **按钮不渲染 + 接口也拒**：无 `Resolve` 权限点时，`Resolved` 开关置灰不可点、**Resolve** 按钮不渲染、`/api/v1/log_monitor/resolve` 接口也调不通 —— 后端按同一份权限数据校验（粒度到「接口 + 动作」，不到字段）。
+- **读不单独控权**：汇总 `list` / 明细 `detail_info/page` / Alarm Log 下载 `log/download` 只要功能级（能进菜单就能看能下），不设读权限点；「查看」随功能级、不单独控权。
+- **单条与批量合并为一点**：`Resolved` 开关（单条）与 **Resolve** 按钮（批量）是同一件事的两个入口，合并为 `Resolve` 一点，避免「能单条解决不能批量解决」这种半开状态（与 `01` §3.1「编辑」+ 启用开关合并同口径）。
+
+**与配置页的关系**：两页共属同一二级菜单 `MES Log Keyword Monitor`，权限点写法同 `01` §3.1。该菜单下共 **1 个功能级 + 4 个动作点**：`01` 配置页占「新增」`Create` / 「编辑」`Update` / 「删除」`Delete` 三点，**本页只占「解决」`Resolve` 一个点** —— 三点都不作用于本页，本页的 `Resolve` 也不给配置页。读类（汇总 / 明细 / Alarm Log 下载）不占动作点，随功能级。
 
 ### 2.1 汇总信息表格
 
@@ -141,7 +150,7 @@
 - **用途**：下载**当前多选选中行归属的原始日志**；属下载类按钮，**不新增、不修改记录**。
 - **启用条件**：**detail 列表中存在选中行即可**（不要求 `resolved = false`，与 Resolve 按钮判据不同）；无选中行时禁用。
 - **单次上限**：服务端按 **`blockId` 去重后最多 10 个块**（§4.5 ②）；超限**由接口报错**、前端按框架错误提示展示，**不自动减选、不截断**。
-- **权限**：随**功能级**管控，不属「解决」权限点。
+- **权限**：随**功能级**管控，不属「解决」`Resolve` 权限点。
 - **调用接口**：**`POST /api/v1/log_monitor/log/download`**，入参 `LogMonitorLogDownloadRo`（只含 `issueIds`），出参为文件流；契约见 §4.5。
 
 ### 2.4 解决（resolve）
@@ -206,7 +215,7 @@
 |---|---|---|---|---|---|
 | 1 | `/api/v1/log_monitor/summary_info/list` | `GET` | 汇总首屏 / Refresh 重查 | 功能级 | §4.1 |
 | 2 | `/api/v1/log_monitor/detail_info/page` | `GET` | 明细分页 | 功能级 | §4.2 |
-| 3 | `/api/v1/log_monitor/resolve` | **`POST`** | 解决提交 | 「解决」权限点 | §4.3 |
+| 3 | `/api/v1/log_monitor/resolve` | **`POST`** | 解决提交 | **「解决」`Resolve`** | §4.3 |
 | 4 | `/api/v1/log_monitor/log/download` | **`POST`** | Alarm Log 下载（选中行原始日志） | 功能级 | §4.5 |
 
 >  Environment 下拉另消费一个 **Misc 模块**的接口 **`GET /api/v1/sys_misc/env/list`**，**不属本功能前缀**；**本篇只消费、不复刻规格**（与 `01` 对 Misc 接口的消费口径一致），接口异常时下拉空、不阻断页面其他部分。
@@ -483,7 +492,7 @@ GET /mes-log-line-2026.08/_search
 | 入参 2 | **`resolvedComment`**：字符串，**不可为空**（对话框输入） |
 | 出参 | **`LogMonitorAlarmDetailDto` 对象集合**，按**实际更新成功的对象**返回（数量 ≤ 入参 `issueIds` 数量：已被解决的 `issueId` 不返回）；前端按 **`issueId`** 覆盖对应行 |
 | 调用时机 | 对话框点「确认」提交时；`Resolved` 开关（单条）或 **Resolve** 按钮（批量） |
-| 权限 | 受**「解决」权限点**管控，与 `Resolved` 开关 / **Resolve** 按钮共用同一权限点，无权限接口不可调 |
+| 权限 | 受**「解决」`Resolve` 权限点**管控，与 `Resolved` 开关 / **Resolve** 按钮共用同一点，无权限接口不可调（§2 权限点表） |
 
 **后端取数（已定）**
 
@@ -622,7 +631,7 @@ UPDATE FvLogMonitorAlarmState
 | 下载上限 | **单次最多 10 个块**（按 **`blockId` 去重后**计数，不是 `issueIds` 个数）；超限由接口报错 |
 | 错误 | 接口发生错误时**仍以框架标准接口返回错误信息**（全局响应外壳 `code` / `success` / `errMsg` / `data` / `txId`），**不自定错误包结构、不自定错误码格式** |
 | 调用时机 | 点 **Alarm Log** 按钮时；启用条件＝detail 列表中存在选中行（§2.3） |
-| 权限 | 随**功能级**管控，不属「解决」权限点 |
+| 权限 | 随**功能级**管控，不属「解决」`Resolve` 权限点 |
 
 **后端处理（已定）**
 
@@ -749,7 +758,7 @@ GET /mes-log-exec-2026.08.11/_search
 | 1 | 本篇归**模块 2**，编号 **05**（顺延 `01`~`04`） |
 | 2 | 作用＝**展示经 MES 关键字监控产生的报警日志 + 在界面上解决**；不负责判定与通知 |
 | 3 | 所属 Module = **`monitor-alarm`**；一级菜单 `Monitor & Alarm` / 中文 `监控通知`；功能名 `MES关键字告警展示`，菜单位于二级菜单 `MES Log Keyword Monitor` 下的 `View & Resolve` |
-| 4 | **采用权限管控方案**：**功能级**（菜单渲染与接口鉴权同一份权限数据，口径同 `01` §3.1）+ **「解决」权限点**；粒度见 §2 |
+| 4 | **采用权限管控方案**：**功能级**（菜单渲染与接口鉴权同一份权限数据，口径同 `01` §3.1）+ **「解决」`Resolve` 权限点**，共 1 + 1 两个点；粒度见 §2 |
 | 5 | Body **自上而下**：上方卡片 = 汇总信息表格、**无关键字搜索框**，顶部工具栏＝**Environment 下拉 + Previous Days 输入 + Refresh 按钮**；进入界面调 `/api/v1/log_monitor/summary_info/list`，出参 `LogMonitorSummaryInfoDto` **对象集合**（每个对象 9 字段 / 9 列见 §2.1） |
 | 6 | 汇总表格**单选模式**、操作列含「查看」（**「查看」为唯一触发，行选中不起作用**） |
 | 7 | `lastAlarmTime` = **发出通知的时间**（非 Alarm 生成时间） |
@@ -770,7 +779,7 @@ GET /mes-log-exec-2026.08.11/_search
 | 22 | `resolve` 出参 = **`LogMonitorAlarmDetailDto` 对象集合**，按**实际更新成功的对象**返回（数量 ≤ 入参 `issueIds`，**已被解决的不返回**）；覆盖时按 **`issueId`** 回显对应行（§4.3 ③） |
 | 23 | **提交后的行保留**：未解决开关**打开**时，返回的已解决行**不隐藏、仍保留显示**；仅用户主动「刷新 / 关闭开关 / 重新点汇总『查看』」才按当前过滤条件重新查询 |
 | 24 | 明细接口入参 = **拼接在 URL 中的 query 参数、不定义 `Ro` 对象**：**分页** + **`environment`** + **`item`** + **`resolved`**（**布尔类型**，对应未解决开关状态） |
-| 25 | 权限管控到**功能级** + **「解决」权限点**（本页只占这一点，配置页的新增 / 编辑 / 删除三点不作用于本页）；`Resolved` 开关与 **Resolve** 按钮**是同一个权限点**，「查看」随功能级、不单独控权 |
+| 25 | 权限管控到**功能级** + **「解决」`Resolve` 权限点**（本页只占这一点，配置页的 `Create` / `Update` / `Delete` 三点不作用于本页）；`Resolved` 开关与 **Resolve** 按钮**是同一个 `Resolve` 点**，「查看」与 Alarm Log 下载随功能级、不单独控权 |
 | 26 | 界面 **4 条端点**：`list` / `detail_info/page` 为 **`GET`**；`resolve` / `log/download` 为 **`POST`** |
 | 27 | 9 列里的 **5 个计数字段**（`remainingCnt` / `totalCnt` / `totalResolvedCnt` / `dailyCnt` / `dailyResolvedCnt`）**统一按 issue 数量统计**，单位不混用 |
 | 28 | `dailyCnt` 中文列名 = **今日问题数量**（Daily Count） |
@@ -789,7 +798,7 @@ GET /mes-log-exec-2026.08.11/_search
 | 41 | **Alarm Log 下载接口已定**（§4.5），已定接口为 §4.0 总表 **4 条** |
 | 42 | **#1 `list` 出参＝`LogMonitorSummaryInfoDto` 对象集合**（每个对象 9 字段见 §2.1），**不是单条对象** |
 | 43 | **#2 `detail_info/page` 入参＝拼接在 URL 中的 query 参数、不定义 `Ro` 对象**：分页 + `environment` + `item` + `resolved`（布尔） |
-| 44 | **#4 端点＝`POST /api/v1/log_monitor/log/download`**（服务内前缀 `/api/v1/log_monitor` + 后缀 `/log/download`），归 `telemetry-hub`，权限随**功能级**、不属「解决」权限点 |
+| 44 | **#4 端点＝`POST /api/v1/log_monitor/log/download`**（服务内前缀 `/api/v1/log_monitor` + 后缀 `/log/download`），归 `telemetry-hub`，权限随**功能级**、不属「解决」`Resolve` 权限点 |
 | 45 | **#4 入参对象＝`LogMonitorLogDownloadRo`，只含 `issueIds` 一个字段**（字符串数组），取自 detail 列表当前多选选中行的 `issueId`；不定义其它参数 |
 | 46 | **#4 出参＝成功以文件流返回原始日志、不走响应外壳**；**接口发生错误时仍以框架标准接口返回错误信息**（全局响应外壳） |
 | 47 | **#4 方法＝`POST`**；`LogMonitorSummaryInfoDto` 字段类型：`environment` / `item` / `priority` 为 `string`、5 个 `Cnt` 结尾字段为 `int`、`lastAlarmTime` 为时间类型（§4.4） |
