@@ -1,22 +1,23 @@
 # 09 · OpenSearch 索引模板（A10）
 
-> 这是 `04-后台链路与数据模型.md` §4 的**可执行版本**：两个可组合索引模板 + 两个 ISM 策略。**行、块两套索引字段口径均以本文为准**（行 → §三、块 → §四）—— 04 已冻结为纯行文档且只讲怎么给行字段赋值，09 是两套 mapping 字段清单 / 类型 / 含义的唯一权威。
-> 文件在 `deploy/opensearch/`：2 个 ISM 策略 + 2 个可组合索引模板，共 4 个 JSON。部署方案由项目后端按项目要求整理，本目录只交可执行配置。
+> 这是 `04-后台链路与数据模型.md` §4 的**可执行版本**：三个可组合索引模板 + 两个 ISM 策略。**行、块、结果三套索引字段口径均以本文为准**（行 → §三、块 → §四、结果 → §五）—— 04 已冻结为纯行文档且只讲怎么给行字段赋值，09 是三套 mapping 字段清单 / 类型 / 含义的唯一权威。
+> 文件在 `deploy/opensearch/`：2 个 ISM 策略 + 3 个可组合索引模板，共 5 个 JSON。部署方案由项目后端按项目要求整理，本目录只交可执行配置。
 > 装入只做 `PUT`（幂等），不删任何东西。顺序有要求：先 ISM 策略，再模板 —— 策略靠自身的 `ism_template` 匹配 `mes-log-*`，索引一建出来就自动挂上。
 
-## 一、两个索引模板（全部是初值）
+## 一、三个索引模板（全部是初值）
 
 | 索引 | 命名 | 模板名 | 分片 | 副本 | `refresh_interval` | `codec` | `dynamic` | 读别名 | ISM 策略 | 到期 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 行 | `mes-log-line-{yyyy.MM}` | `mes-log-line` | 1 | 1 | 5s | `best_compression` | `strict` | `mes-log-line-read` | `mes-log-line-360d` | 360 天删除 |
 | 块 | `mes-log-exec-{yyyy.MM}` | `mes-log-exec` | 1 | 1 | 5s | `best_compression` | `strict` | `mes-log-exec-read` | `mes-log-exec-keep` | 不删除 |
+| 结果 | `mes-log-monitor-issue-{yyyy.MM}` | `mes-log-monitor-issue` | 1 | 1 | 5s | `best_compression` | `strict` | `mes-log-monitor-issue-read` | `mes-log-exec-keep`（共用） | 不删除 |
 
 | 项 | 口径 |
 |---|---|
-| 写别名 | **不设**（04 §4.1）。写入侧直接指定当月索引名；块文档写「**块首行时刻**」那个月的索引，因为闭口 UPSERT 要按 `_id` 定位 |
+| 写别名 | **不设**（04 §4.1）。写入侧直接指定当月索引名；块文档写「**块首行时刻**」那个月的索引，因为闭口 UPSERT 要按 `_id` 定位；结果索引按 `issueTime`（命中时刻）那个月选索引，崩溃重扫跨月仍落同一索引、`_id` 幂等才稳（§五） |
 | 环境区分 | **索引名不带环境段**：`PRD` / `PIRUN` 默认都算 **Production**、写进同一套索引；环境由**框架 `prefix`** 前置区分 —— 索引名、读别名、`index_patterns`、ISM `ism_template` 四处用**同一前缀**；本文写的是去 `prefix` 的**基名** |
 | 读别名 | 写在模板里，**新索引一建就自带**，查询侧只认别名 |
-| 分片副本 1 / 1 | 「按月索引 + 中等偏下量级」的起步值，压测后回填（§六） |
+| 分片副本 1 / 1 | 「按月索引 + 中等偏下量级」的起步值，压测后回填（§七） |
 | ISM 不是 ILM | 接口 `_plugins/_ism/policies/{id}`；**策略不写进索引模板**，靠策略自带的 `ism_template` 按索引模式自动挂（官方唯一推荐路径）。旧的 `plugins.index_state_management.policy_id` 已弃用、3.x 下还可能让索引创建被 unknown setting 拒掉。04 里沿用「ILM」这个习惯叫法，落到配置上按 ISM 写 |
 
 ## 二、两个 ISM 策略的阶段
@@ -24,13 +25,14 @@
 | 策略 | 适用 | hot | warm | cold | delete |
 |---|---|---|---|---|---|
 | `mes-log-line-360d` | `mes-log-line-*` | 0 ~ 30d（priority 100） | 30d 起：只读 + 副本 1 + force merge 单段 + priority 50 | 180d 起：priority 0 | 360d 起：删除 |
-| `mes-log-exec-keep` | `mes-log-exec-*` | 0 ~ 360d（priority 100） | — | 360d 起：只读 + priority 0，**不删** | 无 |
+| `mes-log-exec-keep` | `mes-log-exec-*` + `mes-log-monitor-issue-*`（结果索引共用，不加新策略） | 0 ~ 360d（priority 100） | — | 360d 起：只读 + priority 0，**不删** | 无 |
 
 | 项 | 口径 |
 |---|---|
 | 索引按月命名、不用 rollover | `min_index_age` 就是索引年龄，到期月与索引名里的月份一眼能对上（04 §4.4） |
 | 汇总索引归档后不需要重新可写 | 块文档写哪个索引由块首行时间决定，超过 360 天的块早就闭口了（04 §4.4 已拍）；且静默封口即终局、不再解封，不存在归档后被迟到行重开的情况 |
 | 冷阶段节点分配 | 「低配节点 / 可搜索快照」属部署侧动作，需要集群先定义节点属性，模板里不写死 |
+| 结果索引共用本策略 | `ism_template` 列两条模式：`mes-log-exec-*`（块）+ `mes-log-monitor-issue-*`（结果），`priority` 均 100；结果索引**不新建策略**，靠模式自动挂（§五）。改动文件 `deploy/opensearch/02-ism-exec-keep.json` 只加 `ism_template` 第二行、其余不动 |
 
 ## 三、行索引模板
 
@@ -233,9 +235,64 @@
 - **不存第二份真相**：块不存全部行（靠 04 §4.2 区间回捞）、不存单次调用明细（`COST_BREAKDOWN` 一项一条）、不存逐次加锁清单（`LOCK_SEQ` 只记去重定序序列）。
 - **无 `REOPEN_LOG`**：静默封口即终局、不再解封，块一旦封「超时封口」就是终态，字段清单里没有解封账这一项。
 
-## 五、`dynamic: strict` 的前置条件
+## 五、结果索引模板（监控告警共用）
 
-两个模板都是 `strict` —— 写进一个模板里没声明的字段，**整篇文档被拒**。这样设计的理由：字段清单是固定的（行索引以 04 §4.5 为准、块索引以本文 §四为准），漏改模板应该立刻暴露，而不是悄悄多出一个查不到的字段。
+`deploy/opensearch/13-template-monitor-issue.json`：`mes-log-monitor-issue-{yyyy.MM}`（基名，环境前缀由框架 `prefix` 加），按月切、永久归档不删。**只新增这一个模板，不放进行 / 块索引**；供模块 2 的关键字监控（`02`）与 Server Hang 监控（`04`）**共用一份索引**，靠 `issueType` 区分来源。**本节是结果索引字段清单 / 类型 / 含义 / 取值口径的唯一权威**（两个功能侧的运行时文档已改为引用本节，不再各自复述字段表，避免多处维护漂移）；派生侧怎么用这些字段见 `模块2/02` §2 / `04` §2。
+
+```json
+{
+  "index_patterns": ["mes-log-monitor-issue-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "5s",
+      "index.codec": "best_compression"
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "issueMessage": { "type": "text" },
+        "blockId":      { "type": "keyword" },
+        "issueTime":    { "type": "date", "format": "yyyy/MM/dd HH:mm:ss.SSS||epoch_millis" },
+        "issueType":    { "type": "keyword" }
+      }
+    },
+    "aliases": {
+      "mes-log-monitor-issue-read": {}
+    }
+  }
+}
+```
+
+字段共 **4 个**（`_id` 不占模板字段）：
+
+| 字段 | 类型 | 含义 | 取自 · 关键字监控 | 取自 · Server Hang 监控 |
+|---|---|---|---|---|
+| `issueMessage` | text | 问题摘要，唯一分词字段 | 命中行 `LOG_BODY` 原文 | **判据描述文本**（含阈值与实测值，如 `Server Hang: 停写 180s > 120s`；本功能没有「命中行原文」可写） |
+| `blockId` | keyword | 查询时回块取业务字段的锚点 | 块 `_id`（`REQUEST_EXEC_ID`） | 同左，且与 Oracle 状态表 `BlockId` 同值 |
+| `issueTime` | date，日志格式 | 选索引、按时间检索、ISM 排序 | 命中行 `LOG_TIME` | **判据命中时刻**（告警服务墙钟；本功能没有命中行可取 `LOG_TIME`） |
+| `issueType` | keyword | 区分 issue 来源，**写入时给定的写死入参**，不读配置、不从日志解析 | 恒写 `Keyword` | 判据 A 命中写 `Server Hang`、判据 B 命中写 `Endless Rule` |
+
+文档 **`_id` 按功能各自拼接**，兼作对外 `issueId`；`_id` 是 ES metadata、不占 mapping 字段，文档内不冗余存（`dynamic: strict`）：
+
+- 关键字监控：`LineId|Item` —— 同一条日志行可被多条规则各自命中，不带 `Item` 会互相覆盖。
+- Server Hang 监控：`blockId` —— 整块一条（`issueType` / `issueMessage` 反映先触发的那条判据）。若后续改成 A / B 各报一次，`_id` 须改 `blockId|issueType`、Oracle UK 同步改 `BlockId + 判据类型`；**当前按 `blockId`**。
+
+关键口径：
+
+- **按 `issueTime` 所属月份选索引**，不按生成墙钟 —— 崩溃重扫跨月时同一 issue 仍落同一索引，`_id` 幂等才稳（`_id` 的幂等只在同一个索引内生效）。
+- **环境区分**：索引名不带环境段，`PRD` / `PIRUN` 默认都算 Production、写同一套索引；由框架 `prefix` 前置区分 —— 索引名、读别名 `mes-log-monitor-issue-read`、模板 `index_patterns`、ISM `ism_template` 四处用**同一前缀**，否则别名读不到、ISM 也挂不上；本文写的是去 `prefix` 的基名。
+- **读别名**写在模板里、新索引一建就自带；**不设写别名**，写入直接指定月索引名。
+- **ISM 共用** `mes-log-exec-keep`（§二）：hot 0 ~ 360 天、360 天起 cold 只读 + priority 0、不删除；靠 `ism_template` 自动挂，装入顺序先 Policy 后模板。冷阶段 `read_only` 对结果索引无害（按月建、按 `issueTime` 选月，360 天前的月索引不会再被写）。
+- **`policy_id` setting 不写**：`plugins.index_state_management.policy_id` 已弃用，写进 3.x 可能被 unknown setting 拒掉（§一）。
+- **两种时间格式别混**：`issueTime` 走日志格式 `yyyy/MM/dd HH:mm:ss.SSS`（与行 `LOG_TIME` 一致）；`@timestamp` 这类墙钟字段（若后续加）走 `strict_date_optional_time||epoch_millis`。
+- **分片 / 副本 1 / 1、5s 刷新、best_compression** 均为初值，压测后回填（§七）。
+
+## 六、`dynamic: strict` 的前置条件
+
+三个模板都是 `strict` —— 写进一个模板里没声明的字段，**整篇文档被拒**。这样设计的理由：字段清单是固定的（行索引以 04 §4.5 为准、块索引以本文 §四为准），漏改模板应该立刻暴露，而不是悄悄多出一个查不到的字段。
 
 它带来一条**必须做的配套**：
 
@@ -243,23 +300,24 @@
 
 如果希望上线期更稳、宁可静默忽略未知字段，把两个模板里的 `"dynamic": "strict"` 改成 `"dynamic": false`（未知字段不进索引、仍留在 `_source`）。二选一，改一处即可；推荐保留 `strict`。
 
-## 六、初值可调项（压测或部署后回填）
+## 七、初值可调项（压测或部署后回填）
 
 | 项 | 现值 | 怎么改 |
 |---|---|---|
-| `refresh_interval` | 行/块 5s | 读侧已有 `now − L`（32 秒）水位线，5 秒足够。写压大时上调 |
+| `refresh_interval` | 行/块/结果 5s | 读侧已有 `now − L`（32 秒）水位线，5 秒足够。写压大时上调 |
 | `index.codec` | `best_compression` | 省磁盘、费 CPU。只能建索引时定，改后新索引生效 |
 | 副本数 | 1 | 集群节点数变化时按需调；温阶段固定降到 1 |
 | warm / delete 年龄 | 30d / 360d | 改 ISM 策略即可，对已建索引同样生效 |
-| `dynamic` | `strict` | 见 §五 |
+| `dynamic` | `strict` | 见 §六 |
 | 分片数 | 1 | 按月索引、量级中等偏下；**数据量估算**出来后按实际月增量再核 |
 
-## 七、来源与未做项
+## 八、来源与未做项
 
 | 内容 | 出处 |
 |---|---|
 | 行文档字段清单 | 本文 §三（04 已瘦化为只讲赋值，04 §3.3 / §4.5） |
 | 块文档字段清单 | 本文 §四（04 已冻结为纯行文档，块字段不在 04） |
+| 结果文档字段清单 | 本文 §五（模块 2 的 `02` §2 / `04` §2 已改为引用本节） |
 | 索引划分、读/写别名、环境前缀（框架 `prefix`） | 04 §4.1 |
 | 保留策略三档与「归档不删」 | 04 §4.4 |
 

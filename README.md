@@ -159,7 +159,7 @@ flowchart LR
 | 版本矩阵 | OpenSearch **3.8.0**（可组合模板、ISM 靠 `ism_template` 挂）/ Logstash **9.5.0**（`api.http.*`、ECS 关）/ logstash-output-opensearch **2.x** / Filebeat **≥ 9.5**（fingerprint 身份 + `log.file.fingerprint` 输出 定） |
 | 现场形态 | OpenSearch 与 Logstash **已存在、别的系统在用** → 三层全部**追加部署**；上线顺序 **存储 → 加工 → 派生 → 采集**（顺序不能反；**派生层必须先于采集** —— 行文档 `LOG_INODE` 换 `LOG_FINGERPRINT`，旧派生读不到新行的文件身份） |
 | 索引 | 行 `mes-log-line-{env}-{yyyy.MM}`（`{env}` 小写）360 天删；块 `mes-log-exec-{env}-{yyyy.MM}` 永久归档 |
-| Oracle（派生层调度态） | 四表：`FvTurn`（轮次，恒两行）/ `FvTask`（待办，一行一流）/ `FvNode`（心跳）/ `FvStream`（哈希环落点） |
+| Oracle（派生层调度态） | 四表：`FvTurn`（轮次，恒两行）/ `FvMesLogParserTask`（待办，一行一流）/ `FvMesLogParserNode`（心跳）/ `FvMesLogParserStream`（哈希环落点） |
 | 加工配置 | `deploy/logstash/fabviewer.yaml` 只保留 `msg_kinds` 一段（加工层标签规则）；派生层参数不在此维护，见 `06` |
 | 派生服务部署 | Logstash 服务器同机；起步 **3 台 × 5 Worker**；Worker 容器拉起，`NODE_ID` 由部署层注入 |
 | 关键参数档位 | 心跳 10s ＜ 判死 30s ＝ 摘环 30s ＜ 进度刷新 100s ＜ 回收 300s ＜ 降级退出 900s |
