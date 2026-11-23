@@ -1,6 +1,6 @@
 # MES Server Hang 监控 · 配置文档
 
-> 模块 2 · 日志监控与报警 ｜ 功能 2 ｜ 状态：**配置侧定稿**（2026-11-18 按功能 1 `01` 重组织，新增 `Enabled`）
+> 模块 2 · 日志监控与报警 ｜ 功能 2 ｜ 状态：**配置侧定稿**
 > 本篇定义配置侧：**一个环境下两个阈值配多少、报几级、通知给谁、启不启用** —— 配置表与通知表的字段、配置页的列表与编辑卡片、配置接口与校验口径。两条判据、扫描、报警落库与通知等运行时见 [`04-MES Server Hang 监控与告警.md`](04-MES%20Server%20Hang%20监控与告警.md)；通知配置公共组件 `AlarmCfgEditor` 的定义见 [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md) §3.4。
 
 ## 1. 功能定位
@@ -14,13 +14,13 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | **Max Delay** | Rule 未执行完（块未闭口）就停止写日志，停写超过这个值 ⇒ 报 `Server Hang` | 秒 |
 | **Max Rule Cost** | 一次 Rule 的写日志时长超过这个值 ⇒ 报 `Endless Rule`（进行中就报，闭口后看总耗时） | 秒 |
 
-**配置粒度：只看环境名，不需要 Rule Name**（2026-09-24 已定）—— 该环境下所有块都按这套阈值判。判定口径的原话记录见 `04` §1.1。
+**配置粒度：只看环境名，不需要 Rule Name** —— 该环境下所有块都按这套阈值判；判定口径见 `04` §1.1。
 
 ---
 
 ## 2. 配置表
 
-**入口**：**`monitor-alarm` 模块 → 一级菜单 `Monitor & Alarm` → 二级菜单 `MES Server Hang Monitor` → 本页 `Config`**（§3.1），与功能 1 同模块、同一级菜单；走**菜单级权限管控**。
+**入口**：**`monitor-alarm` 模块 → 一级菜单 `Monitor & Alarm` → 二级菜单 `MES Server Hang Monitor`**，与功能 1 同模块、同一级菜单；权限＝**功能级（到本菜单）+ 三个动作（`Create` / `Update` / `Delete`）**，见 §3.1。
 
 **配置分两张表**：
 
@@ -33,25 +33,36 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 ### 2.1 表一 · `FvSrvHangMonitorCfg`（环境级阈值）
 
-**表规范（全项目）**：自维护表一律 `Fv` 前缀；代理主键 `ID`（不拿业务字段当自然键）；四审计字段由底层赋值；字符串长度**按字符**校验。
+**结论：一张环境阈值表**，一环境一行，`Environment` 作业务键 UK（`POST` / `PUT` / `DELETE` / `state` 均按它定位，§4.1）。表名与栏位均大驼峰、全项目统一不加引号（不加引号的标识符 Oracle 会转成大写，写 `FvSrvHangMonitorCfg` 与 `FVSRVHANGMONITORCFG` 是同一张表）；统一规范如下，长度 / 可空 / UK 见表内。
+
+**统一规范**：
+
+- **主键 `ID`**：`VARCHAR2(≤50)`、非空；由框架底层赋值，业务侧一律按业务 UK `Environment` 读写、不引用 `ID`（不出参）。
+- **审计四字段** `CreatedAt` / `CreatedBy` / `UpdatedAt` / `UpdatedBy`：**由底层统一控制** —— 赋值、`UpdatedAt` / `UpdatedBy` 的刷新与可空性均由框架托管，业务侧不进任何 SQL。
+- 列名大驼峰、不加引号（Oracle 自动转大写）；字符串长度按字符校验（避免 `VARCHAR2` 字节语义抛 `ORA-12899`）。
 
 | 字段 | 列名 | 长度 | 可空 | 说明 |
 |---|---|---|---|---|
-| 主键 | `ID` | ≤50 | 否 | 按全项目表规范，长度对齐 `FvAlarmCfg.ID`；不出参、不进 Ro |
-| 环境名 | `Environment` | ≤30 | 否 | 下拉，候选来自 Misc `mes.global.environments`，前端调 **`GET /api/v1/sys_misc/env/list`**（归属 Misc 模块，本篇只消费）；**唯一键** —— 一环境一行 |
-| 最大 delay | `MaxDelay` | 整数 | 否 | 最大 delay（秒），**`1 ~ 65535`** |
-| 最大耗时 | `MaxRuleCost` | 整数 | 否 | 最大写日志耗时（秒），**`1 ~ 65535`** |
+| 主键 | `ID` | ≤50 | 否 | 底层赋值、业务不引用、不出参 |
+| 环境名 | `Environment` | ≤30 | 否 | **业务 UK** —— 一环境一行；下拉，候选来自 Misc `mes.global.environments`，前端调 **`GET /api/v1/sys_misc/env/list`**（归属 Misc 模块，本篇只消费） |
+| 最大 delay | `MaxDelay` | NUMBER(5) | 否 | 最大 delay（秒），**`1 ~ 65535`** |
+| 最大耗时 | `MaxRuleCost` | NUMBER(5) | 否 | 最大写日志耗时（秒），**`1 ~ 65535`** |
 | 报警等级 | `Priority` | ≤20 | 否 | `P1` ~ `P4`；**值域来自 Misc `system.global.priority`**（后端读 Misc 校验，前端走 `/api/v1/sys_misc/priority/list` 取候选，见 §4.1「后端校验」第 3 条） |
 | 启用状态 | `Enabled` | — | 否 | 布尔；`true` 生效、`false` 停用；**新建默认 `true`**；只由列表开关改（`state` 接口，§3.2 / §4.1-5），不进 Ro |
 | 通知配置 | `AlarmCfgId` | ≤50 | 否 | 关联 `FvAlarmCfg.ID` |
+| 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值、`UpdatedAt` 无条件刷新 |
 
-- **唯一索引**：`Environment`。
-- **`Enabled`**：只有 `true` 的配置生效，`false` 停用但配置保留；停用环境不参与两条判据 —— 运行时每轮重读配置时过滤（§4.3 共性 7 / `04` §3.1）。审计字段 `createdAt` / `createdBy` / `updatedAt` / `updatedBy` 由底层统一赋值。
-- ~~`AlarmItems`~~ 已废弃：通知目标改由 `AlarmCfgId` 指向 `FvAlarmCfg` 承载。
+**业务唯一索引**：`Environment`。
+
+- **`Enabled`**：只有 `true` 的配置生效，`false` 停用但配置保留；停用环境不参与两条判据 —— 运行时每轮重读配置时过滤（§4.3 共性 7 / `04` §3.1）。
 
 ### 2.2 表二 · `FvAlarmCfg`（通知配置）
 
-**复用功能 1 的表，不另立、不重复定义**：`ID` / `MailToUsers` / `MailCCUsers` / `FeishuWebhooks` / `FeishuAtUsers` / `NotifyInterval`（**整数 1 ~ 99999 分钟，默认 5**），以及邮件「To 为空则不发、CC 不顶替」、飞书「群机器人 webhook、可多群、@ 人须在群内」的通道口径，一律见 [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md) §2.2。本表**不设名称字段**，靠引用它的配置来辨识。
+**复用功能 1 的表，不另立、不重复定义**：字段（列名 / 长度 / 可空）与邮件 / 飞书通道口径一律见 [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md) §2.2，本篇不列。
+
+它与主表的关系同 01：**不设名称字段** —— 不是独立业务实体，而是各类监控配置（关键字监控、Hang 监控等）**共用的通知扩展子集**，靠引用它的配置来辨识；**无业务唯一索引** —— 只按 `ID` 被表一 1:1 引用（`FvSrvHangMonitorCfg.AlarmCfgId` → `FvAlarmCfg.ID`），不单独检索；本表不单独展示、也不提供引用下拉，一条配置一份、不允许复用已有配置。
+
+本表随配置走：新增 / 修改 / 删除配置时同事务写它（下方生命周期表），运行时每轮重读、**下一轮生效**。
 
 **通知配置的生命周期（随配置走）**
 
@@ -74,7 +85,18 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | 二级菜单 | **`MES Server Hang Monitor`** |
 | 本页 | **`Config`** —— 菜单内就显示 `Config` |
 | 挂载位置 | **`monitor-alarm`** 模块下（与功能 1 相同） |
-| 权限方式 | **菜单级权限管控**：无该菜单权限的用户**看不到入口、也调不通接口**（菜单渲染与接口鉴权同一份权限数据，对齐功能 1） |
+| 权限方式 | **功能级（到本菜单）+ 三个动作权限点**（`Create` / `Update` / `Delete`），见下表 |
+
+**权限点**
+
+| # | 权限点 | 标识 | 限制行为 |
+|---|---|---|---|
+| 1 | **功能级（菜单）** | — | 二级菜单 `MES Server Hang Monitor` / 本页 `Config` 入口；有菜单权限才可进入、使用本页 |
+| 2 | **「新增」** | `Create` | 控制新增配置；有权限可新增、无权限禁止新增 |
+| 3 | **「修改」** | `Update` | 控制修改配置与启用 / 停用开关（同一动作）；有权限可改、无权限禁止 |
+| 4 | **「删除」** | `Delete` | 控制删除配置；有权限可删、无权限禁止 |
+
+读类（列表 / 查看）不单独设权限，进入本菜单即可查看。
 
 ### 3.2 主界面
 
@@ -83,7 +105,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 **① 表格卡片**
 
 - 进入页面即调 `GET /api/v1/srv_hang_monitor/cfg/list` 渲染全部数据；`刷新` 按钮按当前数据重调同一接口。
-- 工具栏：左侧 `新增` 主按钮（无菜单权限时整页不可见）+ `刷新` 按钮。
+- 工具栏：右侧 `新增` 主按钮（受「新增」`Create` 管控，有权限可新增、无权限禁止）、`刷新` 按钮（按当前数据重调 `list`，不控权）。
 - 表格列（顺序固定）：
 
 | # | 列 | 内容 |
@@ -95,13 +117,14 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | 5 | Priority | `P1`~`P4` 色标，与功能 1 / 展示页同一套 |
 | 6 | Last Updated User | 取 `list` 出参 `lastUpdatedUser` |
 | 7 | Last Updated Time | `yyyy-MM-dd HH:mm:ss`，取 `list` 出参 `lastUpdatedTime` |
-| 8 | 操作 | `修改` / `查看` / `删除` |
+| 8 | 操作 | `修改` / `查看` / `删除`（`修改` 受「修改」`Update`、`删除` 受「删除」`Delete` 管控，有权限可操作、无权限禁止；`查看` 进入本菜单即可） |
 
 **启用开关（第 2 列）**
 
 | 项 | 口径 |
 |---|---|
 | 呈现 | 开关，取行 `enabled`；紧跟 `Environment` 之后；停用行仍留在列表里（列表不过滤） |
+| 权限 | 受「修改」`Update` 管控（与行内修改同一动作），有权限可操作、无权限禁止 |
 | 点击 | **先弹 Warning 提示框**（确认 / 取消），不直接改状态；确认才调 **`POST /api/v1/srv_hang_monitor/cfg/state?environment=&enabled=<目标值>`**（§4.1-5） |
 | 取消 / 失败 | **开关回弹、该行不动**；失败按错误码清单提示 |
 | 成功 | 返回单个 `ServerHangMonitorCfgDto`，按 `environment` **原地刷新该行**（含开关与两个更新时间列），**不重跑 `list`、不跳页** |
@@ -109,7 +132,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 > 列表按 `Environment` 升序（§4.1-1），不分页。
 >
-> **删除**：与启用开关同一套 **Warning 提示框**（确认 / 取消）；确认才调 `DELETE`、取消关闭。提示框**不再写「不是立即生效」**（运行时下一轮生效）；已产生的报警一律保留。
+> **删除**：与启用开关同一套 **Warning 提示框**（确认 / 取消）；确认才调 `DELETE`、取消关闭；按钮受「删除」`Delete` 管控，有权限可删、无权限禁止。提示框**不再写「不是立即生效」**（运行时下一轮生效）；已产生的报警一律保留。
 
 **② 编辑卡片**（表格卡片下方，**页内卡片**，不用弹窗 —— 与功能 1 不同）
 
@@ -124,12 +147,12 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | 状态 | 进入方式 | 行为 |
 |---|---|---|
 | **初始 / 空闲** | 进入页面、或点过 `取消` 后 | 卡片内**全部控件禁用**（含 `确认`），仅 `取消` 按钮可用 |
-| **新增** | 点工具栏 `新增` | 清空全部控件值并**解除禁用**；`Environment` 下拉可选；**`Enabled` 不在卡片里，落库默认 `true`** |
-| **修改** | 点操作列 `修改` | **把该行的值回显到编辑卡片**（含通知配置，用列表行数据回填，无需再调接口）并解除禁用；`Environment` **保持锁定不可改** —— 它是定位键，改了等于换一条，要换就删了重建；**开关状态不在卡片里改**（回显时忽略 `enabled`，提交也不带它） |
-| **查看** | 点操作列 `查看` | **只回显**该行的值，其余控件**保持禁用**（含 `确认`，防止误提交）；仅可点 `取消` 退出 |
+| **新增** | 点工具栏 `新增`（受「新增」`Create` 管控，有权限可新增、无权限禁止） | 清空全部控件值并**解除禁用**；`Environment` 下拉可选；**`Enabled` 不在卡片里，落库默认 `true`** |
+| **修改** | 点操作列 `修改`（受「修改」`Update` 管控，有权限可改、无权限禁止） | **把该行的值回显到编辑卡片**（含通知配置，用列表行数据回填，无需再调接口）并解除禁用；`Environment` **保持锁定不可改** —— 它是定位键，改了等于换一条，要换就删了重建；**开关状态不在卡片里改**（回显时忽略 `enabled`，提交也不带它） |
+| **查看** | 点操作列 `查看`（进入本菜单即可） | **只回显**该行的值，其余控件**保持禁用**（含 `确认`，防止误提交）；仅可点 `取消` 退出 |
 
 - `取消`：清空全部控件值 → 恢复**初始态**（全部禁用），不产生任何提交。
-- `确认`：先校验（必填 4 项 + 两阈值范围 + 通知间隔 + 邮箱 / webhook 格式，规则同 §4.1 的校验清单），通过后与开关 / 删除一样**先弹 Warning 提示框**（确认 / 取消）—— 确认才提交（**新增走 `POST`、修改走 `PUT`**）、取消关闭不动；成功后重新拉 `list` 回显到列表，并回到初始态。
+- `确认`：先校验（必填 4 项 + 两阈值范围 + 通知间隔 + 邮箱 / webhook 格式，规则同 §4.1 的校验清单），通过后与开关 / 删除一样**先弹 Warning 提示框**（确认 / 取消）—— 确认才提交（**新增走 `POST`、修改走 `PUT`**）、取消关闭不动；成功后重新拉 `list` 回显到列表，并回到初始态。按钮权限与入口一致：新增态受「新增」`Create` 管控、修改态受「修改」`Update` 管控（分别对应 `POST` / `PUT`）。
 - 校验不过时就地红字提示，不弹全局错误；保存成功后 toast **不再提示「不会立即生效」**（运行时下一轮生效）。
 - 两条交叉校验（关注 / 排除名单交集、排除词是 keyword 子串）是**关键字监控特有**的，本功能无 keyword，不适用；Alarm 区仅校验格式与必填。
 
@@ -137,25 +160,25 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 ## 4. 接口
 
-服务内前缀 `/api/v1/srv_hang_monitor`（对齐功能 1 命名法，2026-11-10 确认）；前端调用加网关前缀 `telemetry-hub`；响应外壳沿用整体库（`模块6/05-后端设计`）。本篇为全量不分页接口，不使用分页结构。
+服务内前缀 `/api/v1/srv_hang_monitor`；前端调用加网关前缀 `telemetry-hub`；响应外壳沿用整体库。本篇为全量不分页接口，不使用分页结构。
 
 > Misc 的 `env/list` / `priority/list` **归属 Misc 模块**（`/api/v1/sys_misc`），本功能只消费；规格见 `01` §2.1 / §3.3 / §4.1-6，本篇不重复。
 
 ### 4.1 接口清单
 
-| # | 接口 | Method | 用途 |
-|---|---|---|---|
-| 1 | `/api/v1/srv_hang_monitor/cfg/list` | `GET` | 全量查询，**不分页、不设查询条件**，按 `Environment` 升序 |
-| 2 | `/api/v1/srv_hang_monitor/cfg` | `POST` | 新增配置（同事务写通知配置） |
-| 3 | `/api/v1/srv_hang_monitor/cfg` | `PUT` | 修改配置（同事务更新通知配置） |
-| 4 | `/api/v1/srv_hang_monitor/cfg?environment=` | `DELETE` | 删除配置（`Environment` 作定位参数，连带删通知配置） |
-| 5 | `/api/v1/srv_hang_monitor/cfg/state?environment=&enabled` | `POST` | 启用 / 停用单个环境配置（列表开关，规格见本节 5） |
+| # | 接口 | Method | 用途 | 权限 |
+|---|---|---|---|---|
+| 1 | `/api/v1/srv_hang_monitor/cfg/list` | `GET` | 全量查询，**不分页、不设查询条件**，按 `Environment` 升序 | 进入本菜单即可 |
+| 2 | `/api/v1/srv_hang_monitor/cfg` | `POST` | 新增配置（同事务写通知配置） | 有「新增」`Create` 权限可操作，无则禁止 |
+| 3 | `/api/v1/srv_hang_monitor/cfg` | `PUT` | 修改配置（同事务更新通知配置） | 有「修改」`Update` 权限可操作，无则禁止 |
+| 4 | `/api/v1/srv_hang_monitor/cfg?environment=` | `DELETE` | 删除配置（`Environment` 作定位参数，连带删通知配置） | 有「删除」`Delete` 权限可操作，无则禁止 |
+| 5 | `/api/v1/srv_hang_monitor/cfg/state?environment=&enabled` | `POST` | 启用 / 停用单个环境配置（列表开关，规格见本节 5） | 有「修改」`Update` 权限可操作，无则禁止（与 `PUT` 同一动作） |
 
 > **定位键统一是 `environment`**（唯一索引），不用 `id`：
 > - `DELETE` / `state` 用 **query 参数**（无 body，只能走 URL）；
 > - `PUT` **不收 query 参数**，定位键 `environment` 就在 `ServerHangMonitorCfgRo` 里（与 `POST` 同一对象），后端按它找记录、**且不改这一列的值**（改了等于换一条，不允许）。
 >
-> **通知配置没有独立接口** —— 不收 `alarmCfgId` 入参，也不暴露 `/alarm_cfg/*`，全部随配置的写操作在同一事务内完成。权限走**菜单级**（§3.1）：有该菜单权限即具备本功能全部读写能力，不再单独区分只读 / 编辑角色。
+> **通知配置没有独立接口** —— 不收 `alarmCfgId` 入参，也不暴露 `/alarm_cfg/*`，全部随配置的写操作在同一事务内完成；权限随所在写动作（`POST` 随「新增」、`PUT` / `state` 随「修改」、`DELETE` 随「删除」）。
 
 **1 · `list`（GET）** 无入参；出参 `data` = `List<ServerHangMonitorCfgDto>`；**全量、不过滤 `Enabled`** —— 停用配置仍出现在列表里供启停与查看。
 
@@ -165,7 +188,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 **4 · `DELETE`** 按 query 的 `environment` 定位 → **事务内**删配置、删其 `AlarmCfg` → 成功返空。**已产生的 Alarm 一律保留**。
 
-**5 · `state`（POST）** 入参走 query：`environment`（定位键）+ `enabled`（布尔，目标状态）。按定位键加锁查对象，查不到 ⇒ `SrvHangMonitorCfgNotFound`；事务内**只更新主表 `ENABLED` 一列**，不动 `FvAlarmCfg`、不动定位键。出参 `data` = **单个 `ServerHangMonitorCfgDto`**（与 `list` 行同构，含 `enabled` 与两个展示字段），供列表原地刷新该行。权限随菜单级（§3.1）。
+**5 · `state`（POST）** 入参走 query：`environment`（定位键）+ `enabled`（布尔，目标状态）。按定位键加锁查对象，查不到 ⇒ `SrvHangMonitorCfgNotFound`；事务内**只更新主表 `ENABLED` 一列**，不动 `FvAlarmCfg`、不动定位键。出参 `data` = **单个 `ServerHangMonitorCfgDto`**（与 `list` 行同构，含 `enabled` 与两个展示字段），供列表原地刷新该行。权限：有「修改」`Update` 权限可操作、无则禁止（与 `PUT` 同一动作）。
 
 **后端校验（6 条，前后端同源）**
 
@@ -237,14 +260,14 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 **八条共性约定**（下面各接口不再重复）
 
-1. 响应外壳：`code` 成功恒 `OK`、失败为 PascalCase 业务码，`success` 输出 `0` / `1`，`errMsg` 成功为空串（对齐 `模块6/05` §1.4）。
+1. 响应外壳：`code` 成功恒 `OK`、失败为 PascalCase 业务码，`success` 输出 `0` / `1`，`errMsg` 成功为空串。
 2. `ID` 与四个审计字段**全部由底层赋值**，不进任何 Ro；`updatedAt` / `updatedBy` 每次写操作无条件刷新。
 3. 字符串长度一律**按字符**校验（先校验、再落库，避免 `VARCHAR2` 字节语义抛 `ORA-12899`）；`trim` 后为空视同未传。
 4. 两个整数阈值先按整数解析再判 `1 ~ 65535`；`notifyInterval` 同理判 `1 ~ 99999`；非整数 ⇒ `ParameterInvalid`。
 5. 事务边界：一条写接口 = 一个事务（`POST` / `PUT` / `DELETE` 带通知表，`state` 只动主表）；`AlarmCfg` 的 ID 在同一事务内生成。
 6. **存在性与锁**：`POST` 需**校验对象是否已存在**（不加锁）；`PUT` / `DELETE` / `state` 需**校验对象存在并对 `environment` 加锁**（查到即持锁，同键写操作串行）。**不指定具体公共方法名**，实现层按此语义选型。
 7. **启停的生效路径**：`list` 全量返回、`Enabled` 只是行上的一个状态；运行时告警服务**每轮重读配置，只取 `Enabled = true` 的行**，停用环境不进本轮环境集合、不参与两条判据（见 `04` §3.1）。不缓存、不热加载，删改与启停都**下一轮生效**。
-8. 权限：走**菜单级权限管控**（§3.1）—— 有该菜单权限即可读写本功能全部接口，无权限则连接口都调不通。
+8. 权限：功能级到本菜单，进入菜单即可查（`list`）；写动作 `POST` 要「新增」`Create`、`PUT` / `state` 要「修改」`Update`、`DELETE` 要「删除」`Delete`，有权限可操作、无权限禁止。
 
 **1 · `list`**
 
@@ -304,28 +327,11 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | `SrvHangMonitorCfgNotFound` | `PUT` / `DELETE` / `state` 时该 `environment` 未创建 | 提示后刷新列表 |
 | `EnvironmentNotAllowed` / `PriorityNotAllowed` | 值不在 Misc 值域内（含 Misc 未配） | 提示去 System Misc 先配候选值 |
 
-> `RequireParameterMissing` / `ParameterInvalid` 复用整体库既有码；`SrvHangMonitorCfgExists` / `SrvHangMonitorCfgNotFound` 为本篇新增；`EnvironmentNotAllowed` / `PriorityNotAllowed` 复用功能 1 新增码，需在 `模块6/05` §十的错误码表登记。
+> `RequireParameterMissing` / `ParameterInvalid` 复用整体库既有码；`SrvHangMonitorCfgExists` / `SrvHangMonitorCfgNotFound` 为本篇新增；`EnvironmentNotAllowed` / `PriorityNotAllowed` 复用功能 1 新增码。
 > 值域校验逻辑**只实现一份**（`POST` / `PUT` 共用的校验函数），内部统一调 `FetchEnvFromSystemMisc()` / `FetchPriorityFromSystemMisc()`。
 
 ---
 
-## 5. 已确认口径（配置侧）
+## 5. 待确认
 
-| # | 口径 |
-|---|---|
-| 1 | 表名 **`FvSrvHangMonitorCfg`**；`Environment` 为唯一键（一环境一行）；表规范见本篇 §2.1 |
-| 2 | `Priority` 值域来自 Misc `system.global.priority`；`Environment` 来自 Misc `mes.global.environments`，前端分别调 `/api/v1/sys_misc/priority/list` 与 `/api/v1/sys_misc/env/list`（归属 Misc，本篇只消费） |
-| 3 | `MaxDelay` / `MaxRuleCost` 为配置的正整数秒数，**`1 ~ 65535`**（2026-11-10 确认） |
-| 4 | 接口 **5 条**：`list`（不分页无条件）/ `POST` / `PUT` / `DELETE`（`Environment` 定位）/ **`state`（POST，`?environment=&enabled=`）**；入参 `ServerHangMonitorCfgRo`、出参 `ServerHangMonitorCfgDto` |
-| 5 | 通知复用 `FvAlarmCfg`（`AlarmCfgId` 外联，1:1，无独立通知接口）；`ServerHangMonitorCfgRo` 内**嵌套 `alarmCfg`**（`AlarmCfgRo`，对齐功能 1） |
-| 6 | **新增 `Enabled`**（布尔，新建默认 `true`）：只有 `true` 的配置生效，`false` 停用但配置保留；**列表开关调 `state` 接口改、不进 Ro、编辑卡片不碰**；`list` 不过滤停用行；运行时每轮重读配置只取 `Enabled=true`，**下一轮生效**（`04` §3.1）。审计字段由底层统一赋值 |
-| 7 | 接口前缀 **`/api/v1/srv_hang_monitor`**，前端加网关前缀 `telemetry-hub`；响应外壳沿用整体库 |
-| 8 | 配置页挂 **`monitor-alarm` 模块 → 一级菜单 `Monitor & Alarm` → 二级菜单 `MES Server Hang Monitor` → 本页 `Config`**（与功能 1 同模块、同一级菜单），走**菜单级权限管控**；主界面 = 表格卡片 + **页内编辑卡片**（不用弹窗，与功能 1 不同）；表格第 2 列为 `Enabled` 开关 |
-| 9 | 启停 / 新增 / 修改 / 删除**统一走 Warning 提示框**（确认才提交、取消不动）；**不再提示「不会立即生效」** —— 运行时下一轮生效 |
-| 10 | 编辑卡片默认**全部禁用**（仅 `取消` 可用）：`新增` 清空并解除禁用、`修改` 回显并解除禁用、`查看` 只回显不解除；`取消` 清空并回初始态；`确认` 校验后提交并重拉 `list` 回显 |
-| 11 | **修改态 `Environment` 锁定不可改**（定位键）；两阈值输入限整数 `1~65535`；**`PUT` 的 `SET` 不含 `ENVIRONMENT` / `ENABLED`** —— 启停只归 `state` |
-| 12 | **通知配置基于公共组件 `AlarmCfgEditor`**（定义归 `01` §3.4：Interval / Mail / 飞书三段，校验内聚）；编辑卡片右侧直接嵌入，落同一张 `FvAlarmCfg`，回填按组件定义回写 |
-| 13 | **值域校验统一调 `shared-business-lib` utility 的 `FetchEnvFromSystemMisc()` / `FetchPriorityFromSystemMisc()`**，均输入为空、输出 `string[]`；不直连 Misc 表、不复刻解析逻辑 |
-| 14 | **存在性与锁**：`POST` 校验对象是否已存在（不加锁）、已存在则拒；`PUT` / `DELETE` / `state` 校验存在并**对 `environment` 加锁**、同键串行，未创建则拒；不指定具体公共方法名 |
-| 15 | **通知对象的写语义**：创建先建 `AlarmCfg` 再建配置行；修改原地 `UPDATE` 通知行；删除时两表一起删；已产生的报警不动 |
-| 16 | `list` 全量返回、不过滤 `Enabled`；`state` 只更新主表 `ENABLED` 一列并返回单个 Dto 供列表原地刷新该行（不重跑 `list`） |
+（无）
