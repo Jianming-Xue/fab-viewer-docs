@@ -1,311 +1,380 @@
-# MES Server Hang 监控与告警 · 运行时文档
+# MES Server Hang 监控与告警 · 运行时规格
 
-> 模块 2 · 日志监控与报警 ｜ 功能 2 ｜ 状态：**需求沟通中**（2026-11-18 存储与索引口径已定）。配置表与字段见 [`03-MES Server Hang 监控配置.md`](03-MES%20Server%20Hang%20监控配置.md)；关键字监控的运行时实现见 [`02-MES关键字监控与告警.md`](02-MES关键字监控与告警.md) —— 本篇 §1 ~ §3 与之对齐。
+> 模块 2 · 日志监控与报警 ｜ 功能 2 ｜ 状态：**定版**
+> 本篇只讲运行时 —— Oracle 状态表、两条判据与两个 DSL、整轮互斥、每轮业务（A / B 判定 + 落库查重 + Endless Rule 恢复），以及扫描产出给通知与展示用的数据；通知怎么发、发什么格式、发给谁一律见 [`10-告警服务工程实现.md`](10-告警服务工程实现.md)，本篇不定义也不复述。**OS 结果索引的字段口径唯一权威在 [`../09-OpenSearch索引模板.md`](../09-OpenSearch索引模板.md) §五，本篇 §3 只引用**。规则怎么配见 [`03`](03-MES%20Server%20Hang%20监控配置.md)，报警怎么展示与处置见 [`06`](06-MES%20Server%20Hang%20告警展示.md)，关键字监控那一路见 [`02`](02-MES关键字监控与告警.md)。
 
-| 项 | 内容 |
-|---|---|
-| 模块 | 模块 2 · 日志监控与报警 · 功能 2（第二类 · 报警） |
-| 使用者 | IT 运维 |
-| 上承 | `03-Halo功能盘点.md` 一期范围第 2 项 |
-| 本篇范围 | **只管运行时**：两条判据怎么算、扫什么、报警怎么落库与通知 |
-| 不在本篇 | 阈值 / 等级 / 通知目标怎么配 → 配置文档 §2 |
-| 范围排除 | 原第一类「Server Hang List」2026-10-09 已拆出 → 配置归模块 5 `01-Server Hang Reason Config.md`；其**判定与运行口径暂存本篇附录**（动 `06` 时迁出） |
-| 新增口径（2026-11-18） | 状态表**新建** `FvSrvHangMonitorAlarmState`（不复用功能 1）；OS **沿用** `mes-log-monitor-issue` 模板，`issueType` 写 `Server Hang` / `Endless Rule`，**`_id = blockId`** |
+## 1. 功能定位
 
-> 本篇前身含「记录（原话照录）」与「梳理落点」两块，拆分后记录部分集中在本篇 §3（判定口径来源），配置侧只看配置文档即可。
+本篇是 **Server Hang 监控的运行时实现规格**：每 `HangScanInterval` 全量扫块索引里所有「进行中」的块，逐块跑 A（Server Hang）/ B（Endless Rule）两条判据，命中落成 issue，供通知与展示消费。配置侧（阈值 / 等级 / 排除名单 / 收件人）见 `03`；通知怎么发见 `10`；报警怎么展示与处置见 `06`；关键字监控那一路见 `02`。本篇只定义运行时这套机制 —— Oracle 状态表、两条判据与 DSL、整轮互斥与每轮业务。
 
----
+与关键字监控（功能 1）的关系：**各自独立的一张状态表、一套报警服务、一条 `FvTurn` 行锁**，只共用 OS 结果索引（靠 `issueType` 区分来源）与通知配置 `FvAlarmCfg`。
 
-## 1. Oracle 表 · 状态表 `FvSrvHangMonitorAlarmState`
+## 2. Oracle 表
 
-**结论：新建表，不复用功能 1 的 `FvLogMonitorAlarmState`**。两张表各自一张、共用同一套处置状态机与展示口径（模块 2 概览 §四）。本表**一次告警一行**，`BlockId` 作业务键 UK —— 一个块一条（§3.2）。表名与栏位均大驼峰、全项目统一不加引号（不加引号的标识符 Oracle 会转成大写）；字段规格对齐 `06-派生服务工程实现.md` §1.1 统一规范，如下。
+**只一张表** —— `FvSrvHangMonitorAlarmState`（新建，不复用功能 1），一条 issue 一行，`IssueId` = OS `_id` 作业务 UK。不放结果文本与规则配置（结果文本在 OS 结果索引 §3，规则配置在 `03`）。
 
-**统一规范**（与功能 1 `02` §1 同）：
+表名与栏位均大驼峰、全项目统一不加引号（不加引号的标识符 Oracle 会转成大写，写 `FvSrvHangMonitorAlarmState` 与 `FVSRVHANGMONITORALARMSTATE` 是同一张表）；主键 `ID` 与审计四字段由底层统一赋值，业务侧不引用 `ID`、不进任何 SQL；业务时间列统一 `TIMESTAMP(3)`（毫秒），与行索引 `@timestamp` 对齐（审计字段除外）；字符串长度按字符校验（避免 `VARCHAR2` 字节语义抛 `ORA-12899`）。
 
-- **主键 `ID`**：`VARCHAR2(≤50)`、非空；由框架底层赋值，业务侧一律按业务 UK 读写、不引用 `ID`（不出参）。
-- **审计四字段** `CreatedAt` / `CreatedBy` / `UpdatedAt` / `UpdatedBy`：由底层统一赋值、不进任何 SQL；`UpdatedAt` / `UpdatedBy` 每次写操作无条件刷新；新建后未更新时 `UpdatedAt` / `UpdatedBy` 可空。长度 `CreatedAt`/`UpdatedAt` = 63（`VARCHAR2(63)`），`CreatedBy`/`UpdatedBy` ≤50。
-- 列名大驼峰、不加引号（Oracle 自动转大写）；**业务时间列**统一 `TIMESTAMP(3)`（毫秒），与行索引 `@timestamp` 对齐（审计两个 At 字段除外，见上）；字符串长度按字符校验（避免 `VARCHAR2` 字节语义抛 `ORA-12899`）。
+### 2.1 表 · `FvSrvHangMonitorAlarmState`（告警状态）
 
-### 1.1 字段
+每条 issue 一行，`IssueId` = OS `_id` 作业务 UK。
 
 | 字段 | 列名 | 长度 | 可空 | 说明 |
 |---|---|---|---|---|
 | 主键 | `ID` | ≤50 | 否 | 底层赋值、业务不引用、不出参 |
-| 环境 | `Environment` | ≤30 | 否 | 取自配置表，`PROD` / `PIRUN`；**配置表原字段快照** |
-| 等级 | `Priority` | ≤20 | 否 | 取自配置表，`P1` ~ `P4`；**配置表原字段快照** |
-| 最大 delay | `MaxDelay` | NUMBER(5) | 否 | 最大 delay（秒），`1 ~ 65535`；**配置表原字段快照** |
-| 最大耗时 | `MaxRuleCost` | NUMBER(5) | 否 | 最大耗时（秒），`1 ~ 65535`；**配置表原字段快照** |
-| 块身份 | `BlockId` | ≤256 | 否 | **业务 UK**；块文档 `_id`（`REQUEST_EXEC_ID`）；跳模块 1 块详情的锚，与 OS `_id` 同值（§2 / `09` §五） |
-| 规则名快照 | `RuleName` | ≤128 | 是 | 块 `RULENAME` 首值快照（业务上单值） |
-| 命中时刻 | `IssueTime` | TIMESTAMP(3) | 否 | **判据命中时刻**（告警服务墙钟）—— 与功能 1 不同，本功能没有「命中行」可取 `LOG_TIME`；OS 按月选索引用它（§2 / `09` §五） |
-| 生成时刻 | `ReportTime` | TIMESTAMP(3) | 否 | 状态行生成墙钟，**首写后不变** |
-| 处置时刻 | `ResolvedTime` | TIMESTAMP(3) | 是 | 处置时写；是否为空派生「已解决」 |
+| 环境 | `Environment` | ≤30 | 否 | 取自配置表，快照（§2.2） |
+| 等级 | `Priority` | ≤20 | 否 | 取自配置表，快照（§2.2） |
+| 最大 delay | `MaxDelay` | NUMBER(5) | 否 | 秒，`1 ~ 65535`，快照（§2.2） |
+| 最大耗时 | `MaxRuleCost` | NUMBER(5) | 否 | 秒，`1 ~ 65535`，快照（§2.2） |
+| issue 身份 | `IssueId` | ≤400 | 否 | **业务 UK** = OS `_id`：A = `END_LINE_ID\|Server Hang`、B = `BlockId\|Endless Rule`；A 每次命中 `END_LINE_ID` 不同即新一行（§7.6） |
+| 判据类型 | `IssueType` | ≤20 | 否 | 落库 `Server Hang` / `Endless Rule`；B 块闭合后原位改 `Rule Recovered`，与 OS `issueType` 同值（§7.6） |
+| 块身份 | `BlockId` | ≤256 | 否 | 块文档 `_id`（`REQUEST_EXEC_ID`），= OS `blockId`，跳模块 1 块详情的锚；**不是 UK** |
+| 规则名 | `RuleName` | ≤128 | 是 | 块 `RULENAME` 首值快照 |
+| 命中时刻 | `IssueTime` | TIMESTAMP(3) | 否 | 块 `LAST_LINE_TIME`（两条判据相同），= OS `issueTime`，不是墙钟 |
+| 生成时刻 | `ReportTime` | TIMESTAMP(3) | 否 | 状态行生成墙钟，首写后不变 |
+| 处置时刻 | `ResolvedTime` | TIMESTAMP(3) | 是 | 处置时写；空 = 未解决（误报同样写处置字段） |
 | 处置人 | `ResolvedUser` | ≤64 | 是 | 处置人 |
 | 处置备注 | `ResolvedComment` | ≤512 | 是 | 处置备注 |
-| 是否已通知 | `Alarmed` | CHAR(1) | 否 | 默认 `N`；通知器回写 `Y` |
-| 最后通知时刻 | `LastAlarmTime` | TIMESTAMP(3) | 是 | 通知发出的时间，非生成时间 |
+| 是否已通知 | `Alarmed` | CHAR(1) | 否 | 默认 `N`，通知器回写 `Y`；B 恢复时 `Y` → `N`（§7.6） |
+| 最后通知时刻 | `LastAlarmTime` | TIMESTAMP(3) | 是 | 通知发出时间；B 恢复时不变（§7.6） |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值 |
 
-**业务唯一索引**：`BlockId`。
+**业务唯一索引**：`IssueId`（= OS `_id`）。库层冲突跳过，不更新首次写入的行。
+**辅助索引**：`(BlockId, ReportTime DESC)` 同块多 issue / 跳块详情；`(Environment, Priority, ReportTime DESC)` 汇总分组 + 明细分页；`(Alarmed, LastAlarmTime)` 通知器捞未发。
 
-- 错误码为「误报」时同样写处置字段（误报是一等状态，模块 2 概览 §4.2）。
+### 2.2 配置快照
 
-### 1.2 唯一性与索引
+`Environment` / `Priority` / `MaxDelay` / `MaxRuleCost` 在告警生成时从 `FvSrvHangMonitorCfg` 复制，之后不随配置变化 —— 配置改阈值、调等级、删除后，历史告警仍显示当时口径（复盘 / MTTA / MTTR 按当时算）。配置侧字段名与值域原样落列，不重命名、不换算。
 
-| 项 | 口径 |
-|---|---|
-| 业务唯一键 | **`BlockId`** —— 一个块只报一次（§3.2 已核）；库层 UK 兜幂等，冲突跳过、不更新首次写入的行 |
-| 辅助索引 | `(Environment, Priority, ReportTime DESC)` 服务汇总分组 + 明细分页；`(Alarmed, LastAlarmTime)` 通知器捞未发（与功能 1 同形） |
-| 与 OS 的对应 | OS 文档 `_id = blockId`（§2），与本表 `BlockId` 一一对应 —— 两源同一业务键，Oracle 持状态、OS 持观测文本（§2 §6） |
-
-### 1.3 配置字段快照的语义
-
-`Environment` / `Priority` / `MaxDelay` / `MaxRuleCost` 四列在**建告警那一刻从 `FvSrvHangMonitorCfg` 复制**，之后不随配置变化：
-
-- 告警是**历史证据** —— 配置后来改阈值、调等级甚至删掉，报警记录仍要显示「当时按什么阈值、几级报的」；
-- 复盘与 MTTA / MTTR 统计按当时口径算，不被后续配置改写污染；
-- 配置文档 §2.1 的字段名与值域原样落列，不做重命名或换算。
-
-### 1.4 与功能 1 状态表的差异
-
-| 项 | 功能 1 `FvLogMonitorAlarmState` | 本功能 `FvSrvHangMonitorAlarmState` |
-|---|---|---|
-| 表 | 各自一张，不共用 | 各自一张，不共用 |
-| 业务键 | `LineId + Item`（同一行可被多规则命中） | **`BlockId`**（一个块一条） |
-| 配置快照 | `Environment` / `Priority` | `Environment` / `Priority` + **`MaxDelay` / `MaxRuleCost`** |
-| `IssueTime` 来源 | 命中行 `LOG_TIME` | **判据命中时刻（墙钟）** |
-| 判据类型 | 恒为关键字 | 由 OS `issueType` 区分 `Server Hang` / `Endless Rule`（不进本表） |
+> 轮次表 `FvTurn` 是复用的框架表，不在此列；本模块只借它的行锁，预置数据与每轮锁 SQL 见 §5 / §6。
 
 ---
 
-## 2. OS 结果索引 · 见 `09` §五
+## 3. OS 结果索引 · 见 `09` §五
 
-**不新建模板、不改 mapping**：本功能与关键字监控**写同一份 `mes-log-monitor-issue`**，靠 `issueType` 区分来源。索引名 / 命名写入 / settings / mapping 四字段 / `_id` 拼接 / ISM 挂载的**唯一权威在 `09-OpenSearch索引模板.md` §五**（4 字段表中「取自 · Server Hang 监控」一列即本功能口径），本篇只列**本功能实际写入什么值**，字段定义不复述。
-
-**本功能写入内容**（4 个 mapping 字段 + `_id`）：
+不新建模板、不改 mapping：与关键字监控写同一份 `mes-log-monitor-issue`，靠 `issueType` 区分来源。**字段清单、类型、索引名 / settings / mapping / ISM 的唯一权威在 `09-OpenSearch索引模板.md` §五**（含完整 JSON 模板 + 字段表），可执行配置在 `deploy/opensearch/13-template-monitor-issue.json`。本文只列**本功能实际写入什么值**，字段定义不复述，避免两处维护漂移。
 
 | 字段 | 类型 | 本功能写入值 | 说明 |
 |---|---|---|---|
-| `issueMessage` | text | **判据描述文本**，如 `Server Hang: 停写 180s > 120s`、`Endless Rule: 写日志 360s > 300s` | 本功能没有「命中行原文」可写，用描述文本替代 |
-| `blockId` | keyword | 块 `_id`（`REQUEST_EXEC_ID`） | 兼作回模块 1 块详情的锚点，与 Oracle `BlockId` 同值 |
-| `issueTime` | date | **判据命中时刻**（告警服务墙钟） | 选索引依据 + 按时间检索 + ISM 排序 |
-| `issueType` | keyword | 判据 A → **`Server Hang`**；判据 B → **`Endless Rule`** | 写死入参，不读配置、不从日志解析 |
-| `_id` | ES metadata，非 mapping 字段 | **`blockId`** | 兼作对外 `issueId`；与 Oracle `BlockId` UK 一起落实「一个块只报一次」（§3.2） |
+| `issueMessage` | text | A：判定时当时 `END_LINE_ID` 那一行的 `LOG_BODY` 原文；B：**为空** | 问题日志原文，唯一分词字段 |
+| `blockId` | keyword | 块 `_id`（`REQUEST_EXEC_ID`），= Oracle `BlockId` | 不是 `_id`；查询时回块取业务字段的锚 |
+| `issueTime` | date | 块 `LAST_LINE_TIME`（两条判据相同），= Oracle `IssueTime` | 选索引依据 + 按时间检索 + ISM 排序 |
+| `issueType` | keyword | A `Server Hang`；B `Endless Rule`，块闭合后覆盖为 `Rule Recovered`（§7.6） | 一条 issue 一个值，区分来源与判据 |
+| `_id` | ES metadata，非 mapping 字段 | A `END_LINE_ID\|Server Hang`（判定时未闭合块当时）；B `BlockId\|Endless Rule` | = 对外 `issueId` = Oracle `IssueId`，文档内不冗余存（`06` 出参由 `_id` 映射） |
 
 其余两条口径，照 `09` §五：
 
-- **选索引与环境**：按 `issueTime` 所属月份选、不按扫描墙钟；环境由框架 `prefix` 前置区分；读走 `mes-log-monitor-issue-read`、不设写别名；`dynamic: strict` 写表外字段整篇拒写。
-- **ISM 不另配**：与关键字监控共用 `mes-log-exec-keep`、靠 `ism_template` 匹配 `mes-log-monitor-issue-*` 自动挂，hot 0 ~ 360 天、360 天后 cold 只读不删（`09` §二 / §五）。
+- **选索引与环境**：按 `issueTime`（业务时间）所属月份选、不按扫描墙钟；环境由框架 `prefix` 前置区分；读走 `mes-log-monitor-issue-read`、不设写别名；`dynamic: strict`。
+- **ISM 不另配**：与关键字监控共用 `mes-log-exec-keep`，靠 `ism_template` 匹配 `mes-log-monitor-issue-*` 自动挂，hot 0 ~ 360 天、360 天后 cold 只读不删（`09` §二 / §五）。
 
 ---
 
-## 3. 两条判据
+## 4. 运行时逻辑
 
-只做**主动推**的报警，两条判据都盯「一次 Rule 执行（一个块）」，阈值**环境级**（只看环境名，不需要 Rule Name）：
+**一句话**：每 `HangScanInterval` 醒一轮，**全量**捞块索引 `mes-log-exec-read` 中**所有 `EXEC_STATUS = 进行中` 的块**，逐块判 A / B；无 `@timestamp` 滑动窗口、不推 `FvTurn.CursorTs`、不需要 Block Scan 表；上一轮未命中的块下一轮自然还会被看到，闭口后不再进查询、不补报。
 
-| 判据 | 名目 | 一句话 |
-|---|---|---|
-| A | **Server Hang** | Rule 未执行完成（块未闭口）便停止写日志，停写超 **Max Delay** 秒 ⇒ 报 |
-| B | **Endless Rule** | Rule 写日志时长超 **Max Rule Cost** 秒 ⇒ 报（进行中就报；闭口后看总耗时） |
+### 4.1 口径
 
-> **闭口口径（2026-11-19 统一，对齐 `06` §4）**：`EXEC_STATUS` 四态 —— 进行中 / 已完成 / 超时封口 / 中断；**除「进行中」外三态都算闭口**（已完成 = 正常执行结束、中断 = 被重启截断、超时封口 = 静默兜底截断）。超时封口是终局态，不再解封、不再重放（尾行按终态处理、不进块）。故判据 A 的「块未闭口」= 仅进行中；判据 B「闭口后看总耗时」覆盖三态闭口块（含超时封口）。
+| 项 | 口径 |
+|---|---|
+| 扫描对象 | `EXEC_STATUS = 进行中`；闭口三态（已完成 / 中断 / 超时封口）不进查询 |
+| 判定依据 | 块上现成的 `START_TIME` / `LAST_LINE_TIME` / `EXEC_STATUS`，零字段改动 |
+| 环境过滤 | 每轮读 `FvSrvHangMonitorCfg` 取 `Enabled = true` 的 `Environment`，DSL 用 `terms ENV` |
+| Server 过滤 | 启动时读 Misc `log.monitor.servercategory`，DSL 用 `terms SERVER_CATEGORY`，**空名单 = 零命中** |
+| Rule 过滤 | 两条判据各自的 Exclude Rule Name List（启动读），各进各的 DSL；**空名单不加该条件** |
+| 产出 | 命中 → A / B 各按自己的 `_id` 写 Oracle + OS，一条 issue 一个 `issueType`，同一块可各一条 |
+| 互斥 | `FvTurn` 独立行 `Name = SRVHANGMON`，`SELECT … FOR UPDATE SKIP LOCKED`（§6） |
+| 应用形态 | 同一应用多定时器项目；与关键字监控是两个独立报警服务 |
 
-产出：报警事件落 **Oracle**（§1 状态表）+ 通知外发（邮件 / 飞书，复用 `FvAlarmCfg`）。
+### 4.2 必须守住
 
-### 3.1 原话（2026-09-24）
-
-> 「第二类是 Server Hang 报警：也是基于 Rule 来判定的，当 Rule 开始执行前到执行结束前：1，停止写 log 超过最大 delay 时间（秒）后通过钉钉、企业微信等等发送警报（这个叫 Server hang）。2. 持续写日志超过最大耗时（秒）后通过钉钉、企业微信发送警报（这个叫 Endless Rule）。第一类需要配置 Rule Name、带特殊标志的开始行日志和结束行日志。第二类需要配置环境名、最大 delay 时间、最大耗时时间，等级、发送邮件的地址、企业微信、钉钉等等。」
-
-拆解（配置项部分已落配置文档 §2）：
-
-| # | 要素 | 内容 |
-|---|---|---|
-| 1 | 判定对象 | **一次 Rule 的执行**（「Rule 开始执行前 → 执行结束前」这个窗口内） |
-| 2 | 判据 A · **Server Hang** | **停止写 log 超过最大 delay 时间（秒）** ⇒ 报警，名目 `Server Hang` |
-| 3 | 判据 B · **Endless Rule** | **持续写日志超过最大耗时（秒）** ⇒ 报警，名目 `Endless Rule` |
-| 4 | 通知渠道 | 原口径钉钉 / 企业微信 / 邮件 → **已收口为邮件 + 飞书**（配置文档 §2.2） |
-| 5 | 配置项 | 环境名、最大 delay、最大耗时、等级、收件人 → **见配置文档 §2** |
-
-### 3.2 已核（2026-09-24 15:00 / 15:09；末行 2026-10-09）
-
-| # | 判据 / 项 | 判定的口径 |
-|---|---|---|
-| A · Server Hang | `now − LAST_LINE_TIME >= delay` ⇒ 报。基准是**块末行的日志时间** |
-| B · Endless Rule | **进行中**：`now − START_TIME >= 最大耗时` ⇒ 报；**闭口后**：看 `TOTAL_COST_MS >= 最大耗时` |
-| 次数 | **一个块只报一次** —— 报过即落库标记，同一块不再重复报（已落 §1.2 UK + §2 `_id` 幂等） |
-| 配置范围 | **只看环境名**、**不需要 Rule Name** —— 该环境下的块都判 |
-| 前提（2026-10-09 确认） | 判据 A 的「Rule **未执行完成**便停止写日志」= **块未闭口** |
-
-> 原话（2026-09-24 15:09）：
-> 「我觉得要记录块报过一次就不再报了。」（原话「包过」按「报过」理解）
+- **A 的上界**：`now − LAST_LINE_TIME > MaxDelay` 且 `≤ 10min` 才报 Server Hang；更大的块由派生层封成超时封口、不再进扫描。**10min 与静默期 `SilenceMinutes` 各按各自配置走、不互相兜底**。
+- **Exclude Rule List 为空时不加排除条件**；**Server Category 白名单恒拼，空名单零命中**（不写「空名单跳过该条件」）。
 
 ---
 
-## 4. 与现有口径的关系
+## 5. 轮次表 · 预置数据
 
-### 4.1 已经对上的（不用改）
+**结论**：轮次表 `FvTurn` 复用现成框架表，**不改表结构；`Name = 'SRVHANGMON'` 这一行由初始化脚本 / 运维预置，服务启动不写、只校验（§6）**。本模块只借这张表的行锁做整轮互斥，**不读也不推 `CursorTs`** —— 与关键字监控的 `MONITOR` 行各占一行、各一把独立行锁，互不阻塞。
 
-| 现有口径 | 位置 | 与本功能的对应 |
+### 5.1 本模块用到的列
+
+| 列 | 类型 | 说明 |
 |---|---|---|
-| 块上有 `START_TIME` / `LAST_LINE_TIME` / `TOTAL_COST_MS` / `EXEC_STATUS` | `06` §2.2 | 两条判据所需的事实值**都已有**，零字段缺口 |
-| 静默判据（未闭口块 + `LAST_LINE_TIME`） | `06` §3.2.3 慢轮次（路 2 静默判据） | 与判据 A **同形**（差别只在阈值来源，见 §5.2） |
-| 告警落 Oracle、通知外发 | `04` §六 | 本功能的落点 |
-| 结果索引模板 / ISM | `09` §五 / §二（权威）；`02` §2（引用） | 本功能**直接沿用**，不新建（§2） |
+| `Name` | VARCHAR2(30) | **唯一索引**，业务定位键。本模块固定 `SRVHANGMON`；与 `MONITOR` 各占一行、各一把锁 |
+| `Owner` | VARCHAR2(64) | 抢到本轮的节点，诊断用 |
+| `StartedAt` | TIMESTAMP(3) | 本轮触发时刻，诊断用 |
 
-### 4.2 冲突 / 需要重新定口径的
+> `CursorTs` **本模块不用**：全量扫未闭合块、不推窗口游标，抢到锁即整轮重判。列名为本模块口径；现场轮次表若已有等价列，直接复用、SQL 里的列名按现场对齐，**口径不变**。`ID` 等技术主键由自增 / 框架补。
 
-| # | 冲突点 | 现状 | 结果 |
-|---|---|---|---|
-| 1 | 模块 2 概览 §五「Hang 数据同源」 | 「Hang 在采集/加工阶段判定并落库；模块 1 是详情视角、模块 2 是监控视角」 | **2026-10-09 拆分后失效**：第一类归模块 5 + 派生层 + 模块 1 展示，模块 2 只剩报警 —— 概览待同步 |
-| 2 | 静默阈值硬编码 5 分钟 | `fabviewer.yaml` 的 `silence_minutes: 5`（派生层专用） | 判据 A 的 delay **按配置可调**且配在 `FvSrvHangMonitorCfg.Environment` 行上（**按环境各管各**）⇒ 与静默期的时序关系见 §5.2 |
-| 3 | `04` §六只登记关键字监控 | 「本文所涉的告警服务只有一个」 | 本功能定稿后需**回补 `04` §六**（冻结文档，动前确认；§7-7） |
+### 5.2 预置数据
 
----
+`Name = 'SRVHANGMON'` 这一行由**初始化脚本 / 运维预置**，初始化脚本只需给下面这一个栏位赋值（部署时一次）：
 
-## 5. 落点与架构（2026-10-09 过图已核）
+| 栏位 | 值 |
+|---|---|
+| `Name` | `SRVHANGMON` |
 
-```mermaid
-flowchart LR
-    subgraph ORA["Oracle · 规则与报警"]
-        MON["FvSrvHangMonitorCfg<br/>环境级阈值"]
-        ALM["FvSrvHangMonitorAlarmState<br/>新建状态表（一块一条）"]
-    end
-    subgraph OS["OpenSearch"]
-        EXEC[("汇总索引 · 块文档")]
-        ISSUE[("mes-log-monitor-issue<br/>issueType=Server Hang / Endless Rule")]
-    end
-    ALS["告警服务<br/>Server Hang 监控项"]
-    UI2["模块 2 报警处置<br/>模块 4 告警 Dashboard"]
-    NOTI["通知外发<br/>邮件 + 飞书"]
+- **谁写**：初始化脚本 / 运维；服务启动**一行都不写** —— 不补行、不覆盖。
+- **多实例**：每台启动各自校验、都不写；行由部署阶段一次性预置。
 
-    MON -->|"读配置：04 §六口径 1 现成路径"| ALS
-    EXEC -->|"定时扫未闭口块"| ALS
-    ALS -->|"报警落状态表"| ALM
-    ALS -->|"issue 写结果索引（_id=blockId）"| ISSUE
-    ALS -->|"按 priority + FvAlarmCfg"| NOTI
-    ALM --> UI2
+## 6. 启动校验与每轮锁 SQL
+
+**启动前置校验**：只读检查 `SRVHANGMON` 行存在且可读（连不上 / 查不动一并算失败）；**有问题直接启动失败并报错**，不降级、不静默跳过、不自动补。`SKIP LOCKED` 返回 0 行的语义是「别人在跑」，行一旦缺失会伪装成「每轮都被跳过」⇒ 静默全停，必须在启动阶段挡住。业务规则仍由 `03` 配置页维护，服务不预置。
+
+### 6.1 每轮执行的 SQL
+
+```sql
+-- ① 抢轮次：本轮第一条语句，跨机互斥；返回 0 行即本轮结束（不排队、不补跑）
+SELECT Name
+  FROM FvTurn
+ WHERE Name = 'SRVHANGMON'
+   FOR UPDATE SKIP LOCKED;      -- 必须带 SKIP LOCKED
+
+-- ② 抢到后登记本轮归属（同一事务，行锁持到整轮结束）
+UPDATE FvTurn SET Owner = :nodeId, StartedAt = :fireAt
+ WHERE Name = 'SRVHANGMON';
+
+-- ③ §7 整轮完成后 COMMIT；跳过 / 失败 ROLLBACK，本轮无改动（不读也不推 CursorTs）
+COMMIT;
 ```
 
-> 第一类（块文档 `HANG_LIST` / 派生 Worker 判定 / 模块 1 展示）已拆出，图与架构记录见模块 5 `01-Server Hang Reason Config.md` §三 / §四。
+- 返回 **1 行** = 抢到，行锁从这条 `SELECT` 一直持到 `COMMIT`；返回 **0 行** = 别人在跑，**本轮事务直接结束**（还没做任何改动，提交与回滚等价）。
+- **为什么必须 `SKIP LOCKED`**：不带 SKIP，后醒的节点会阻塞在行锁上排队，锁一释放接着跑第二遍 —— 周期漂移、同一刻度重复执行；带 SKIP 才是「被占用就跳过、不排队、不补跑」。
+- 不引 Redis / 分布式锁：进程崩了事务回滚、行锁自动释放，不需要租约与接管。
 
-**架构上真正的新东西只有一件**：告警服务加「Server Hang 监控项」（定时扫未闭口块）—— 归 `10-告警服务工程实现.md` 重写时一并（已清空待重写，顺路）。其余全是现成路径：`FvSrvHangMonitorCfg` 归告警服务读、报警落 Oracle、数据源取链路已产出的块 —— `04` §六三条边界一条不破；结果索引与 ISM 直接沿用功能 1（§2 / §3）。
+### 6.2 锁的边界
 
-### 5.1 落点：独立 Alarm Application，定时读块文档（2026-10-09 拍板）
-
-**拍板**：Alarm **单独一个 Application**，定时读取块文档产生报警 —— 数据源 = 汇总索引的块文档，**不回捞行**（`04` §六口径 3「数据源取自链路已产出的日志」落在这里）。待定：扫描周期量级（§7-9）、与功能 1（关键字监控）是同一个告警服务还是两个应用（§7-10）。
-
-第二类判的是「**还没闭口的块**」（= 仅进行中，闭口口径见 §3），而块上现成就有 `START_TIME` / `LAST_LINE_TIME` / `EXEC_STATUS`。两条判据都不需要新字段：
-
-| 判据 | 判定式（告警服务侧） | 用的现成字段 |
-|---|---|---|
-| A · Server Hang（停止写 log 超 delay） | 块未闭口（=进行中）**且** `now − LAST_LINE_TIME >= delay` ⇒ 报 | `EXEC_STATUS` / `LAST_LINE_TIME` |
-| B · Endless Rule（持续写超最大耗时） | **进行中**：块未闭口 **且** `now − START_TIME >= 最大耗时` ⇒ 报；**闭口后**（含超时封口）：`TOTAL_COST_MS >= 最大耗时` ⇒ 报 | `EXEC_STATUS` / `START_TIME` / `TOTAL_COST_MS` |
-
-⇒ **零字段改动、零派生层改动**，只在**告警服务**里加一个「Server Hang 监控项」。这与 `04` §六 的架构（告警服务是 OpenSearch 之后的独立应用层）一致。
-
-**配置生效（`Enabled`，2026-11-18 补）**：告警服务**每轮重读 `FvSrvHangMonitorCfg`，只取 `Enabled = true` 的行**，`Environment` 去重成本轮环境集合；`false` 的环境整行不参与两条判据，配置保留不删。不缓存、不热加载，删改与启停都**下一轮生效**（配置侧字段与 `state` 接口见 `03` §2.1 / §4.1-5）。配置页 `list` 全量返回、不过滤，过滤只发生在运行时读配置这一步。
-
-**运行时参数**：本功能用到的服务级参数（`HangScanInterval` 扫描周期、`SilenceMinutes` 静默期、环境名单）与关键字监控**共用一张表**，统一见 `02` §6「配置参数」，此处不重复维护；业务阈值 `MaxDelay` / `MaxRuleCost` / `Enabled` 在配置文档 `03` §2 维护。
-
-### 5.2 一条跨层约束（2026-10-09 修正方向 —— 首轮推演写反了）
-
-**时序**：派生层在块停写满静默期（5min）后把它封成 `超时封口`；超时封口已归入闭口（§3 口径，对齐 `06` §4「除进行中外都算闭口」，且封口即终局、不再解封/重开），判据 A 只认「未闭口 = 进行中」块 ⇒ 触发窗口只有**停写后 [maxDelay, 静默期) 这一段**：
-
-| maxDelay 配置 | 结果 |
+| 项 | 口径 |
 |---|---|
-| **< 静默期** 且告警扫描周期 **< 静默期 − maxDelay** | 窗口内必有扫描点 ⇒ **报得出** |
-| **≥ 静默期** | 窗口为空，块先被派生层封口 ⇒ **判据 A 永不触发**（首轮建议「delay ≥ 静默期」恰是这个死局，已纠） |
-
-⇒ **唯一方案：maxDelay 严格小于静默期并留扫描裕量**（约束配置上限）。原「二选一」的另一支「判据 A 扩认超时封口块」随本次闭口口径**取消** —— 超时封口已是闭口终态、不再重开，扩认它等于对已结束的块补报，与「一个块只报一次」和判据 A「未闭口」前提都冲突。扫描周期与两阈值的咬合见 `02` §6 参数表（`HangScanInterval` / `SilenceMinutes`）。
-
----
-
-## 6. 报警存储与通知
-
-| # | 口径 | 说明 |
-|---|---|---|
-| 1 | 配置落 **Oracle** | 消费方是**告警服务** —— `04` §六口径 1 的现成路径，零架构改动 |
-| 2 | **Alarm 存 Oracle，不进 OpenSearch** | `04` §六口径 2 既定边界，不破。理由：报警是**有状态事件**（新建/已确认/已恢复/已关闭/误报 + 处置记录 + 通知留痕，Oracle 行级更新干净）；「一个块只报一次」要**幂等标记**（§1.2 UK 兜死）；与功能 1 报警**同一套处置状态机与展示口径**（模块 2 处置页、模块 4 Dashboard 不跨源取数）—— **表各自一张**（§1），不是物理同表。观测性靠 OS 结果索引（§2）与「报警记录存 `BlockId`，点开跳模块 1 块详情看原始日志」补齐 —— `04` §六「两边靠键关联」现成口径 |
-| 3 | 报警表名 | **已定 `FvSrvHangMonitorAlarmState`**（§1，新建）；与功能 1 的 `FvLogMonitorAlarmState` **各一张**，不混用 |
-| 4 | 术语落定 | 阈值名 **Max Delay** / **Max Rule Cost**（Halo 术语），与模块 5 重做的「Server Hang 配置」页对上 |
-| 5 | 通知渠道 | 本功能原口径为钉钉 / 企业微信 / 邮件；功能 1 本版只做邮件 + 飞书。**已收口（2026-11-10）**：复用功能 1 的 `FvAlarmCfg`（邮件 + 飞书 + 通知间隔），随配置 1:1，企微 / 钉钉后续扩 —— 见配置文档 §2.2 |
+| 事务范围 | 只包本轮扫描与判定落库；外部 IO（通知等）全在 `COMMIT` 之后、锁外 |
+| 串行语义 | 不排队、不补跑；上一轮没结束，下一个 `HangScanInterval` 刻度整轮跳过 |
+| 同机防重入 | 定时器固定速率触发，上一轮没完下次照样来 ⇒ 进程内「正在跑就跳过本次触发」标记 |
+| 一轮跑过一周期 | 持锁跨过下一个刻度，那个刻度被跳过；因全量重判、不推游标，无需收敛 |
+| 崩溃 | Oracle 行锁随事务回滚自动释放，下一轮别的节点直接接管，无主备切换 |
+| 相位固定节点 | 可能长期抢不到轮次，不报错、不影响正确性；排查时先看这一处 |
 
 ---
 
-## 7. 待确认（运行时侧）
+## 7. 每轮业务
 
-| # | 问题 | 归口 / 为什么必须问 |
+**一句话**：本章只写 §4 / §6 没写的部分 —— 抢到 `SRVHANGMON` 行锁（§6.1 ①）之后、`COMMIT`（③）之前，一轮 6 步。全量扫与互斥口径（§4）、抢锁与失败回滚（§6.1）、事务边界（§6.2）一律引用，不重复。
+
+### 7.1 一轮 6 步
+
+| 步 | 做什么 | 打在哪 | 口径 |
+|---|---|---|---|
+| 1 | 抢 `SRVHANGMON` 行锁；抢不到整轮跳过 | Oracle | **已写** §6.1 ① / §6.2 |
+| 2 | 启动读 System Misc 三份名单（§7.2）；每轮重读配置表（§7.3） | System Misc + Oracle | §7.2 / §7.3 |
+| 3 | A / B 各发一个 DSL 捞进行中块，各自带 ENV + Server Category + 自己的 Exclude Rule List（§7.4） | 块索引 | §7.4 |
+| 4 | 逐块判定，两判据互不冲突、可同时检查；命中按 §7.4 映射准备落库 | 块文档 | §7.4 |
+| 5 | 第二轮起：A 落库前查重、B 以第一次为准；Endless Rule 闭合块改 `Rule Recovered`（§7.6） | OS + Oracle | §7.6 |
+| 6 | `COMMIT`；通知在事务 / 锁之外外发（见 `10`） | Oracle | **已写** §6.1 ③ / §6.2 |
+
+### 7.2 启动时读 System Misc
+
+| 配置项 | 用途 | 处理 |
 |---|---|---|
-| 4 | 报警的**恢复**怎么算（继续写日志即恢复？还是人工关闭） | 接模块 2 概览 §四 的状态机 |
-| 7 | `04` §六**回补**：现写死「只有关键字监控一个告警服务」，本功能定稿后加入 | 冻结文档，动前确认 |
-| 9 | **扫描周期**：Alarm App 多久扫一轮块文档？最坏报警延迟 ≈ `maxDelay + 扫描周期`，且须 < `静默期 − maxDelay`（§5.2）—— 三者互相咬 | `10-告警服务工程实现.md` |
-| 10 | **应用形态**：本功能的 Alarm App 与功能 1（关键字监控）告警服务 = 同一个应用多监控项，还是两个独立应用？（倾向前者：`10` 本按「一个告警层」重写） | `10-告警服务工程实现.md` |
-| 11 | ~~§5.2 二选一~~ | ✅ 已随闭口口径收敛（2026-11-19）：超时封口归入闭口、不再重开，判据 A 不扩认；唯一方案 `maxDelay` < 静默期并留裕量（§5.2） |
+| `log.monitor.servercategory` | 决定哪些 Server 看 Server Hang | 启动读一次，取 `string[]`，嵌 `terms SERVER_CATEGORY`；**空名单零命中**；改配置要重启 |
+| `log.monitor.srvhang.excludeRules` | A · Server Hang 的排除 Rule Name List | 启动读一次，**空名单不加排除条件**；改配置要重启 |
+| `log.monitor.endless.excludeRules` | B · Endless Rule 的排除 Rule Name List | 同上 |
 
-> 编号沿用原沟通稿（4 / 7 / 9 / 10 / 11）；原第 6 条（A / B 各报一次）已定为**整块一条**（§2 `_id = blockId`）—— 备选改法为 `_id = blockId|issueType`（与功能 1 的 `LineId|Item` 同思路）+ Oracle UK 改 `BlockId + 判据类型`，当前不走；原第 8 条（表是否统一）已定为**新建各自一张**（§1）。
+- 三份名单都是**公共方法返回什么原样记什么**，服务侧不解析、不校验、不转换、不补默认值；与每轮重读的配置表（§7.3）是两回事。
+- 环境名单 `mes.global.environments` 随配置校验，运行时按配置表 `Environment` 取（§7.3）。
 
----
+### 7.3 每轮读配置
 
-## 8. 下一步
+重读 `FvSrvHangMonitorCfg`，只取 `Enabled = true`，`Environment` 去重成环境集合，DSL 用 `terms ENV`。不缓存、不热加载，改配置下一轮生效。环境候选来自 Misc `mes.global.environments`；与 Filebeat `fields.ENV` 大小写不齐会全落空且不报错 ⇒ 启动时打印读到的环境集合。
 
-1. **已答（2026-09-24 15:00）**：判据 A = `now − LAST_LINE_TIME >= delay`、判据 B 进行中就报 + 闭口后看总耗时、**只看环境名**。（首轮同时答的第一类口径已随拆分迁模块 5。）
-2. **已答（2026-09-24 15:09）**：**一个块只报一次**（报过落库标记、不重复）—— 已落 §1.2 `BlockId` UK + §2 OS `_id` 幂等。
-3. **已答（2026-10-09）**：配置表 `FvSrvHangMonitorCfg`（2026-11-10 定稿：Environment 唯一键 + 两阈值 + Priority + AlarmCfgId，见配置文档 §2）；**Alarm 存 Oracle**；判据 A 前提 = 块未闭口。
-4. **已答（2026-10-09 续）**：**落点拍板** —— 独立 Alarm Application 定时读块文档（不回捞行）。**跨层约束方向修正**：`maxDelay` 须严格 < 静默期并留扫描裕量（原「delay ≥ 静默期」是死局）。
-5. **已答（2026-10-09 · 拆分）**：第一类 Server Hang List 整体拆出 → 模块 5 **Server Hang Reason Config**（配置）+ 派生服务（运行）+ 模块 1（Rule Info 检索 §3.6 与 Rule 实效分析展示）；本功能只留第二类。（第一类两轮全部已定口径见模块 5 文档。实效分析出口**后取消**——不消费，2026-10-09 定，见附录 A.4-3。）
-6. **已答（2026-11-10 · 拆分）**：本篇与原 `03` 按「配置 / 运行时」拆两篇，与功能 1 的 `01` / `02` 对齐。
-7. **已答（2026-11-10；2026-11-18 更新）**：配置表 / 接口已定稿（配置文档 §2 / §4），`AlarmItems` 废弃、通知复用 `FvAlarmCfg`；**新增 `Enabled`**（布尔，新建默认 `true`，列表开关走 `state` 接口），运行时每轮重读配置只取 `Enabled = true` 的环境（§5.1）。
-8. **已答（2026-11-18）**：状态表**新建** `FvSrvHangMonitorAlarmState`（§1，含环境 / 等级 / 两阈值快照 + 块与处置字段）；OS **沿用** `mes-log-monitor-issue` 模板，`issueType` = `Server Hang` / `Endless Rule`、**`_id = blockId`**（§2）；ISM 共用不新建（§3）。
-9. 已定（2026-11-19）：**§5.2** 随超时封口归入闭口收敛为单方案（`maxDelay` < 静默期并留裕量，判据 A 不扩认超时封口）；§7 其余四条归模块 2 `10`。
+```sql
+-- 每轮开头重读；快照四列一并用，AlarmCfgId 留给通知器按 ID 取
+SELECT Environment, Priority, MaxDelay, MaxRuleCost, AlarmCfgId
+  FROM FvSrvHangMonitorCfg
+ WHERE Enabled = :enabledTrue;
+```
 
----
+### 7.4 两条判据与两个 DSL
 
-## 附录 · 第一类判定与运行口径速查（2026-10-09 已定；暂存于此，动 `06` 时迁出）
+| 判据 | 对象（`EXEC_STATUS`） | 判定式 | `issueType` |
+|---|---|---|---|
+| A · Server Hang | 未闭合（仅进行中） | `now − LAST_LINE_TIME > MaxDelay` 且 `≤ 10min`（上界即超时封口判据） | `Server Hang` |
+| B · Endless Rule | 未闭合（仅进行中） | `LAST_LINE_TIME − START_TIME > MaxRuleCost` | `Endless Rule` |
 
-> 第一类 2026-10-09 拆分：**配置逻辑**（表结构 / 四式语义 / 页面骨架）归模块 5 `01-Server Hang Reason Config.md`；以下为**判定与运行侧**已定口径，暂存备查，动 `06` 时正式迁入。
+闭口三态都不判。
 
-### A.1 判定（2026-09-24 口述 + 已核 10 条）
+**DSL 拼装**
 
-> 原话（2026-09-24）：「一类是通过定义 Rule Name、开始行和结束行的带特殊标志的日志（两头模糊匹配）来在原始日志中瞄定开始行和结束行，计算每个开始行和结束行的时差，时差大于 0 时将其放入 Server hang list 并标注出来开始行完整日志与结束行完整日志。当一个 Rule 存在大于等于 1 个 Server Hang 时在 Rule Info 检索功能中展示。」
-> （15:09 补）：「按匹配编号相邻。例如配置了两类，A和B，匹配的行分别是A1-Start，B1-Start， A1-End，A1-Start、A1-End，B1-End。那么分类也是1-3，2-6，4-5的关系。只有开始没有结束，那就是再多一个B1-Start的场景，找不到结束则忽略。只统计每个结束-开始时差 >0的。如果多个都时差大于0，展示层就显示多行。」
+- A / B 各一个查询，可同时检查；各自按自己的 `_id` 落一条 issue。
+- 各自带三项条件：`terms ENV`（本轮环境集合）+ `terms SERVER_CATEGORY`（恒拼）+ 该判据自己的 Exclude Rule List（拼在块 `RULENAME` 上，空则不加）。
+- 公共过滤：`EXEC_STATUS = 进行中`；`IssueId` 幂等照 §2 / §3。
+- **DSL 只捞候选块、时间判据在应用侧逐块判**：`MaxDelay` / `MaxRuleCost` 按环境不同（一环境一行配置），且 B 是两个字段相减，range 表达不了；DSL 不拼时间阈值。
 
-| # | 口径 | 说明 |
+**A · Server Hang 查块 DSL**（`mes-log-exec-read`；`terms SERVER_CATEGORY` 恒拼、空数组即零命中）
+
+```json
+GET /mes-log-exec-read/_search
+{
+  "size": 200,
+  "track_total_hits": false,
+  "query": {
+    "bool": {
+      "filter": [
+        {"term":  {"EXEC_STATUS": "进行中"}},
+        {"terms": {"ENV": ["PROD", "PIRUN"]}},
+        {"terms": {"SERVER_CATEGORY": ["FAB", "LIST"]}}
+      ],
+      "must_not": [
+        {"terms": {"RULENAME": ["JOBPREPRULE", "EAPReqJobOutEx"]}}
+      ]
+    }
+  },
+  "sort": [{"_id": "asc"}],
+  "_source": ["ENV", "RULENAME", "START_TIME", "LAST_LINE_TIME", "END_LINE_ID"]
+}
+```
+
+**B · Endless Rule 查块 DSL**：把上面 `must_not` 的名单换成 `log.monitor.endless.excludeRules` 那份（示例 `["EAPReqJobInEx", "PRE", "POST"]`），其余完全相同。**名单为空时整条 `must_not` 不拼**，不是拼空数组（空 `must_not` 会排除所有块）。
+
+- 翻页用 `search_after` 带上页最后一条的 `_id`，首屏不带，翻到返回空数组为止；`_id` 即 `BlockId` 默认返回。
+- `_source` 取判定所需字段：`START_TIME` / `LAST_LINE_TIME` 应用侧判时间、`END_LINE_ID` A 取原文与拼 `_id`、`RULENAME` 落 Oracle 快照；`SERVER_CATEGORY` 已进查询不再取。
+
+**应用侧逐块判定**
+
+```
+A: (now - LAST_LINE_TIME) > MaxDelay*1000 且 (now - LAST_LINE_TIME) <= 600000   → issueType = Server Hang
+B: (LAST_LINE_TIME - START_TIME) > MaxRuleCost*1000                            → issueType = Endless Rule
+```
+
+`MaxDelay` / `MaxRuleCost` 按该块 `ENV` 从本轮重读的配置快照取（单位秒，×1000 换毫秒）；两条独立判定、同块可同时命中。`issueTime` 取块 `LAST_LINE_TIME`。
+
+**A 取 `issueMessage` 原文**：按判定当时块的 `END_LINE_ID` 到行索引取 `_source.LOG_BODY`（`END_LINE_ID` 即行 `_id`）；B 不取、写空字符串。
+
+```json
+GET /mes-log-line-read/_doc/{END_LINE_ID}
+{"_source": ["LOG_BODY"]}
+```
+
+**写入映射**
+
+| 项 | A · Server Hang | B · Endless Rule |
 |---|---|---|
-| 1 | **不跨块** | 开始行与结束行都在同一个 Rule（同一个块）内判断 |
-| 2 | 匹配**块内所有行** | 由该条配置写的标志决定，不按 `MSG_KIND` 预筛 |
-| 3 | 「一个 Rule」= **一个块** | Hang 数按这一次执行（这一个块）算，不按 Rule Name 汇总 |
-| 4 | **同类内配对、跨配置不配** | 每条配置（一类标志）单独处理；不同配置的行互不配对 |
-| 5 | **连续同类：End 配最近的未闭合 Start（栈式）** | 每个 Start 各开一行候选，End 配最后一个 Start；块闭口仍未等到 End ⇒ 丢弃；多余 End（无可配 Start）忽略；栈式天然产生同类内嵌套 |
-| 6 | **只有开始行、找不到结束行 ⇒ 忽略** | 配不上结束行的开始行不计入 List |
-| 7 | **时差 = 结束行时间 − 开始行时间** | 只统计 `> 0` 的对 |
-| 8 | **一个块可产出多条** | 多对都 > 0 ⇒ 展示层显示多行 |
-| 9 | **多 Reason 区间可嵌套 / 交叉** | 不同 Reason 各自独立配对、独立记录；R1 可完全包裹 R2 或交叉，共存不互斥 |
-| 10 | 展示出口 | 该块 Hang ≥ 1 ⇒ 模块 1 Rule Info 检索展示（**唯一出口**；实效分析不消费，2026-10-09 定） |
+| OS `_id` = Oracle `IssueId` | `END_LINE_ID\|Server Hang`（判定时未闭合块当时） | `BlockId\|Endless Rule` |
+| `issueType` | `Server Hang` | `Endless Rule` |
+| `issueTime` = Oracle `IssueTime` | 块 `LAST_LINE_TIME` | 块 `LAST_LINE_TIME` |
+| `issueMessage` | 当时 `END_LINE_ID` 那一行的 `LOG_BODY` 原文 | 空字符串 |
+| `blockId` = Oracle `BlockId` | 块 `_id`（`REQUEST_EXEC_ID`） | 同左 |
+| Oracle `RuleName` | 取块的 `RULENAME` 快照 | 同左 |
 
-### A.2 运行（派生服务 Worker 侧）
+A 的 `_id` 取判定时那一次的 `END_LINE_ID`，不是块 `_id`；B 用块 `_id`。两条 issue 都写 Oracle + OS 两源，各按自己的 `_id` 幂等。
 
-**拍板（2026-10-09）**：落点 = 派生服务 **Worker 端**，每次重放**全量重算、UPSERT 覆盖**（与 `LOCK_SEQ` / `INNER_RULES` 同构）—— 进行中块每轮只见已配对部分，闭口后最后一次重放定格全量。
+### 7.5 存放与通知
 
-| 环节 | 做法 |
-|---|---|
-| 配置加载 | **块处理时按块 `RULENAME` 现查** `FvSrvHangConfig`（不全量抓）；**内存短缓存 TTL 5min**（配置多时迁 Redis、配置保存时更新缓存）⇒ 变更最迟 5min 生效。`RULENAME` 为块文档字段（行文档无此字段，04 §3.3 / §4.5），业务上单值 |
-| 匹配入口 | 块 `RULENAME` 精确命中配置的 `ruleName` 才判（没配的块零成本跳过）；原料 = 重放行 `LOG_BODY` |
-| 压缩 | Hang 判断跟着重放走，**且命中块走压缩例外**（`06` §3.3.3）：留存行 = 界线后**有标签**行 + 末行，但 Hang 标志行多为**无标签 Other** ⇒ 命中 Hang 配置的块**界线后全留（含 Other）** —— 否则跨单位行的块若在本轮闭口，HANG_LIST 漏配且**永久**（终态块不再重放）；未闭口块可自愈（下一轮路 2 重扫整块、行索引全量拉回） |
-| 计算与入列 | `End.LOG_TIME − Start.LOG_TIME`：**> 0 记入 `HANG_LIST`；≤ 0 不记录** |
-| 为什么是这里 | 派生层重放时手上就有该块全量有序行 —— 放别处要重做「捞行 + 两级排序 + 块边界」 |
-| 不要走的路 | 告警服务侧扫（重做重放的活）；塞加工层（`04` §六：Logstash 不做业务判定，配对有状态） |
-| 代价 | 块 mapping 加字段 ⇒ 连动 `09` §四 / `deploy/opensearch/12-template-exec.json` —— **动块字段前必须拍板** |
+- 配置与报警状态落 Oracle，不进 OpenSearch；观测文本走 OS 结果索引（§3），报警记录存 `BlockId`，点开跳模块 1 块详情看原始日志。
+- 与功能 1 共用同一套处置状态机与展示口径（模块 2 处置页 / 模块 4 Dashboard），表各自一张。
+- 通知复用功能 1 的 `FvAlarmCfg`（邮件 + 飞书 + 通知间隔），随配置 1:1；企微 / 钉钉后续扩。外发实现见 `10`。
 
-### A.3 产出 `HANG_LIST` 与展示
+### 7.6 第二轮起 · 落库查重与 Endless Rule 恢复
 
-**`HANG_LIST`（块文档嵌套数组）每条 8 项（2026-10-09 第二版形态）**：Hang Start Line ID、Hang Start Line（完整原文）、Hang End Line ID、Hang End Line（完整原文）、Hang Reason（带自配置）、耗时、开始行时间、结束行时间 —— 两行的行身份串（`hit._id`）即跳行索引原文的锚。
-
-展示：模块 1 `01` §3.6 **唯一出口**（列数字 = `hangCount`、弹框 = 10 号接口 `rule_info/hang_list`，落库后启用；弹框加 Hang Reason 列**推后**，先做后端）；`02` 实效分析**不消费**（2026-10-09 定，列表无该列）。
-
-### A.4 第一类待定
-
-| # | 问题 | 归口 |
+| 场景 | 检查 | 结果 |
 |---|---|---|
-| 1 | ~~存量块不回算？~~ ✅ **已答（2026-10-09）**：不回算 —— `HANG_LIST` / `LOCK_SEQ` / `INNER_RULES` 三字段一个口径 | — |
-| 2 | ~~`HANG_LIST` 英文命名~~ ✅ **已答（2026-10-09）**：8 项命名已定并落 `09` §四 / `12-template-exec.json`（块 32 字段、3 组 nested） | — |
-| 3 | ~~实效分析怎么消费 Hang 数据~~ ✅ **已答（2026-10-09）**：**不消费**，列表无 `Server Hang` 列 | — |
+| A 重复命中 | 落库前按本条 `issueId` 查 OS 是否已有该 `_id` | 有 ⇒ OS + Oracle 都不写；无 ⇒ 新建两源各一行 |
+| A 恢复后再犯 | 同一块 a 点记过、恢复后 b 点又命中 | `LAST_LINE_ID`（`END_LINE_ID`）不同 ⇒ `issueId` 不同 ⇒ 两行，不合并、不覆盖 |
+| B 重复命中 | 再次扫到未停止的同一块 | 不写两源，以第一次落的那行为准（`_id` 恒定，天然幂等） |
+| B 恢复 | 按 Oracle `IssueType = Endless Rule` 找行，检查块是否闭合（已完成 / 超时封口 / 中断都算） | 闭合 ⇒ 两源原位改 `Rule Recovered`，`_id` / `IssueId` 不变 |
+
+**B 恢复的字段更新**（原位，不新增行）
+
+| 源 | 字段 | 动作 |
+|---|---|---|
+| OS | `issueType` | `Endless Rule` → `Rule Recovered` |
+| OS | `_id` | 不变 |
+| Oracle | `IssueType` | `Endless Rule` → `Rule Recovered` |
+| Oracle | `Alarmed` | 当前为 `Y` 时改 `N`，已是 `N` 不动 |
+| Oracle | `LastAlarmTime` | 不变 |
+
+A 的查重按 OS `_id` 存在性，Oracle `IssueId` UK 作库层兜底；B 靠恒定 `_id` 幂等。**A 不做 `Rule Recovered`**：恢复后再次停写是新的一条，旧行保持 `Server Hang` 不动。恢复检查从 Oracle 已落的 `Endless Rule` 行出发按 `BlockId` 查块 `EXEC_STATUS`（主扫只捞进行中块，闭口块不在候选里）。
+
+**A 查重 + 写两源**（索引名按 `issueTime` = 块 `LAST_LINE_TIME` 所属月份选，示例 `2026.11`）
+
+```json
+-- ① 查重：存在则本条整条跳过（OS 与 Oracle 都不写）
+HEAD /mes-log-monitor-issue-2026.11/_doc/{issueId}      -- 200 = 已有，404 = 新建
+
+-- ② 新建 OS：_id 即对外 issueId，四字段写全（dynamic: strict）
+PUT /mes-log-monitor-issue-2026.11/_doc/{issueId}
+{
+  "issueMessage": "<END_LINE_ID 行的 LOG_BODY 原文>",
+  "blockId": "<REQUEST_EXEC_ID>",
+  "issueTime": "2026/11/23 10:15:30.000",
+  "issueType": "Server Hang"
+}
+```
+
+```sql
+-- ③ 新建 Oracle 状态行：ID 与审计四字段由底层赋值，不出现在 SQL 里
+MERGE INTO FvSrvHangMonitorAlarmState t
+USING (SELECT :issueId AS issueId FROM dual) s
+   ON (t.IssueId = s.issueId)
+ WHEN NOT MATCHED THEN
+   INSERT (Environment, Priority, MaxDelay, MaxRuleCost, IssueId, IssueType,
+           BlockId, RuleName, IssueTime, ReportTime, Alarmed)
+   VALUES (:env, :priority, :maxDelay, :maxRuleCost, :issueId, 'Server Hang',
+           :blockId, :ruleName, :issueTime, :reportTime, 'N');
+```
+
+B 命中走同一套写入，`IssueType` / `issueType` 换 `Endless Rule`、`issueMessage` 传空串；重复命中因 `_id` 与 `IssueId` 恒定，`HEAD` 返回 200 即跳过、`MERGE` 也命中已有行不插入，以第一次为准。
+
+**B 恢复**（从 Oracle 找候选 → 查块状态 → 两源原位改）
+
+```sql
+-- ① 候选：只找 Endless Rule 行（已改 Rule Recovered 的不再进来）
+SELECT IssueId, BlockId
+  FROM FvSrvHangMonitorAlarmState
+ WHERE IssueType = 'Endless Rule';
+```
+
+```json
+-- ② 逐行按 BlockId 查块；EXEC_STATUS ∈ {已完成, 超时封口, 中断} 即闭合
+GET /mes-log-exec-read/_doc/{BlockId}
+{"_source": ["EXEC_STATUS"]}
+```
+
+```sql
+-- ③ Oracle 原位改：Alarmed 仅 Y→N，LastAlarmTime 不出现在 SET 里
+UPDATE FvSrvHangMonitorAlarmState
+   SET IssueType = 'Rule Recovered',
+       Alarmed   = CASE WHEN Alarmed = 'Y' THEN 'N' ELSE Alarmed END
+ WHERE IssueId = :issueId;
+```
+
+```json
+-- ④ OS 原位改：_id 不变，只覆盖 issueType
+POST /mes-log-monitor-issue-{yyyy.MM}/_update/{issueId}
+{"doc": {"issueType": "Rule Recovered"}}
+```
+
+**待确认（不阻塞开发，定后补）**：① 查重与 B 恢复检查的执行顺序 / 频率 —— 是否同一轮内；B 恢复检查每轮都扫 Oracle 的 `Endless Rule` 行，还是只在扫到相关块时。② 恢复后是否触发通知 —— `Alarmed` 由 `Y` 改 `N` 后，通知器按 `(Alarmed, LastAlarmTime)` 捞未发时会不会把这条恢复行重新捞去发（归 `10`）。
+
+## 8. 参数配置（包含公共方法）
+
+本篇只列本功能读的应用参数；业务阈值 / 等级 / 通知目标在 `03`，关键字监控的参数见 `02` §7。改值不动判定逻辑，走 git 同步版本；默认值均为初值，压测后回填。
+
+| 参数 | 说明 | 默认值 |
+|---|---|---|
+| `HangScanInterval` | Server Hang 监控扫块文档周期；全量扫未闭合块，每轮重判 | 暂定 3min |
+| `SilenceMinutes` | 派生层停写封「超时封口」门槛；与判据 A 的 10min 各按各自配置、不互相兜底 | `06` §五 10min / `fabviewer.yaml` 5min（两处未统一、留底不改） |
+
+### 8.1 公共方法与系统配置（本篇只消费，定义不在本篇）
+
+本篇跑在 System Misc 之上；下面这些系统配置**不在本篇定义、也不在本篇维护**，本篇只是读取。明细散落在各步骤，此处集中列出备查，口径以对应步骤为准。**本功能不调用 `FetchMESRuleFullLogs()`**（只按 `END_LINE_ID` 取单行原文，见 §7.4）。
+
+**系统配置（System Misc，本篇只读取不定义）**
+
+| 配置项 | 用途 | 读取时点 | 明细 |
+|---|---|---|---|
+| `mes.global.environments` | 环境名单，配置 `Environment` 值域 | 启动时随读 | §7.3 |
+| `log.monitor.servercategory` | Server 类别白名单，嵌 `terms SERVER_CATEGORY`（恒拼、空名单零命中） | 启动时读一次，改后重启生效 | §7.2 / §4.1 |
+| `log.monitor.srvhang.excludeRules` | A · Server Hang 排除 Rule Name List（空则不加条件） | 启动时读一次，改后重启生效 | §7.2 / §7.4 |
+| `log.monitor.endless.excludeRules` | B · Endless Rule 排除 Rule Name List（空则不加条件） | 启动时读一次，改后重启生效 | §7.2 / §7.4 |
+
+> 以上均非本服务参数（应用参数表见上）；本篇消费但不维护，定义与维护方不在本篇。

@@ -1,75 +1,36 @@
 # MES 关键字告警展示 · 功能文档
 
-> 模块 2 · 日志监控与报警 ｜ 功能 1 ｜ 状态：**接口已定（4 条端点）、待后端实现** ｜ 以本篇 §5 为唯一生效口径
-> 本篇只做一件事：把功能 1 判出的 Alarm **展示出来、并在界面上完成解决**。规则怎么配见 [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md)；怎么判 / 检测时机 / 怎么通知见 [`02-MES关键字监控与告警.md`](02-MES关键字监控与告警.md)。
+> 模块 2 · 日志监控与报警 ｜ 功能 1 ｜ 状态：**接口已定（4 条端点）、待后端实现** ｜ 以本篇正文（§2 / §4）为唯一生效口径
+> 本篇定义展示处置侧：把功能 1 判出的 Alarm **展示出来、并在界面上完成解决**。规则怎么配见 `01`；怎么判 / 检测时机 / 怎么通知见 `02`；视觉与交互见 [`../05-视觉与交互规范.md`](../05-视觉与交互规范.md)。
 
-| 项 | 内容 |
-|---|---|
-| 功能名称 | 中文 **`MES关键字告警展示`**；英文 **`MES Log Keyword Monitor`**（菜单项显示为 `View & Resolve`） |
-| 所属 Module | **`monitor-alarm`**；一级菜单 **`Monitor & Alarm`** / 中文 `监控通知` |
-| **作用** | **把「MES 关键字监控」判出的报警日志展示出来，并在界面上完成解决** |
-| 使用者 | IT 运维 |
-| 界面类型 | **展示类 + 处置类** |
-| 权限 | **采用权限管控方案**：**功能级** + **「解决」`Resolve` 权限点**（`Resolved` 开关与 **Resolve** 按钮**共用同一个权限点**）；菜单渲染与接口鉴权同一份权限数据，权限点定义口径同 [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md) §3.1（本页只占「解决」`Resolve` 这一点，配置页的新增 `Create` / 编辑 `Update` / 删除 `Delete` 三个点不作用于本页）；粒度为 **1 + 1 共 2 个点**，见 §2 |
-| 入口 | 一级菜单 `Monitor & Alarm` → 二级菜单 **`MES Log Keyword Monitor`** → 本页 **`View & Resolve`**（菜单项就显示 `View & Resolve`）；与配置页 `Config` 同属该二级菜单 |
-| 数据来源 | 功能 1 判定生成的 **Alarm**（配规则见 `01`，判定与通知见 `02`，本篇不重跑判定、不发通知） |
-| 与既有文档 | 规则怎么配 → [`01-MES关键字监控配置.md`](01-MES关键字监控配置.md)；怎么判 / 检测时机 / 怎么通知 → [`02-MES关键字监控与告警.md`](02-MES关键字监控与告警.md)；字段与落点边界 → [`../04-后台链路与数据模型.md`](../04-后台链路与数据模型.md) §六 |
+## 1. 功能定位
 
----
-
-## 1. 功能定位与边界
-
-**一句话**：功能 1（MES 关键字监控）定时扫日志、命中就生成 Alarm；本篇把这些 **Alarm 摆到界面上**，让 IT 运维看到、并**在界面上把它们解决掉**，形成「发现 → 处置」的闭环。
-
-| 环节 | 归谁 |
-|---|---|
-| 配置规则（扫什么 / 等级 / 通知给谁） | `01` 配置文档 |
-| 定时扫描、判定、生成 Alarm、通知 | `02` 运行时文档（§3 / §4.4 / §5） |
-| **展示 Alarm + 界面处置** | **本篇 §2**（处置见 §2.4） |
-| 字段 / 落点边界 | [`../04-后台链路与数据模型.md`](../04-后台链路与数据模型.md) §六 |
-
-> 本篇**只消费 Alarm**：不产生告警、不重跑判定、不发通知；日志正文本体仍回 OpenSearch 查（链路边界不破）。
+功能 1（MES 关键字监控）定时扫日志、命中就生成 Alarm；本篇把这些 **Alarm 摆到界面上**，让 IT 运维**查看并解决**，形成「发现 → 处置」的闭环。本篇**只消费 Alarm**：不产生告警、不重跑判定、不发通知，日志正文本体仍回 OpenSearch 查。
 
 ## 2. 页面与交互
 
-### 2.0 前端规格总览
+### 2.1 菜单位置与权限
 
-> 下表按区域收拢已定规格，细则见对应小节；组件的视觉呈现一律以 [`../05-视觉与交互规范.md`](../05-视觉与交互规范.md) 为准。
+| 项 | 内容 |
+|---|---|
+| 一级菜单 | **`Monitor & Alarm`** |
+| 二级菜单 | **`MES Log Keyword Monitor`**（与配置页 `Config` 同属这一个二级菜单） |
+| 本页 | **`View & Resolve`** —— 菜单项就显示 `View & Resolve` |
+| 挂载位置 | **`monitor-alarm`** 模块下 |
+| 权限方式 | **功能级到本菜单 + 「解决」`Resolve`**（`Resolved` 开关与 **Resolve** 按钮同一动作），见下表 |
 
-| 区域 | 元素 | 已定规格 | 细则 |
+**权限点**
+
+| # | 权限点 | 标识 | 限制行为 |
 |---|---|---|---|
-| 上卡片 · 汇总 | 工具栏 | **Environment 下拉**（候选来自 Misc，**可为空＝全部环境**）+ **Previous Days 输入框**（**1~60 正整数**，可空，**空按 30**）+ **Refresh** 按钮；进入界面 **ENV 空 / Days 30**；点 Refresh 按当前两值重查 | §2.1 |
-| 上卡片 · 汇总 | 汇总表格 | **9 列**；**单选**；**无关键字搜索框**；操作列**「查看」为唯一触发**（行选中不参与）；**进入界面调 `list` 取首屏数据**，页面内不做实时推送、只由 Refresh 手动刷新 | §2.1 |
-| 下卡片 · detail | 当前查看行标识 | 详情表格**上方显示当前查看行的 `item + environment`**；明细表格内**不显示 Item / Environment 两列** | §2.3 |
-| 下卡片 · detail | 明细表格 | **9 列**；**多选**；按 `reportTime` 倒序；分页 | §2.3 |
-| 下卡片 · detail | 初始 / 空态 | 未点「查看」、当前行无 issue、开关打开后全已解决 —— 均**只显示一个表头**，无数据行 | §2.3 |
-| 下卡片 · detail | 查看行切换 | 点另一行「查看」后**自动回第 1 页、清空明细多选选中** | §2.3 |
-| 下卡片 · detail | 列表工具 | **刷新**按钮；**无新增记录入口**；**只过滤未解决的开关**（开＝仅未解决，关＝全部） | §2.3 |
-| 下卡片 · detail | **Alarm Log** 按钮 | 下载**选中行归属的原始日志**；**启用条件＝detail 列表中存在选中行即可**；下载类按钮，不新增 / 不修改记录；接口见 §4.5 | §2.3 |
-| 下卡片 · detail | 操作列菜单 | **More Info** → 弹出详情对话框 | §2.3 / §2.5 |
-| 下卡片 · detail | `Resolved` 开关 | 由 `resolvedTime` 派生；打开即禁用、关闭可点 → 弹 comment 框提交 | §2.4 |
-| 下卡片 · detail | **Resolve** 按钮 | 选中行只要有一个 `resolved = false` 即可用；批量只提交未解决行 | §2.4 |
-| 弹框 · More Info | 3 个字段 | **取自当前行对象**；Rule Message（Label 全文 + 参数逐行 + 展开 / 折叠）、Resolved Time（**时间组件**）、Resolved User（**输入框组件**）；Time 在前、两者禁用；**只有「关闭」按钮** | §2.5 |
-| 弹框 · Resolved Comment | 输入框 + 确认 | `Resolved Comment` **不可为空** → 点「确认」提交 | §2.4 |
-| 全局 | Body 布局 | **自上而下**两张卡片 | 本节布局段 |
-| 全局 | 权限 | **功能级 + 「解决」`Resolve`**（共 2 个点）；`Resolved` 开关与 Resolve 按钮**共用 `Resolve` 这一点**；配置页的 `Create` / `Update` / `Delete` 三点不作用于本页 | 本节权限段 |
+| 1 | **功能级（菜单）** | — | 二级菜单 `MES Log Keyword Monitor` / 本页 `View & Resolve` 入口；有菜单权限才可进入、使用本页 |
+| 2 | **「解决」** | `Resolve` | 控制单条 `Resolved` 开关与批量 Resolve（同一动作）；有权限可解决、无权限禁止解决 |
 
-**Body 布局（自上而下）**：上方卡片 = **汇总信息表格**（§2.1）；下方卡片 = **点「查看」后的 detail**（§2.3，行选中不参与），detail 内的**解决动作**见 §2.4、**More Info 弹框**见 §2.5。汇总表格**无关键字搜索框**，卡片顶部工具栏＝**Environment 下拉 + Previous Days 输入框 + Refresh 按钮**（§2.1）；**进入界面即调** `/api/v1/log_monitor/summary_info/list` 取首屏数据，入参 **`environment` 传空**、**`previousDays` 传 30**（§4.1）。视觉与交互一律以 [`../05-视觉与交互规范.md`](../05-视觉与交互规范.md) 为准，本篇只记「哪个条件触发」，不记呈现。
+读类（汇总 / 明细 / Alarm Log 下载）不单独设权限，进入本菜单即可查看 / 下载。
 
-**权限点（共 2 个）**
+**与配置页的关系**：两页共属二级菜单 `MES Log Keyword Monitor`。配置页占 `Create` / `Update` / `Delete` 三个动作，本页只占 `Resolve`；两组动作各管各的、互不相干。
 
-| # | 权限点 | 标识 | 管控范围（页面元素 + 接口） |
-|---|---|---|---|
-| 1 | **功能级（菜单）** | — | 二级菜单 `MES Log Keyword Monitor` 入口 + 全部 4 条端点的前置校验；只读类 `summary_info/list` / `detail_info/page` / `log/download` 只要求这一点 |
-| 2 | **「解决」** | `Resolve` | `Resolved` 开关（单条）+ **Resolve** 按钮（批量）+ `POST resolve` **共用同一点**（两个入口都是处置已有 issue，不再拆第二点） |
-
-- **按钮不渲染 + 接口也拒**：无 `Resolve` 权限点时，`Resolved` 开关置灰不可点、**Resolve** 按钮不渲染、`/api/v1/log_monitor/resolve` 接口也调不通 —— 后端按同一份权限数据校验（粒度到「接口 + 动作」，不到字段）。
-- **读不单独控权**：汇总 `list` / 明细 `detail_info/page` / Alarm Log 下载 `log/download` 只要功能级（能进菜单就能看能下），不设读权限点；「查看」随功能级、不单独控权。
-- **单条与批量合并为一点**：`Resolved` 开关（单条）与 **Resolve** 按钮（批量）是同一件事的两个入口，合并为 `Resolve` 一点，避免「能单条解决不能批量解决」这种半开状态（与 `01` §3.1「编辑」+ 启用开关合并同口径）。
-
-**与配置页的关系**：两页共属同一二级菜单 `MES Log Keyword Monitor`，权限点写法同 `01` §3.1。该菜单下共 **1 个功能级 + 4 个动作点**：`01` 配置页占「新增」`Create` / 「编辑」`Update` / 「删除」`Delete` 三点，**本页只占「解决」`Resolve` 一个点** —— 三点都不作用于本页，本页的 `Resolve` 也不给配置页。读类（汇总 / 明细 / Alarm Log 下载）不占动作点，随功能级。
-
-### 2.1 汇总信息表格
+### 2.2 汇总信息表格
 
 **工具栏**（卡片顶部，左起三个控件）：
 
@@ -78,6 +39,8 @@
 | **Environment** | **下拉，可为空**；候选来自 Misc `mes.global.environments`，前端调 **`GET /api/v1/sys_misc/env/list`** 取值（该接口**归属 Misc 模块**，本篇只消费、不复刻规格）；**空 ＝ 不限环境**（各环境的行都返回），**有值 ＝ 只取该环境** |
 | **Previous Days** | **输入框，可为空**；只接受 **1~60 的正整数**，越界 / 非整数在前端阻断并提示（后端同样按 1~60 校验）；**空 ＝ 按默认 30 天**（不是「不限」） |
 | **Refresh** | **按钮**；按**当前 Environment + Previous Days** 重新调 `list`（§4.1）取汇总数据；刷新后清空汇总表格的行选中，**不触发下方 detail 重查**（§2.4 三种重查时机里不含本动作） |
+
+汇总表格**不设关键字搜索框**；工具栏就是上面三个控件。
 
 - **默认值**：进入界面 **Environment 为空、Previous Days 为 30**；首调 `list` 即 `environment`（空）+ `previousDays=30`。
 - **空值按 30**：点 **Refresh** 时 Previous Days 被清空（或本来就是空），**按 30 天重查**，与进界面默认一致；前端发请求时直接传 `previousDays=30`。
@@ -101,7 +64,7 @@
 - **汇总数据在进入界面时调 `list` 取一次**，之后**只有点 Refresh 才重查**；不建实时通道、页面内不做定时刷新。
 - 汇总表格的更新**不触发下方 detail 重新查询**；detail 的重查时机以 §2.4 三种为准。
 
-### 2.2 字段定义（已定）
+**字段定义**
 
 | 字段 | 定义 |
 |---|---|
@@ -109,15 +72,15 @@
 | `dailyCnt` | **当日 issue 的数量**；中文列名 **今日问题数量** |
 | `remainingCnt` / `totalCnt` / `totalResolvedCnt` / `dailyResolvedCnt` | 与 `dailyCnt` 一致，**统一按 issue 数量统计** |
 
-> 9 列里的 5 个计数字段**单位一致、不混用**；其余字段语义随七问卡片逐条拍板后回填。
+> 9 列里的 5 个计数字段**单位一致、不混用**；字段语义见上表。
 
-### 2.3 明细卡片（detail）
+### 2.3 明细表格（detail）
 
 **触发**：点汇总表格操作列**「查看」** → 下方卡片展示该行 **`item + environment` 下的全部 issue list**，调 §4.2 分页接口；结果按 **`ReportTime` 倒序** 排列（**同毫秒按 `ID` 倒序**兜底，§4.2 ①）。**「查看」是唯一触发动作，行选中不触发 detail、也不作为前置条件**。
 
-**当前查看行标识**：详情表格**上方显示当前查看行的 `item + environment`**；明细表格内**不再显示 Item / Environment 两列**（输出字段仍是 14 个，这两项只移到表格上方显示）。
+**当前查看行标识**：详情表格**上方显示当前查看行的 `item + environment`**；明细表格内**不再显示 Item / Environment 两列**（输出字段共 15 个，这两项只移到表格上方显示）。
 
-**输出字段（14 个）**：`environment`、`item`、`lotId`、`ruleName`、`hostIpAddress`、`ruleMessage`、`issueMessage`、`tId`、`issueTime`、`reportTime`、`resolvedTime`、`resolvedUser`、`alarmed`、**`issueId`**；字段类型见 §4.4。
+**输出字段（15 个）**：`environment`、`item`、`lotId`、`ruleName`、`hostIpAddress`、`ruleMessage`、`issueMessage`、`tId`、`issueTime`、`reportTime`、`resolvedTime`、`resolvedUser`、**`resolvedComment`**、`alarmed`、**`issueId`**；字段类型见 §4.4。
 
 - **`issueId`** = 每条 issue 的**唯一 ID**；不单独成列，作为行主键与解决提交标识（§2.4）。
 
@@ -135,7 +98,7 @@
 | 8 | Report Time | 报告时间 | `reportTime` |
 | 9 | Resolved | 是否解决 | **`resolvedTime` 派生的可点击开关**（§2.4） |
 
-**列表未显示的字段**：`environment`、`item`、`ruleMessage`、`resolvedTime`、`resolvedUser`、`issueId`。其中 `environment` / `item` **显示在详情表格上方**（当前查看行标识）；`ruleMessage` / `resolvedTime` / `resolvedUser` **由 More Info 弹框展示**（§2.5）；`issueId` **不展示**，仅作行主键与解决提交标识；`resolvedTime` 兼作 `Resolved` 开关判据。
+**列表未显示的字段**：`environment`、`item`、`ruleMessage`、`resolvedTime`、`resolvedUser`、`resolvedComment`、`issueId`。其中 `environment` / `item` **显示在详情表格上方**（当前查看行标识）；`ruleMessage` / `resolvedTime` / `resolvedUser` / `resolvedComment` **由 More Info 弹框展示**（§2.5）；`issueId` **不展示**，仅作行主键与解决提交标识；`resolvedTime` 兼作 `Resolved` 开关判据。
 
 - **表格多选模式**（汇总表格为单选，本表为多选）；多选用于列表下方 **Resolve 批量提交**（§2.4）。
 - **初始态 / 空态**：进入界面尚未点「查看」、当前查看行无 issue、或未解决开关打开后全部已解决 —— 均**只显示一个表头**，无数据行，不隐藏卡片。
@@ -150,7 +113,7 @@
 - **用途**：下载**当前多选选中行归属的原始日志**；属下载类按钮，**不新增、不修改记录**。
 - **启用条件**：**detail 列表中存在选中行即可**（不要求 `resolved = false`，与 Resolve 按钮判据不同）；无选中行时禁用。
 - **单次上限**：服务端按 **`blockId` 去重后最多 10 个块**（§4.5 ②）；超限**由接口报错**、前端按框架错误提示展示，**不自动减选、不截断**。
-- **权限**：随**功能级**管控，不属「解决」`Resolve` 权限点。
+- **权限**：进入本菜单即可下载，不属「解决」`Resolve` 动作。
 - **调用接口**：**`POST /api/v1/log_monitor/log/download`**，入参 `LogMonitorLogDownloadRo`（只含 `issueIds`），出参为文件流；契约见 §4.5。
 
 ### 2.4 解决（resolve）
@@ -186,7 +149,7 @@
 
 ### 2.5 More Info 弹框
 
-**展示字段（3 个）**：`ruleMessage`（Rule Message）、`resolvedTime`（Resolved Time）、`resolvedUser`（Resolved User）；**`issueId` 不展示**。
+**展示字段（4 个）**：`ruleMessage`（Rule Message）、`resolvedTime`（Resolved Time）、`resolvedUser`（Resolved User）、`resolvedComment`（Resolved Comment）；**`issueId` 不展示**。
 
 | 区块 | 呈现 |
 |---|---|
@@ -194,15 +157,16 @@
 | **解析后的请求参数** | 前端调 **API 组件中原有的 `mesRuleMessageParser` 方法**把 `ruleMessage` 里的参数解析出来，**逐行显示**；配一个**展开 / 折叠按钮**控制该区块展开或收起；**滚动只发生在参数行区域**，Label 区与其余区块不滚动 |
 | **Resolved Time** | **时间组件**，**禁用** |
 | **Resolved User** | **输入框组件**，**禁用** |
+| **Resolved Comment** | **输入框组件／文本域**（多行），**禁用**；显示解决时填写的 `resolvedComment` 原文 |
 
-- 两个 Resolved 字段的**显示顺序**：**Time 在前、User 在后**；两者均**禁用**。
+- 三个 Resolved 字段的**显示顺序**：**Time → User → Comment**；三者均**禁用**（解决时填的 comment 在此原样回显）。
 - **展示字段与 Rule Message 原文均取自当前行对象**，不另调接口；参数解析用 **API 组件中原有的 `mesRuleMessageParser` 方法**完成，不新增后端接口。
 - **按钮**：More Info 弹框**只有一个「关闭」按钮**，无「确认」/「保存」等其它操作按钮；与 §2.4 输入 `Resolved Comment` 的对话框（含「确认」提交）不是同一个弹框。
 
 ## 3. 数据口径
 
 - 字段与取值一律引用 [`../04-后台链路与数据模型.md`](../04-后台链路与数据模型.md)，本篇不另立；告警落点以 §六为边界。
-- 汇总字段与列见 **§2.1**（`environment` / `previousDays` 两个查询条件见 §2.1 / §4.1）；已定字段语义见 **§2.2**；明细字段与列见 **§2.3**，排序按 `reportTime` 倒序；解决提交与行覆盖见 **§2.4 / §4.3**。
+- 汇总字段、列与字段语义见 **§2.2**（`environment` / `previousDays` 两个查询条件见 §2.2 / §4.1）；明细字段与列见 **§2.3**，排序按 `reportTime` 倒序；解决提交与行覆盖见 **§2.4 / §4.3**。
 - 计数单位见 **§2.2**、More Info 弹框规格见 **§2.5**；四个端点的总表与全局约定见 **§4.0**、出入参对象见 **§4.4**。
 
 ## 4. 接口
@@ -213,10 +177,10 @@
 
 | # | 服务内路径 | 方法 | 用途 | 权限 | 细则 |
 |---|---|---|---|---|---|
-| 1 | `/api/v1/log_monitor/summary_info/list` | `GET` | 汇总首屏 / Refresh 重查 | 功能级 | §4.1 |
-| 2 | `/api/v1/log_monitor/detail_info/page` | `GET` | 明细分页 | 功能级 | §4.2 |
-| 3 | `/api/v1/log_monitor/resolve` | **`POST`** | 解决提交 | **「解决」`Resolve`** | §4.3 |
-| 4 | `/api/v1/log_monitor/log/download` | **`POST`** | Alarm Log 下载（选中行原始日志） | 功能级 | §4.5 |
+| 1 | `/api/v1/log_monitor/summary_info/list` | `GET` | 汇总首屏 / Refresh 重查 | 进入本菜单即可 | §4.1 |
+| 2 | `/api/v1/log_monitor/detail_info/page` | `GET` | 明细分页 | 进入本菜单即可 | §4.2 |
+| 3 | `/api/v1/log_monitor/resolve` | **`POST`** | 解决提交 | 有「解决」`Resolve` 权限可操作，无则禁止 | §4.3 |
+| 4 | `/api/v1/log_monitor/log/download` | **`POST`** | Alarm Log 下载（选中行原始日志） | 进入本菜单即可 | §4.5 |
 
 >  Environment 下拉另消费一个 **Misc 模块**的接口 **`GET /api/v1/sys_misc/env/list`**，**不属本功能前缀**；**本篇只消费、不复刻规格**（与 `01` 对 Misc 接口的消费口径一致），接口异常时下拉空、不阻断页面其他部分。
 
@@ -224,10 +188,10 @@
 
 | 项 | 约定 | 来源 |
 |---|---|---|
-| 响应外壳 | `list` / `detail_info/page` / `resolve` **三条 REST 统一走全局响应包**：`code` / `success` / `errMsg` / `data` / `txId`，业务数据一律放 `data`；成功 `code = OK`、`success` 输出 `0` / `1`；**业务类失败 HTTP 恒 200**。`log/download` **成功为文件流、不走外壳**，仅**错误时**以框架标准接口返回错误信息（§4.5） | [`../模块6-用户与安全管理/05-后端设计.md`](../模块6-用户与安全管理/05-后端设计.md) §1.4；`01` §4.3 共性约定 1 |
+| 响应外壳 | `list` / `detail_info/page` / `resolve` **三条 REST 统一走全局响应包**：`code` / `success` / `errMsg` / `data` / `txId`，业务数据一律放 `data`；成功 `code = OK`、`success` 输出 `0` / `1`；**业务类失败 HTTP 恒 200**。`log/download` **成功为文件流、不走外壳**，仅**错误时**以框架标准接口返回错误信息（§4.5） | `01` §4.3 共性约定 1 |
 | 分页 | `detail_info/page` **有分页** | 同上 §1.5 |
 | 对象命名 | API 入参 `Ro`、出参 `Dto`；**#2 `detail_info/page` 入参为 URL 拼接参数、不定义 `Ro`**（§4.2） | 同上 §1.6 |
-| 定位键 | 汇总 / 明细按 `item + environment` 定位；单条 issue 按 `issueId` 定位 | §2.1 / §2.3 |
+| 定位键 | 汇总 / 明细按 `item + environment` 定位；单条 issue 按 `issueId` 定位 | §2.2 / §2.3 |
 
 ### 4.1 汇总信息（已定）
 
@@ -236,9 +200,9 @@
 | 路径 | `/api/v1/log_monitor/summary_info/list` |
 | 方法 | **`GET`** |
 | 入参 | **query 参数**（拼在 URL 中，**不定义 `Ro` 对象**）：**`environment`**（可空，空＝不限环境）+ **`previousDays`**（可空，**空＝按 30**；有值须为 **1~60 正整数**） |
-| 出参 | **`LogMonitorSummaryInfoDto` 对象集合**（每个对象 9 字段见 §2.1）；集合行范围受 `environment` 收窄，计数字段受 `previousDays` 收窄 |
+| 出参 | **`LogMonitorSummaryInfoDto` 对象集合**（每个对象 9 字段见 §2.2）；集合行范围受 `environment` 收窄，计数字段受 `previousDays` 收窄 |
 | 调用时机 | **进入界面调一次**（`environment` 空、`previousDays=30`）；点工具栏 **Refresh** 时按当前两值再调（**Previous Days 留空按 30**） |
-| 权限 | 随**功能级权限**管控，无权限接口不可调 |
+| 权限 | 进入本菜单即可查询 |
 
 **后端取数（已定）**
 
@@ -313,11 +277,11 @@ SELECT Environment,
 | 路径 | **`/api/v1/log_monitor/detail_info/page`** |
 | 方法 | **`GET`** |
 | 入参 | **参数拼接在 URL 中传递**（query 参数），**不定义 `Ro` 对象**；参数＝**分页**（见 §4.0）+ **`environment`** + **`item`** + **`resolved`**（**布尔类型**，对应未解决开关状态）；**`environment` / `item` 必填非空**，见 ⓪ |
-| 出参 | **分页对象 `Pageable`**（行元素 14 字段见 §2.3 / §4.4） |
+| 出参 | **分页对象 `Pageable`**（行元素 15 字段见 §2.3 / §4.4） |
 | 排序 | 按 **`ReportTime` 倒序**，**`ID` 作稳定第二键**（`ORDER BY ReportTime DESC, ID DESC`，理由见本节 ①） |
 | 调用时机 | 点汇总表格「查看」时；未解决开关切换时重新查询 |
 | 过滤 | 开关**开**＝仅未解决（`resolved = true` ⇒ `ResolvedTime IS NULL`）；开关**关**＝全部（含已解决与未解决） |
-| 权限 | 随**功能级权限**管控，无权限接口不可调 |
+| 权限 | 进入本菜单即可查询 |
 
 **后端取数（已定）**
 
@@ -331,7 +295,7 @@ SELECT Environment,
 | `pageSize` | 否 | 整数 **1~200**，缺省 **20** | 越界 ⇒ `PageSizeOutOfRange` |
 | `resolved` | 否 | 布尔；`true` = 只查未解决；缺省 / `false` = 全部 | 非布尔值由框架层拒 |
 
-> **本接口不收 `previousDays`**：明细是该 `item + environment` 下的**全量 issue**，不受汇总统计窗口约束（§5-60）。
+> **本接口不收 `previousDays`**：明细是该 `item + environment` 下的**全量 issue**，不受汇总统计窗口约束。
 > `environment` / `item` 必须非空—— 两者是汇总表的行定位键，界面永远从「查看」带过来；空入参等于把全库 issue 当一页返回，直接拒。
 
 **① 排序与分页方案（只在 Oracle 侧做）**
@@ -363,6 +327,7 @@ SELECT ID,
        ReportTime,
        ResolvedTime,
        ResolvedUser,
+       ResolvedComment,
        Alarmed,
        LineId || '|' || Item AS ISSUE_ID
   FROM FvLogMonitorAlarmState
@@ -451,7 +416,7 @@ GET /mes-log-line-2026.08/_search
 - 三段都**不带 `sort`**（按 `_id` 取没有顺序意义）；回填时**按 `_id` 建 map**，OS 返回顺序不保证。
 - 结果索引**不需要加 `issueType = Keyword` 过滤**：本功能的 `_id` 恒为 `LineId|Item`，Server hang 写的是 `LineId|issueType`，两批 `_id` 不会撞。
 
-**④ 字段来源总表（14 字段）**
+**④ 字段来源总表（15 字段）**
 
 | # | 出参字段 | 来源 | 说明 |
 |---|---|---|---|
@@ -467,19 +432,20 @@ GET /mes-log-line-2026.08/_search
 | 10 | `reportTime` | Oracle `ReportTime` | 排序键 |
 | 11 | `resolvedTime` | Oracle `ResolvedTime` | 前端据此派生 `resolved`（§2.4） |
 | 12 | `resolvedUser` | Oracle `ResolvedUser` | 处置人 |
-| 13 | `alarmed` | Oracle `Alarmed` | `Y` → `true`、`N` → `false` |
-| 14 | `issueId` | Oracle `LineId`（用竖线拼 `Item`） | 与结果索引 `_id` 同值；行主键与解决提交标识 |
+| 13 | `resolvedComment` | Oracle `ResolvedComment` | 处置说明，More Info 弹框回显（§2.5） |
+| 14 | `alarmed` | Oracle `Alarmed` | `Y` → `true`、`N` → `false` |
+| 15 | `issueId` | Oracle `LineId`（用竖线拼 `Item`） | 与结果索引 `_id` 同值；行主键与解决提交标识 |
 
-> Oracle 出 **9 个**（1、2、4、9~14），OS 出 **5 个**（3、5、6、7、8）。`ID` / `ResolvedComment` / 审计列**不出参**。
+> Oracle 出 **10 个**（1、2、4、9~15），OS 出 **5 个**（3、5、6、7、8）。`ID` / 审计列**不出参**；`ResolvedComment` 本次起随明细出参（§2.3 / §4.4）。
 
 **⑤ 取数要点**
 
 1. **OS 是补齐、不是过滤**：一页里某些 `issueId` 在结果索引/块索引查不到 ⇒ 对应字段留**空串**，**不丢行、不改 `total`**、不报错，只记一条 WARN。
 2. **OS 请求失败要报错**（连接 / 超时 / 5xx）：抛 `LogMonitorSourceUnavailable`，**不返回半页空字段** —— 明细页几乎每行都有 OS 字段，静默降级等于让人对着一片空判断（本接口口径：OS 失败显式报错，**不静默降级**）。
-3. **行索引 360 天过期的降级**：`ruleMessage` 取不到 ⇒ 留空，其余 13 个字段照常（设计接受的降级，保留期见 `04` §4.4）。
+3. **行索引 360 天过期的降级**：`ruleMessage` 取不到 ⇒ 留空，其余 14 个字段照常（设计接受的降级，保留期见 `04` §4.4）。
 4. **多值字段取首个**：`LOTID` / `TID` 是 keyword 数组（`09` §四：按出现顺序追加、同值去重），出参是 `string`，统一取**下标 0**，取不到给空串。
 5. **批量粒度**：每跳一次带整页 ID（≤ 200），**不逐行发请求**；按索引名分组后，跨几天就几组，正常情况下 200 条落在 1~2 天内（3 组以内）。
-6. **`resolved` 只管过滤、不改出参**：出参仍 14 字段、不含 `resolved`；行状态由前端从 `resolvedTime` 派生（§2.4 / §4.4）。
+6. **`resolved` 只管过滤、不改出参**：出参 15 字段、不含 `resolved`；行状态由前端从 `resolvedTime` 派生（§2.4 / §4.4）。
 
 ### 4.3 解决提交（已定）
 
@@ -492,7 +458,7 @@ GET /mes-log-line-2026.08/_search
 | 入参 2 | **`resolvedComment`**：字符串，**不可为空**（对话框输入） |
 | 出参 | **`LogMonitorAlarmDetailDto` 对象集合**，按**实际更新成功的对象**返回（数量 ≤ 入参 `issueIds` 数量：已被解决的 `issueId` 不返回）；前端按 **`issueId`** 覆盖对应行 |
 | 调用时机 | 对话框点「确认」提交时；`Resolved` 开关（单条）或 **Resolve** 按钮（批量） |
-| 权限 | 受**「解决」`Resolve` 权限点**管控，与 `Resolved` 开关 / **Resolve** 按钮共用同一点，无权限接口不可调（§2 权限点表） |
+| 权限 | 有「解决」`Resolve` 权限可操作、无则禁止（`Resolved` 开关与 Resolve 按钮同一动作，§2） |
 
 **后端取数（已定）**
 
@@ -537,7 +503,7 @@ UPDATE FvLogMonitorAlarmState
 
 **② 出参组装**
 
-- **Oracle 9 字段**取自更新后的对象（`resolvedTime` = `:now`、`resolvedUser` = `:user`、`resolvedComment` 写入库但**不出参**）。
+- **Oracle 10 字段**：9 个取自更新后的对象（`resolvedTime` = `:now`、`resolvedUser` = `:user`），**`resolvedComment` 取本次入参 `:comment`**（本次起随出参返回，供 More Info 回显，§2.5）。
 - **OS 5 字段**（`lotId` / `hostIpAddress` / `ruleMessage` / `issueMessage` / `tId`）**复用 §4.2 ③ 的同一套三跳查询**，不另写一套；索引选择与分组规则完全一致。
 - `issueId` 用 `LineId` + 竖线 + `Item` 拼回，供前端匹配行。
 
@@ -563,8 +529,8 @@ UPDATE FvLogMonitorAlarmState
 
 | 对象 | 用于 | 字段 |
 |---|---|---|
-| `LogMonitorSummaryInfoDto`（出参） | §4.1 汇总首屏 | **对象集合**；每个对象 **9 字段**见 §2.1、**字段类型见下表**；5 个计数字段按 issue 数量统计，见 §2.2 |
-| `LogMonitorAlarmDetailDto`（出参） | §4.2 明细分页的行元素 / §4.3 解决提交的返回 | **14 字段**见 §2.3、**字段类型见下表**；`issueId` 为每行唯一 ID、`resolvedTime` 派生 `Resolved` 开关；`environment` / `item` 显示在详情表上方、不成列 |
+| `LogMonitorSummaryInfoDto`（出参） | §4.1 汇总首屏 | **对象集合**；每个对象 **9 字段**见 §2.2、**字段类型见下表**；5 个计数字段按 issue 数量统计，见 §2.2 |
+| `LogMonitorAlarmDetailDto`（出参） | §4.2 明细分页的行元素 / §4.3 解决提交的返回 | **15 字段**见 §2.3、**字段类型见下表**；`issueId` 为每行唯一 ID、`resolvedTime` 派生 `Resolved` 开关；`environment` / `item` 显示在详情表上方、不成列 |
 | `ResolveLogMonitorAlarmRo`（入参） | §4.3 解决提交 | 2 字段，见下表 |
 | `LogMonitorLogDownloadRo`（入参） | §4.5 Alarm Log 下载 | **1 字段**，见下表 |
 
@@ -600,10 +566,11 @@ UPDATE FvLogMonitorAlarmState
 | `reportTime` | 时间类型 |
 | `resolvedTime` | 时间类型 |
 | `resolvedUser` | `string` |
+| `resolvedComment` | `string` |
 | `alarmed` | `boolean` |
 | `issueId` | `string` |
 
-> 输出字段仍为 **14 个**，**不含 `resolved`**：行状态布尔 `resolved` 由前端按 `resolvedTime` 是否为空计算（§2.4），**不在接口出入参中**；§4.2 的同名入参 `resolved` 是「未解决开关」的过滤条件，二者不是同一个东西。`resolvedTime` 为时间类型，与 §2.5 的 Resolved Time 时间组件一致。
+> 输出字段为 **15 个**，**不含 `resolved`**：行状态布尔 `resolved` 由前端按 `resolvedTime` 是否为空计算（§2.4），**不在接口出入参中**；§4.2 的同名入参 `resolved` 是「未解决开关」的过滤条件，二者不是同一个东西。`resolvedTime` 为时间类型，与 §2.5 的 Resolved Time 时间组件一致；`resolvedComment` 为 `string`，与 §2.5 的 Resolved Comment 输入框组件对应。
 
 **`ResolveLogMonitorAlarmRo`**
 
@@ -631,7 +598,7 @@ UPDATE FvLogMonitorAlarmState
 | 下载上限 | **单次最多 10 个块**（按 **`blockId` 去重后**计数，不是 `issueIds` 个数）；超限由接口报错 |
 | 错误 | 接口发生错误时**仍以框架标准接口返回错误信息**（全局响应外壳 `code` / `success` / `errMsg` / `data` / `txId`），**不自定错误包结构、不自定错误码格式** |
 | 调用时机 | 点 **Alarm Log** 按钮时；启用条件＝detail 列表中存在选中行（§2.3） |
-| 权限 | 随**功能级**管控，不属「解决」`Resolve` 权限点 |
+| 权限 | 进入本菜单即可下载，不属「解决」`Resolve` 动作 |
 
 **后端处理（已定）**
 
@@ -704,6 +671,8 @@ GET /mes-log-exec-2026.08.11/_search
 - 拿回来的行序**就是写入顺序**，直接照序写文件，不再排序。
 - **块与块串行**：一个块写完再下一个，10 个块也不并发拉行（避免同时开 10 条重查询把 OS 打满）。
 
+**下载的库级方法（`common-lib`）**：本篇下载的文件 IO 走 `common-lib` 库的**库级下载方法**。
+
 **⑤ 组织文件与内容（IO 交工具方法）**
 
 **业务侧只负责组织文件和文件内容** —— 目录名、文件名、每行内容、zip 包名；**文件夹组织 / 写入 / 删除 / 下载输出等一律调 `common-lib` 库的工具方法**（方法提供文件夹组织、写入、删除、下载输出等能力）：
@@ -751,137 +720,24 @@ GET /mes-log-exec-2026.08.11/_search
 
 > 示例只用真实业务接口 / 服务名，不用占位符。
 
-## 5. 已确认口径
+## 5. 公共内容（本篇只消费，定义不在本篇）
 
-| # | 口径 |
-|---|---|
-| 1 | 本篇归**模块 2**，编号 **05**（顺延 `01`~`04`） |
-| 2 | 作用＝**展示经 MES 关键字监控产生的报警日志 + 在界面上解决**；不负责判定与通知 |
-| 3 | 所属 Module = **`monitor-alarm`**；一级菜单 `Monitor & Alarm` / 中文 `监控通知`；功能名 `MES关键字告警展示`，菜单位于二级菜单 `MES Log Keyword Monitor` 下的 `View & Resolve` |
-| 4 | **采用权限管控方案**：**功能级**（菜单渲染与接口鉴权同一份权限数据，口径同 `01` §3.1）+ **「解决」`Resolve` 权限点**，共 1 + 1 两个点；粒度见 §2 |
-| 5 | Body **自上而下**：上方卡片 = 汇总信息表格、**无关键字搜索框**，顶部工具栏＝**Environment 下拉 + Previous Days 输入 + Refresh 按钮**；进入界面调 `/api/v1/log_monitor/summary_info/list`，出参 `LogMonitorSummaryInfoDto` **对象集合**（每个对象 9 字段 / 9 列见 §2.1） |
-| 6 | 汇总表格**单选模式**、操作列含「查看」（**「查看」为唯一触发，行选中不起作用**） |
-| 7 | `lastAlarmTime` = **发出通知的时间**（非 Alarm 生成时间） |
-| 8 | `dailyCnt` = **当日 issue 的数量**；中文列名 **今日问题数量** |
-| 9 | **汇总数据在进入界面调 `list` 取一次，之后仅由 Refresh 触发重查**；不建实时通道、不做定时刷新 |
-| 10 | 下方卡片 = **点「查看」后的 detail**（行选中不参与）；点操作列「查看」触发，取该行 `item + environment` 下的全部 issue list |
-| 11 | 明细接口 = **`/api/v1/log_monitor/detail_info/page`**，**分页**取数，结果按 **`reportTime` 倒序** |
-| 12 | 明细 **14 个输出字段 → 9 个显示列**（§2.3）；`environment` / `item` 显示在详情表格上方，`ruleMessage` / `resolvedTime` / `resolvedUser` 由 **More Info 弹框**展示，`issueId` 不展示 |
-| 13 | 明细表格**多选**；操作列为**菜单**，含 **More Info**；列表有**刷新**按钮、**无新增记录入口**；另设 **Alarm Log** 下载按钮 |
-| 14 | **只过滤未解决的开关**：开＝只查未解决，关＝查全部（含已解决与未解决），均调 `/api/v1/log_monitor/detail_info/page` |
-| 15 | 明细输出字段含 **`issueId`** = 每条 issue 的**唯一 ID**，不单独成列，作行主键与解决提交标识 |
-| 16 | `Resolved` 列为**可点击开关**，由 **`resolvedTime` 派生**：为空＝关闭、不为空＝打开；**打开时禁用**（不可改回），关闭时取消禁用 |
-| 17 | 点击关闭态开关 → 弹出**输入 `Resolved Comment` 的对话框**（**不可为空**）→ 点「确认」提交 |
-| 18 | 解决提交 = **`POST /api/v1/log_monitor/resolve`**，入参对象 **`ResolveLogMonitorAlarmRo`**：`issueIds`（字符串数组，不可为空）+ `resolvedComment`（字符串，不可为空）；**单条＝数组 1 个元素，批量＝多个元素**，同走一个接口 |
-| 19 | 提交成功后，用**返回结果覆盖掉原有行**的内容 |
-| 20 | 列表下方 **Resolve** 按钮：多选选中行中**只要有一个 `resolved = false` 即可用**，否则禁用；点击同样弹 comment 对话框提交，`issueId` 为**多个值（字符串数组）** |
-| 21 | `issueIds` **维持数组形态**：1 个或多个元素同走一个接口；批量提交**只放未解决行的 `issueId`，不含已解决行** |
-| 22 | `resolve` 出参 = **`LogMonitorAlarmDetailDto` 对象集合**，按**实际更新成功的对象**返回（数量 ≤ 入参 `issueIds`，**已被解决的不返回**）；覆盖时按 **`issueId`** 回显对应行（§4.3 ③） |
-| 23 | **提交后的行保留**：未解决开关**打开**时，返回的已解决行**不隐藏、仍保留显示**；仅用户主动「刷新 / 关闭开关 / 重新点汇总『查看』」才按当前过滤条件重新查询 |
-| 24 | 明细接口入参 = **拼接在 URL 中的 query 参数、不定义 `Ro` 对象**：**分页** + **`environment`** + **`item`** + **`resolved`**（**布尔类型**，对应未解决开关状态） |
-| 25 | 权限管控到**功能级** + **「解决」`Resolve` 权限点**（本页只占这一点，配置页的 `Create` / `Update` / `Delete` 三点不作用于本页）；`Resolved` 开关与 **Resolve** 按钮**是同一个 `Resolve` 点**，「查看」与 Alarm Log 下载随功能级、不单独控权 |
-| 26 | 界面 **4 条端点**：`list` / `detail_info/page` 为 **`GET`**；`resolve` / `log/download` 为 **`POST`** |
-| 27 | 9 列里的 **5 个计数字段**（`remainingCnt` / `totalCnt` / `totalResolvedCnt` / `dailyCnt` / `dailyResolvedCnt`）**统一按 issue 数量统计**，单位不混用 |
-| 28 | `dailyCnt` 中文列名 = **今日问题数量**（Daily Count） |
-| 29 | More Info 弹框展示 **3 个字段**：Rule Message / Resolved Time / Resolved User；**`issueId` 不展示** |
-| 30 | Resolved Time 用**时间组件**、Resolved User 用**输入框组件**；**Time 在前、User 在后**，两者**均禁用** |
-| 31 | Rule Message 完整原文用 **Label** 显示；请求参数由前端调 **API 组件中原有的 `mesRuleMessageParser` 方法**解析后**逐行显示**、带**展开 / 折叠按钮**，**滚动只发生在参数行区域** |
-| 32 | More Info 弹框**只有一个「关闭」按钮**，无其它操作按钮（与 §2.4 的 comment 对话框不同） |
-| 33 | **4 条端点均归属 `telemetry-hub`**（与 `01` §4 的 6 条配置接口同服务）；服务内前缀 `/api/v1/log_monitor` |
-| 34 | `list` / `detail_info/page` / `resolve` **三条 REST 统一走全局响应外壳**（业务数据放 `data`）；明细**有分页**（§4.0） |
-| 35 | **初始态 / 空态**：进入界面未点「查看」、当前查看行无 issue、未解决开关打开后全已解决 —— 明细表格**只显示一个表头**，无数据行，不隐藏卡片 |
-| 36 | **点操作列「查看」是触发 detail 的唯一动作**；**行选中不起作用**，不触发加载、也不作为前置条件 |
-| 37 | **切换查看行**：点另一行「查看」后 detail **自动回第 1 页、清空明细多选选中**，再按新行的 `item + environment` 查询 |
-| 38 | 详情表格**上方显示当前查看行的 `item + environment`**；明细**不再显示 Item / Environment 两列**（14 个输出字段 → **9 个显示列**） |
-| 39 | More Info 弹框**展示字段与 Rule Message 原文均取自当前行对象**，不另调接口 |
-| 40 | 下方卡片增设 **Alarm Log** 按钮（与 Resolve 并列）：下载**当前多选选中行归属的原始日志**；**启用条件＝detail 列表中存在选中行即可**（不要求未解决、无选中行时禁用）；下载类按钮，不新增 / 不修改记录，权限随**功能级** |
-| 41 | **Alarm Log 下载接口已定**（§4.5），已定接口为 §4.0 总表 **4 条** |
-| 42 | **#1 `list` 出参＝`LogMonitorSummaryInfoDto` 对象集合**（每个对象 9 字段见 §2.1），**不是单条对象** |
-| 43 | **#2 `detail_info/page` 入参＝拼接在 URL 中的 query 参数、不定义 `Ro` 对象**：分页 + `environment` + `item` + `resolved`（布尔） |
-| 44 | **#4 端点＝`POST /api/v1/log_monitor/log/download`**（服务内前缀 `/api/v1/log_monitor` + 后缀 `/log/download`），归 `telemetry-hub`，权限随**功能级**、不属「解决」`Resolve` 权限点 |
-| 45 | **#4 入参对象＝`LogMonitorLogDownloadRo`，只含 `issueIds` 一个字段**（字符串数组），取自 detail 列表当前多选选中行的 `issueId`；不定义其它参数 |
-| 46 | **#4 出参＝成功以文件流返回原始日志、不走响应外壳**；**接口发生错误时仍以框架标准接口返回错误信息**（全局响应外壳） |
-| 47 | **#4 方法＝`POST`**；`LogMonitorSummaryInfoDto` 字段类型：`environment` / `item` / `priority` 为 `string`、5 个 `Cnt` 结尾字段为 `int`、`lastAlarmTime` 为时间类型（§4.4） |
-| 48 | `LogMonitorAlarmDetailDto` 字段类型：`issueTime` / `reportTime` / `resolvedTime` 为时间类型、`alarmed` 为 `boolean`、其余 10 个字段为 `string`；**输出字段仍 14 个、不含 `resolved`**，`resolvedTime` 时间类型与 §2.5 时间组件一致（§4.4） |
-| 49 | **行状态布尔 `resolved` 是前端由 `resolvedTime` 是否为空计算出的派生值**（为空 → `false`、不为空 → `true`），**不在任何接口出入参中**；界面过程判断（Resolve 按钮可用性、批量提交只取未解决行）一律用它，不必每处再判 `resolvedTime`。与 §4.2 同名入参 `resolved`（「只过滤未解决」开关的查询条件）不是同一个东西（§2.4 / §4.4） |
-| 50 | 汇总卡片顶部工具栏**三个元素**：**Environment 下拉** + **Previous Days 输入框** + **Refresh 按钮**（§2.1） |
-| 51 | Environment 候选来自 Misc `mes.global.environments`，前端调 **`GET /api/v1/sys_misc/env/list`**（归属 Misc 模块，本篇只消费、不复刻规格）；**可为空，空＝不限环境** |
-| 52 | Previous Days **只接受 1~60 的正整数、可为空**，**空＝按默认 30 天**（不提供「不限 / 全部历史」口径），越界 / 非整数前端阻断、后端同样按 1~60 校验 |
-| 53 | 进入界面默认 **Environment 空 / Previous Days 30**，首调 `list` 即 `environment` 空 + `previousDays=30` |
-| 54 | `list` **通过 query 传 `environment` + `previousDays`**（不定义 `Ro`）；点 **Refresh** 按当前两值重查汇总，且不触发下方 detail 重查（§4.1 / §2.4） |
-| 55 | `previousDays` 时间窗（按 **`ReportTime`**）：**终点＝今天 23:59:59、起点＝（今天 −（N−1）天）00:00:00**（含今天共 N 个自然日）；空按 30；实现用 `< 明天 00:00:00` 半开区间以免丢毫秒（§4.1 ①） |
-| 56 | 5 个计数字段与 `lastAlarmTime` **全部在同一窗口内统计**，`remainingCnt` 不特例（窗口外的未解决不计）；`dailyCnt` / `dailyResolvedCnt` 另用固定今日边界（§4.1 ②） |
-| 57 | **summary 只查 Oracle `FvLogMonitorAlarmState` 一张表**，不读 OS 索引、不 join 规则表，OS 不可用时汇总仍可用（§4.1） |
-| 58 | 9 字段 ↔ 栏位：`environment`→`Environment`、`item`→`Item`、`priority`→`Priority`（快照，`MAX` 兜底）、`remainingCnt`/`totalCnt`/`totalResolvedCnt`→按 `ResolvedTime` 条件计数、`dailyCnt`/`dailyResolvedCnt`→加 `ReportTime >= TRUNC(SYSDATE)`、`lastAlarmTime`→`MAX(LastAlarmTime)`（§4.1 ③） |
-| 59 | summary 结果**固定按 `Environment`、`Item` 升序**；空结果返回 `data: []`，`LastAlarmTime` 为空出 `null`（不按 0） |
-| 60 | **明细入参不收 `previousDays`**：明细是该 `item + environment` 下的**全量 issue**，不受汇总统计窗口约束（§4.2 ⓪） |
-| 61 | 明细入参校验：`environment` / `item` **必填非空**（≤30），空 ⇒ `EnvironmentRequired` / `ItemRequired`；`pageIndex` 默认 1；`pageSize` **1~200** 默认 20，越界 ⇒ `PageSizeOutOfRange`；`resolved = true` ⇒ `ResolvedTime IS NULL`（§4.2 ⓪） |
-| 62 | 明细**排序＝`ORDER BY ReportTime DESC, ID DESC`**：`ID` 作稳定第二键，避免同毫秒多行在分页时重复 / 漏行；**分页与排序只在 Oracle**，OS 不参与排序、不参与分页（§4.2 ①） |
-| 63 | 明细用**偏移分页**，翻页期间的漂移（新 issue 入库导致后页错位）**接受**，不引入游标；看最新数据由列表刷新回第 1 页（§4.2 ①） |
-| 64 | 明细的 OS 补字段走**三跳 `ids` 查询**（结果 → 块 → 行），**按物理索引名分组请求**：结果与行按月（`IssueTime` / `_id` **末段 17 位毫秒串**的月份）、块按日取同段毫秒串的日期；**不扫读别名**（`04` §4.2）。索引名不带环境段、由框架 `prefix` 前置（§4.2 ③） |
-| 65 | 明细 14 字段来源：**Oracle 出 9 个**（`environment` / `item` / `ruleName` / `issueTime` / `reportTime` / `resolvedTime` / `resolvedUser` / `alarmed` / `issueId`）+ **OS 出 5 个**（`lotId` / `hostIpAddress` / `ruleMessage` / `issueMessage` / `tId`）；`lotId` / `tId` 是 keyword 多值，**取数组首个**；`ruleName` 用 Oracle 快照、不取块的多值 `RULENAME`（§4.2 ④） |
-| 66 | OS 为**补齐不是过滤**：查不到的字段留空串、**不丢行、不改 `total`**；**OS 请求失败报 `LogMonitorSourceUnavailable`**，不返回半页空字段；行索引 360 天过期只影响 `ruleMessage`（留空，其余照常）（§4.2 ⑤） |
-| 67 | `resolve` 校验：`issueIds` **非空数组且每个元素可拆为 `LineId`+`Item`**（`IssueIdsRequired` / `IssueIdInvalid`）；`resolvedComment` **非空且 ≤512**（`ResolvedCommentRequired` / `ResolvedCommentTooLong`）（§4.3 ⓪） |
-| 68 | `issueId` 按**首个竖线**拆：前段 `LineId`、后段 `Item`；表中**没有 `Resolved` 布尔栏位**，「已解决」由 `ResolvedTime` 是否为空表达，更新 resolved ＝**写 `ResolvedTime` + `ResolvedUser` + `ResolvedComment` 三列**（§4.3 ⓪ / ①） |
-| 69 | `resolve` 在**同一事务**内：先按 `(LineId, Item)` 对**一次加锁读** `ResolvedTime IS NULL` 的全部行（`FOR UPDATE`），**集合为空 ⇒ `LogMonitorIssueNotFound` 并回滚**（不写库、不返回空数组）（§4.3 ①） |
-| 70 | 更新只改三列：`ResolvedTime = :now`（整批同值）、`ResolvedUser = 当前登录用户`、`ResolvedComment = 入参`；审计列由框架补；按 `ID` 批量一条 `UPDATE`，不循环单条（§4.3 ①） |
-| 71 | `resolve` 出参**按实际更新成功的对象返回**（数量 ≤ 入参），已解决的 `issueId` 不返回、行保持原样；前端**按字段合并覆盖：非空覆盖、空串保留原值**（§4.3 ③ / §2.4） |
-| 72 | `resolve` **先提交事务、后补 OS**（复用 §4.2 三跳）；**OS 失败不报错**、记 WARN、OS 5 字段回传空串 —— 处置动作不被 OS 拖死（§4.3 ④） |
-| 73 | 下载校验：`issueIds` **非空数组、元素非空** + 每个 `issueId` 可拆 `LineId` / `Item`，复用 **`IssueIdsRequired`** / **`IssueIdInvalid`**；拆出的两段**不用于查库**，只为保证拿去 OS 的串就是结果索引的 `_id`（§4.5 ⓪） |
-| 74 | 下载用 **`issueId` 直接去结果索引取 `blockId`**（1 组请求）；**索引月份由 `issueId` 里 `LineId` 末段 17 位毫秒的前 6 位算** —— 这条路径没有 Oracle 行可取 `IssueTime`（§4.5 ①） |
-| 75 | **单次最多 10 个块，按 `blockId` 去重后计数**（不是 `issueIds` 个数，多个 issue 落同一块只算 1 个）；超限报 **`LogMonitorDownloadBlockLimitExceeded`**，**不截断降级**（§4.5 ②） |
-| 76 | **单个 `issueId` 取不到 `blockId` ⇒ 只记 WARN 日志并跳过该条**，其余块照常打包、不阻断；**一个 `blockId` 都取不到** ⇒ `LogMonitorIssueNotFound`（不返回空包）；**块文档取不到** ⇒ **算失败**、整批不下载（§4.5 ②③） |
-| 77 | 块信息只取捞行必需的 **8 个字段**（`ENV` / `HOSTIP` / `SERVER_ID` / `system.name` / `START_TIME` / `END_TIME` / `START_LINE_ID` / `END_LINE_ID`），**按 `blockId` 末段 17 位毫秒定日索引、分组请求**（§4.5 ③） |
-| 78 | 捞整块行**调 `shared-business-lib` 的 `FetchMESRuleFullLogs()`**：**输入＝块信息对象、输出＝该块全部行日志对象集合**；粗筛 / 重排 / 截断都在方法内部（口径 `04` §4.2 / §4.3），**本接口不自拼 DSL**；**块与块串行**，行序即写入顺序、照序写不再排（§4.5 ④） |
-| 79 | 下载件结构：文件夹 **`meslog_{yyyyMMddHHmmss}`** / 每块 **`{blockId}.log`** / 包 **`meslog_{yyyyMMddHHmmss}.zip`**；**不拼 `txId`**，时间戳由服务端在进 ⑤ 时取一次、目录与 zip 共用；文件内容＝该块行按写入顺序的 **`LOG_RAW`**（行原文含前缀），一行一条、`\n` 结尾、UTF-8 无 BOM，**不加表头 / 分隔线 / 块元信息**（§4.5 ⑤） |
-| 80 | 文件夹组织 / 写入 / 删除 / 下载输出一律调 **`common-lib` 的工具方法**（方法提供文件夹组织、写入、删除、下载输出等能力，不写具体方法名），**业务侧只组织文件和内容**；口径：**要么完整 zip 要么错误包**；**下载完成和接口失败两条路径都清理**本次 `meslog_{yyyyMMddHHmmss}` 整个目录；工具方法内部不展开（§4.5 ⑤⑥） |
-| 81 | 目录 / 文件的创建、重名、并发冲突由 **`common-lib` 工具方法**处理：业务侧**不判重、不加随机后缀、不检查存在性**（§4.5 ⑤） |
-| 82 | 下载的业务错误码全部复用：`IssueIdsRequired` / `IssueIdInvalid` / `LogMonitorDownloadBlockLimitExceeded` / `LogMonitorIssueNotFound` / `LogMonitorSourceUnavailable`（OS 失败）；**文件 IO 类错误直接拿工具方法的 error 输出**，不自定错误包结构、不自定错误码格式（§4.5 ⑦） |
+本篇跑在通用前端组件 / 规范与通用后端库之上；下面这些公共方法与配置**不在本篇定义、也不在本篇维护**，本篇只是调用 / 读取。明细散落在各节，此处集中列出备查，口径以对应节为准。
 
-> 只留生效口径，按编号追加，不留作废说明。
+### 5.1 前端
 
-## 6. 待确认（七问卡片）
+| 项 | 来源 | 本篇用途 | 明细 |
+|---|---|---|---|
+| `mesRuleMessageParser` | API 组件中原有方法 | 把 `ruleMessage` 解析成请求参数，More Info 弹框逐行显示 | §2.5 |
+| 视觉与交互规范 | [`../05-视觉与交互规范.md`](../05-视觉与交互规范.md) | 本页视觉与交互以其为准，本篇只记「哪个条件触发」、不记呈现 | 头部 |
+| 环境下拉（接口 + 配置） | Misc 接口 `GET /api/v1/sys_misc/env/list` + 系统配置 `mes.global.environments` | 取 Environment 下拉候选；本篇只消费、不复刻规格，接口异常时下拉空、不阻断页面 | §2.2 / §4.0 |
 
-| # | 问题 | 状态 |
-|---|---|---|
-| 1 | 一句话：给谁解决什么问题 | ✅ 已明确：IT 运维在界面上看报警、就地解决，形成处置闭环 |
-| 2 | 谁在用、什么时候触发它 | ✅ 已明确：IT 运维；**进入界面即加载**汇总数据 |
-| 3 | 输入从哪来、结果给谁 | ✅ 已明确：汇总＝`list`、明细＝`detail_info/page`；处置结果＝`resolve` 提交并覆盖原有行 |
-| 4 | 核心对象是什么、有哪些状态 | ✅ 已明确：核心对象＝issue（`issueId` 唯一）；状态＝未解决 / 已解决，由 `resolvedTime` 是否为空派生 |
-| 5 | 正常流程走几步 | ✅ 已明确：**7 步**走完「发现 → 处置」闭环（§6.3） |
-| 6 | 最常出问题的三种情况 | ✅ 已明确：**汇总时效 / 解决提交 / 过滤与行保留** 三类（§6.4） |
-| 7 | 怎么算做好了 | ✅ 已明确：**闭环 / 时效 / 一致 / 可核对** 四条标准，对齐北星指标 MTTR 小时级 → 分钟级（§6.5） |
+### 5.2 后端
 
-### 6.2 本轮待拍板
+| 项 | 来源 | 本篇用途 | 明细 |
+|---|---|---|---|
+| 全局响应包 | 整体库既有（口径同 `01` §4.3） | `code` / `success` / `errMsg` / `data` / `txId`；`list` / `detail_info/page` / `resolve` 三条走外壳、业务失败 HTTP 恒 200；`log/download` 成功为文件流不走外壳、错误走外壳 | §4.0 / §4.5 |
+| 分页 `Pageable` | 整体库既有 | `detail_info/page` 的分页出参结构；分页只在 Oracle 侧做，OS 不参与 | §4.0 / §4.2 |
+| 文件 IO 工具方法 | `common-lib` 库工具方法 | 文件夹组织 / 写入 / 删除 / 下载输出；业务侧只组织文件与内容，落盘 / 重名 / 清理实现不在本篇展开 | §4.5 ⑤⑥ |
 
-（暂无）。后续新增缺口按此表顺延补入。
-
-> 以下三节**只按 §2 / §4 / §5 已定规格整理**，不新增业务口径。
-
-### 6.3 正常流程（7 步）
-
-1. **进页面**：默认 **ENV 空 / Days 30**，调 §4.1 `list` 取汇总数据。
-2. **看汇总 / 换条件**：9 列按 `Item + Environment` 定位一行；改 Environment / Previous Days 后点 **Refresh** 按新条件重查，页面内不自动更新。
-3. **点「查看」**：调 §4.2 `detail_info/page` 取该行 `item + environment` 下的 issue 列表，按 `reportTime` 倒序。
-4. **看明细**：按需用「只过滤未解决」开关 / **刷新** / 翻页；点 **More Info** 看 Rule Message 全文与解析后的请求参数（§2.5）。
-5. **发起处置**：点关闭态 `Resolved` 开关，或多选未解决行点列表下方 **Resolve** 按钮（§2.4）。
-6. **提交**：填 `Resolved Comment`（不可为空）→ 点「确认」→ **POST** §4.3 `/api/v1/log_monitor/resolve`（`issueIds` + `resolvedComment`）。
-7. **回显**：按返回 `LogMonitorAlarmDetailDto` 的 `issueId` 覆盖对应行（**返回数量可少于提交数量**：已被别人解决的会跳过）；已解决行**仍保留显示**，直到主动「刷新 / 关开关 / 重新点『查看』」才重查。
-
-### 6.4 最常见的三类问题
-
-| # | 风险点 | 为什么容易出事 |
-|---|---|---|
-| 1 | **汇总条件与时效** | 汇总只在进界面与点 Refresh 时取数、页面内不自动更新，长时间停留后看到的是**旧计数**；改了下拉 / 天数却忘了点 Refresh，看到的是**旧条件下的计数**；`previousDays` 填窗口外的值会让「总数量」与预期对不上；留空则**按 30 天兜底**，别当成「全部历史」 |
-| 2 | **解决提交的范围与失败态** | Resolve 按钮只看「选中行有一个 `resolved = false`」即可用，批量时混入已解决行会多提交 `issueId`；重复点击、提交失败时 comment 框与行状态如何回退，本篇未定义 |
-| 3 | **过滤条件与行保留打架** | 未解决开关**打开**时，提交返回的已解决行按 §5-23 **必须仍显示**；前端若顺手按当前过滤条件重过滤，就会「解决完行突然消失」。三种重查时机（刷新 / 关开关 / 重新点「查看」）漏一个，列表就和后端不一致 |
-
-> 另有一处易混口径：5 个计数字段按 **issue 数量**，`lastAlarmTime` 是**通知发出时间**、`reportTime` 是明细**报告时间**；对账时按通知条数或把两个时间当同一个，就会算不平。
-
-### 6.5 验收标准
-
-1. **闭环**：从看汇总 → 查看明细 → 解决 → 行回显，全程在本页面完成，不切系统、不手工改库。
-2. **时效与筛选**：进入界面按 `environment` 空 + `previousDays=30` 由 `list` 给出汇总数据；改条件后点 **Refresh** 即按新条件重查；页面内不自动刷新。
-3. **一致**：5 个计数字段统一按 issue 数量；解决后按 `issueId` 覆盖、已解决行的保留与三种重查时机符合 §2.4 / §5-23，不出现「行消失 / 计数不降」。
-4. **可核对**：More Info 能看到 Rule Message 全文与解析后的请求参数，凭 `issueId` 能定位到具体 issue。
-5. **对齐北星指标**：把 Lot stuck / EAP offline / 接口超时等典型异常的 **MTTR 从小时级压到分钟级**（项目既定目标，本篇不另设数值）。
+> 以上均非本篇定义或维护；本篇消费但不改其规格。
