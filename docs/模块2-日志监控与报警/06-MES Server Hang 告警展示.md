@@ -72,6 +72,7 @@
 | 14 | Resolved | 是否解决 | **`resolvedTime` 派生的可点击开关**（§2.4） |
 
 - **`issueType`** 三态：`Server Hang` / `Endless Rule` / `Rule Recovered`（B 闭合后原位改，见 `04` §7.6），照 Oracle `IssueType` 快照显示。
+- **B 恢复行按已解决显示**：`04` §7.6 恢复时写 `ResolvedTime` = 当前时间、`ResolvedUser` = `System`、`ResolvedComment` = `Rule Recovered` —— 前端照常按 `resolvedTime` 非空派生 `resolved = true`（不再是人工处置的「未解决」行），More Info 里处置人显示 `System`（系统自动，不是登录用户）。
 - **`maxDelay` / `maxRuleCost` / `priority`** 是告警生成时的配置快照（`04` §2.2），改配置不影响历史行。
 - **列表未显示的字段**：`issueId`、`resolvedUser`、`resolvedTime`、`resolvedComment`。其中 `resolvedTime` 兼作 `Resolved` 开关判据；`resolvedUser` / `resolvedComment` 由 More Info 弹框展示（§2.5）；`issueId` 不展示，仅作行主键与解决提交标识。
 

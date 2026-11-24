@@ -32,9 +32,9 @@
 | 规则名 | `RuleName` | ≤128 | 是 | 块 `RULENAME` 首值快照 |
 | 命中时刻 | `IssueTime` | TIMESTAMP(3) | 否 | 块 `LAST_LINE_TIME`（两条判据相同），= OS `issueTime`，不是墙钟 |
 | 生成时刻 | `ReportTime` | TIMESTAMP(3) | 否 | 状态行生成墙钟，首写后不变 |
-| 处置时刻 | `ResolvedTime` | TIMESTAMP(3) | 是 | 处置时写；空 = 未解决（误报同样写处置字段） |
-| 处置人 | `ResolvedUser` | ≤64 | 是 | 处置人 |
-| 处置备注 | `ResolvedComment` | ≤512 | 是 | 处置备注 |
+| 处置时刻 | `ResolvedTime` | TIMESTAMP(3) | 是 | 处置时写；空 = 未解决（误报同样写处置字段）；B 恢复写恢复当时的系统当前时间 |
+| 处置人 | `ResolvedUser` | ≤64 | 是 | 处置人；B 恢复写 `System`（系统自动处置，非登录用户） |
+| 处置备注 | `ResolvedComment` | ≤512 | 是 | 处置备注；B 恢复写 `Rule Recovered` |
 | 是否已通知 | `Alarmed` | NUMBER(1) | 否 | 布尔、**由底层控制**：`1`（true）= 已发通知，非 `1` = 未发；通知发出后底层回写，B 恢复时 `true` → `false`（§7.6） |
 | 最后通知时刻 | `LastAlarmTime` | TIMESTAMP(3) | 是 | 通知发出时间；B 恢复时不变（§7.6） |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值 |
@@ -280,7 +280,7 @@ A 的 `_id` 取判定时那一次的 `END_LINE_ID`，不是块 `_id`；B 用块 
 | A 重复命中 | 落库前按本条 `issueId` 查 OS 是否已有该 `_id` | 有 ⇒ OS + Oracle 都不写；无 ⇒ 新建两源各一行 |
 | A 恢复后再犯 | 同一块 a 点记过、恢复后 b 点又命中 | `LAST_LINE_ID`（`END_LINE_ID`）不同 ⇒ `issueId` 不同 ⇒ 两行，不合并、不覆盖 |
 | B 重复命中 | 再次扫到未停止的同一块 | 不写两源，以第一次落的那行为准（`_id` 恒定，天然幂等） |
-| B 恢复 | 按 Oracle `IssueType = Endless Rule` 找行，检查块是否闭合（已完成 / 超时封口 / 中断都算） | 闭合 ⇒ 两源原位改 `Rule Recovered`，`_id` / `IssueId` 不变 |
+| B 恢复 | 按 Oracle `IssueType = Endless Rule` 找行，检查块是否闭合（已完成 / 超时封口 / 中断都算） | 闭合 ⇒ 两源原位改 `Rule Recovered`，`_id` / `IssueId` 不变；Oracle 同时写 resolved 三列（当前时间 / `System` / `Rule Recovered`） |
 
 **B 恢复的字段更新**（原位，不新增行）
 
@@ -290,6 +290,9 @@ A 的 `_id` 取判定时那一次的 `END_LINE_ID`，不是块 `_id`；B 用块 
 | OS | `_id` | 不变 |
 | Oracle | `IssueType` | `Endless Rule` → `Rule Recovered` |
 | Oracle | `Alarmed` | 当前为 `true`（1）时改 `false`（0），已是 `false` 不动 |
+| Oracle | `ResolvedTime` | 写恢复当时的系统当前时间（与 `ReportTime` 不同 —— 这是恢复时刻） |
+| Oracle | `ResolvedUser` | 写 `System`（系统自动处置，非登录用户） |
+| Oracle | `ResolvedComment` | 写 `Rule Recovered` |
 | Oracle | `LastAlarmTime` | 不变 |
 
 A 的查重按 OS `_id` 存在性，Oracle `IssueId` UK 作库层兜底；B 靠恒定 `_id` 幂等。**A 不做 `Rule Recovered`**：恢复后再次停写是新的一条，旧行保持 `Server Hang` 不动。恢复检查从 Oracle 已落的 `Endless Rule` 行出发按 `BlockId` 查块 `EXEC_STATUS`（主扫只捞进行中块，闭口块不在候选里）。
@@ -341,9 +344,13 @@ GET /mes-log-exec-read/_doc/{BlockId}
 
 ```sql
 -- ③ Oracle 原位改：Alarmed 仅 true→false（1→0），LastAlarmTime 不出现在 SET 里
+--    resolved 三列按系统自动处置写（当前时间 / System / Rule Recovered）
 UPDATE FvSrvHangMonitorAlarmState
-   SET IssueType = 'Rule Recovered',
-       Alarmed   = CASE WHEN Alarmed = 1 THEN 0 ELSE Alarmed END
+   SET IssueType       = 'Rule Recovered',
+       Alarmed         = CASE WHEN Alarmed = 1 THEN 0 ELSE Alarmed END,
+       ResolvedTime    = :now,
+       ResolvedUser    = 'System',
+       ResolvedComment = 'Rule Recovered'
  WHERE IssueId = :issueId;
 ```
 
@@ -353,7 +360,7 @@ POST /mes-log-monitor-issue-{yyyy.MM}/_update/{issueId}
 {"doc": {"issueType": "Rule Recovered"}}
 ```
 
-**待确认（不阻塞开发，定后补）**：① 查重与 B 恢复检查的执行顺序 / 频率 —— 是否同一轮内；B 恢复检查每轮都扫 Oracle 的 `Endless Rule` 行，还是只在扫到相关块时。② 恢复后是否触发通知 —— `Alarmed` 由 `true` 改 `false` 后，通知器按 `(Alarmed, LastAlarmTime)` 捞未发时会不会把这条恢复行重新捞去发（归 `10`）。
+**待确认（不阻塞开发，定后补）**：① 查重与 B 恢复检查的执行顺序 / 频率 —— 是否同一轮内；B 恢复检查每轮都扫 Oracle 的 `Endless Rule` 行，还是只在扫到相关块时。② 恢复后是否触发通知 —— `Alarmed` 由 `true` 改 `false` 且 `ResolvedTime` 已写，通知器按 `(Alarmed, LastAlarmTime)` 捞未发时会不会把这条恢复行重新捞去发（归 `10`）。
 
 ## 8. 参数配置（包含公共方法）
 
