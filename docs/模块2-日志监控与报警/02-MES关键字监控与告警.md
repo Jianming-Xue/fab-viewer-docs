@@ -263,7 +263,6 @@ COMMIT;
 | 生效 | 不缓存、不热加载；删改**与启停**都**下一轮生效**，本轮读到的版本跑到底 |
 
 - **只有 `Enabled = true` 的规则进本轮** —— 有行不等于启用；非 `true`（`0` / `NULL`）一律视为未启用，不参与检查、不进环境集合（启停口径见 `01` §4.1-7）。三个名单是 JSON 数组，未配存 `NULL` ⇒ 该项检查跳过。
-- 环境值域以 Misc `mes.global.environments` 为准，与 Filebeat `fields.ENV` 大写值不齐会全落空**且不报错** ⇒ 启动时打印读到的环境集合。
 
 **启动时读一次 · ServerCategory 白名单（新加）**
 
@@ -408,7 +407,6 @@ GET /mes-log-exec-read/_search
 
 | 配置项 | 用途 | 读取时点 | 明细 |
 |---|---|---|---|
-| `mes.global.environments` | 环境名单，规则 `Environment` 值域 | 启动时随读 | §6.2 |
 | `log.monitor.servercategory` | Server 类别白名单，嵌 `terms SERVER_CATEGORY`（恒拼、空名单零命中） | 启动时读一次，改后重启生效 | §6.2 |
 
 > 以上均非本服务参数（应用参数表见上）；本篇消费但不维护，定义与维护方不在本篇。

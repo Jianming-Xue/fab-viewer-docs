@@ -191,7 +191,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 1. `environment` / `maxDelay` / `maxRuleCost` / `priority` **四项必填**（`POST` / `PUT` 同）；
 2. `maxDelay` / `maxRuleCost` 为整数且落在 **`1 ~ 65535`**；
-3. `environment` ∈ Misc `mes.global.environments`、`priority` ∈ Misc `system.global.priority` —— 调 `shared-business-lib` 库 utility 的 **`FetchEnvFromSystemMisc()`** / **`FetchPriorityFromSystemMisc()`**，**均输入为空、输出 `string[]`**；**不直连 Misc 表、不复刻解析逻辑**（对齐功能 1）；
+3. `environment` ∈ Misc `mes.global.environments`、`priority` ∈ Misc `system.global.priority` —— 复用 `env/list` / `priority/list` 的后端取值方法拿候选校验（与前端下拉同一套取值逻辑、同服务内直接调方法不走 HTTP，对齐功能 1）；
 4. `POST`：`environment` **不能已存在**（一环境一行）；
 5. `PUT` / `DELETE` / `state`：`environment` **必须已存在**；
 6. 通知配置：`notifyInterval` 为整数且 **`2 ~ 99999`（必须 > 1）**，`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式，`feishuGroups` 的 **key 逐个**校验群机器人地址格式、**value** 校验 open_id（`ou_` 开头，单个 string 或 string 数组逐项校验），任一不合规 ⇒ `ParameterInvalid`（三项名单均可为空，空则跳过校验）。
@@ -282,7 +282,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | 步骤 | 动作 |
 |---|---|
 | ① | **必填校验（4 项）**：`environment` / `maxDelay` / `maxRuleCost` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验两阈值（`1~65535`）、`notifyInterval`（`2~99999`，必须 > 1，缺省补 **5**）、邮箱 / `feishuGroups` 的 key（webhook）与 value（open_id）格式校验（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid` |
-| ② | **值域校验（调 `shared-business-lib` 库 utility 的公共方法）**：环境候选调 `FetchEnvFromSystemMisc()`、等级候选调 `FetchPriorityFromSystemMisc()`，均输入为空、输出 `string[]`；**不直连 Misc 表、不复刻解析逻辑**；不在值域（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
+| ② | **值域校验（复用 `/list` 方法）**：环境候选取 `env/list`、等级候选取 `priority/list` 的后端取值方法（同服务内直接调方法、不走 HTTP；分别读 Misc `mes.global.environments` / `system.global.priority`）；不在候选内（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
 | ③ | **存在性校验**：按 `environment` 校验对象是否已存在（**不加锁**）—— 已存在 ⇒ 不允许创建（`SrvHangMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突转同一业务码（防并发穿透） |
 | ④ | 事务：**先建通知对象** —— 生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建配置对象** —— 生成本表 `ID` → INSERT `FvSrvHangMonitorCfg`（带该 `ALARM_CFG_ID`），**`ENABLED` 取默认 `true`** → 提交 |
 | ⑤ | 回参：按 `environment` 单条重查一次并映射，**不回显入参**，保证与库内真实值一致（含默认值补全） |
@@ -327,7 +327,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | `EnvironmentNotAllowed` / `PriorityNotAllowed` | 值不在 Misc 值域内（含 Misc 未配） | 提示去 System Misc 先配候选值 |
 
 > `RequireParameterMissing` / `ParameterInvalid` 复用整体库既有码；`SrvHangMonitorCfgExists` / `SrvHangMonitorCfgNotFound` 为本篇新增；`EnvironmentNotAllowed` / `PriorityNotAllowed` 复用功能 1 新增码。
-> 值域校验逻辑**只实现一份**（`POST` / `PUT` 共用的校验函数），内部统一调 `FetchEnvFromSystemMisc()` / `FetchPriorityFromSystemMisc()`。
+> 值域校验逻辑**只实现一份**（`POST` / `PUT` 共用的校验函数），内部复用 `env/list` / `priority/list` 的后端取值方法拿候选 `string[]`（与前端下拉共用一套取值逻辑、同服务内直接调方法不走 HTTP）。
 
 ---
 

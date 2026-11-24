@@ -170,18 +170,17 @@ COMMIT;
 
 ### 7.2 启动时读 System Misc
 
-| 配置项 | 用途 | 处理 |
-|---|---|---|
-| `log.monitor.servercategory` | 决定哪些 Server 看 Server Hang | 启动读一次，取 `string[]`，嵌 `terms SERVER_CATEGORY`；**空名单零命中**；改配置要重启 |
-| `log.monitor.srvhang.excludeRules` | A · Server Hang 的排除 Rule Name List | 启动读一次，**空名单不加排除条件**；改配置要重启 |
-| `log.monitor.endless.excludeRules` | B · Endless Rule 的排除 Rule Name List | 同上 |
+| 配置项 | 用途 | 公共方法（`shared-business-lib`） | 处理 |
+|---|---|---|---|
+| `log.monitor.servercategory` | 决定哪些 Server 看 Server Hang | `FetchLogMonitorSrvCategoryFromSystemMisc()` | 启动读一次，取 `string[]`，嵌 `terms SERVER_CATEGORY`；**空名单零命中**；改配置要重启 |
+| `log.monitor.srvhang.excludeRules` | A · Server Hang 的排除 Rule Name List | `FetchSrvHangExcludeRulesFromSystemMisc()` | 启动读一次，**空名单不加排除条件**；改配置要重启 |
+| `log.monitor.endless.excludeRules` | B · Endless Rule 的排除 Rule Name List | `FetchEndlessExcludeRulesFromSystemMisc()` | 同上 |
 
 - 三份名单都是**公共方法返回什么原样记什么**，服务侧不解析、不校验、不转换、不补默认值；与每轮重读的配置表（§7.3）是两回事。
-- 环境名单 `mes.global.environments` 随配置校验，运行时按配置表 `Environment` 取（§7.3）。
 
 ### 7.3 每轮读配置
 
-重读 `FvSrvHangMonitorCfg`，只取 `Enabled = true`，`Environment` 去重成环境集合，DSL 用 `terms ENV`。不缓存、不热加载，改配置下一轮生效。环境候选来自 Misc `mes.global.environments`；与 Filebeat `fields.ENV` 大小写不齐会全落空且不报错 ⇒ 启动时打印读到的环境集合。
+重读 `FvSrvHangMonitorCfg`，只取 `Enabled = true`，`Environment` 去重成环境集合，DSL 用 `terms ENV`。不缓存、不热加载，改配置下一轮生效。
 
 ```sql
 -- 每轮开头重读；快照四列一并用，AlarmCfgId 留给通知器按 ID 取
@@ -372,11 +371,18 @@ POST /mes-log-monitor-issue-{yyyy.MM}/_update/{issueId}
 
 本篇跑在 System Misc 之上；下面这些系统配置**不在本篇定义、也不在本篇维护**，本篇只是读取。明细散落在各步骤，此处集中列出备查，口径以对应步骤为准。**本功能不调用 `FetchMESRuleFullLogs()`**（只按 `END_LINE_ID` 取单行原文，见 §7.4）。
 
+**公共方法（`shared-business-lib`，本篇只调用不实现）**
+
+| 方法 | 职责 | 入 / 出 | 明细 |
+|---|---|---|---|
+| `FetchLogMonitorSrvCategoryFromSystemMisc()` | 启动时读 ServerCategory 白名单 | 入空 / 出 `string[]`；公共方法返回什么原样记，服务侧不解析、不校验、不转换、不补默认值 | §7.2 |
+| `FetchSrvHangExcludeRulesFromSystemMisc()` | 启动时读 A · Server Hang 排除 Rule Name List | 同上 | §7.2 / §7.4 |
+| `FetchEndlessExcludeRulesFromSystemMisc()` | 启动时读 B · Endless 排除 Rule Name List | 同上 | §7.2 / §7.4 |
+
 **系统配置（System Misc，本篇只读取不定义）**
 
 | 配置项 | 用途 | 读取时点 | 明细 |
 |---|---|---|---|
-| `mes.global.environments` | 环境名单，配置 `Environment` 值域 | 启动时随读 | §7.3 |
 | `log.monitor.servercategory` | Server 类别白名单，嵌 `terms SERVER_CATEGORY`（恒拼、空名单零命中） | 启动时读一次，改后重启生效 | §7.2 / §4.1 |
 | `log.monitor.srvhang.excludeRules` | A · Server Hang 排除 Rule Name List（空则不加条件） | 启动时读一次，改后重启生效 | §7.2 / §7.4 |
 | `log.monitor.endless.excludeRules` | B · Endless Rule 排除 Rule Name List（空则不加条件） | 启动时读一次，改后重启生效 | §7.2 / §7.4 |

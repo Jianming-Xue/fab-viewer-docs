@@ -274,7 +274,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 **6 · `priority/list`（GET）** 无入参；出参 `data` = **`List<string>`**（去重 + 字符串升序，如 `["P1","P2","P3","P4"]`）。
 
 - **归属 Misc 模块**（服务内路径 `/api/v1/sys_misc/priority/list`），本功能只是**消费方**；规格写在本篇。
-- **后端实现调 `shared-business-lib` 库 utility 中的 `FetchPriorityFromSystemMisc()`**：**输入为空、输出为字符串数组（`string[]`）**；**不直连 Misc 表、不复刻解析逻辑**（方法内部取值与回落不在本篇展开）；返回空数组 ⇒ `[]`。
+- **后端实现：同服务内直接读 System Misc 的优先级配置项 `system.global.priority`**，输出 `string[]`；取值 / 回落规则见 System Misc 规格；返回空数组 ⇒ `[]`。
 - **只读 Misc 表、不改**；供规则弹框的「报警等级」下拉取值，接口异常时下拉空、不阻断页面其他部分。
 
 **7 · `state`（POST）** 入参走 query：`item` + `environment`（定位键）+ `enabled`（布尔，目标状态）。按定位键加锁查对象，查不到 ⇒ `LogMonitorCfgNotFound`；事务内**只更新主表 `ENABLED` 一列**，不动 `FvAlarmCfg`。出参 `data` = **单个 `LogMonitorCfgDto`**（与 `page` 行同构，含 `enabled` 与两个展示字段），供列表原地刷新该行。权限：有「编辑」`Update` 权限可操作、无则禁止。
@@ -404,7 +404,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 步骤 | 动作 |
 |---|---|
 | ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30、`keyword` ≤30、`description` ≤255、`notifyInterval`（整数 **2~99999**，必须 > 1，缺省补 **5**）、**邮箱 / `feishuGroups` 的 key（webhook）与 value（open_id）格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
-| ② | **值域校验（调 `shared-business-lib` 库 utility 的公共方法）**：环境候选调 **`FetchEnvFromSystemMisc()`**、等级候选调 **`FetchPriorityFromSystemMisc()`**，两者**均输入为空、输出为字符串数组 `string[]`**；**不直连 Misc 表、不复刻解析逻辑**；不在值域（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
+| ② | **值域校验（复用 `/list` 方法）**：环境候选取 `env/list`、等级候选取 `priority/list` 的后端取值方法（同服务内直接调方法、不走 HTTP；二者均出 `string[]`，分别读 Misc `mes.global.environments` / `system.global.priority`）；提交值不在候选内（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
 | ③ | **存在性校验**：按 `item + environment` 校验对象是否已存在（**不加锁**）—— 已存在 ⇒ **不允许创建**（`LogMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突**转同一业务码**（防并发穿透） |
 | ④ | 事务：**先建通知对象**——生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建监控对象**——生成规则 `ID` → INSERT `FvLogMonitorCfg`（带该 `ALARM_CFG_ID`）→ 提交 |
 | ⑤ | 回参：按 `detail` 逻辑重查一次并映射（**不回显入参**，保证与库内真实值一致，含默认值补全） |
@@ -433,11 +433,11 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 步骤 | 动作 |
 |---|---|
-| ① | 无入参；调 `shared-business-lib` 库 utility 中的 **`FetchPriorityFromSystemMisc()`**：**输入为空、输出 `string[]`** |
-| ② | 方法内部如何取值 / 回落**不在本篇展开**，本篇只消费返回的 `string[]`；**不直连 Misc 表、不复刻解析逻辑** |
+| ① | 无入参；同服务内直接读 System Misc 的优先级配置项 `system.global.priority`，输出 `string[]` |
+| ② | 取值 / 回落规则见 System Misc 规格；本篇只消费返回的 `string[]` |
 | ③ | 返回空数组 ⇒ 出参 `[]`（**不报错**，前端下拉空、不阻断页面） |
 | ④ | 去重 + **字符串升序**排序后输出 `List<string>` |
-| ⑤ | 不缓存：每次调用公共方法取当前值，Misc 改完即时生效 |
+| ⑤ | 不缓存：每次调此 list 方法读当前值，Misc 改完即时生效 |
 
 **7 · `state`**
 
@@ -478,7 +478,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `ExcludeKeywordInvalid` | 存在「排除词是 keyword 子串（含相等）」的配置 | 提示该排除词会让规则永不生效，定位到排除关键字行 |
 
 > 前 4 个是整体库既有码，直接复用；`EnvironmentNotAllowed` / `PriorityNotAllowed` / `RuleNameConflict` / `ExcludeKeywordInvalid` 为本模块新增。
-> 值域校验逻辑**只实现一份**（`POST` / `PUT` 共用的校验函数），内部统一调 `shared-business-lib` utility 的 `FetchEnvFromSystemMisc()` / `FetchPriorityFromSystemMisc()`（均输入为空、输出 `string[]`）。
+> 值域校验逻辑**只实现一份**（`POST` / `PUT` 共用的校验函数），内部复用 `env/list` / `priority/list` 的后端取值方法拿候选 `string[]`（与前端下拉共用一套取值逻辑、同服务内直接调方法不走 HTTP），不在候选内即拒。
 
 ## 5. 待确认
 
