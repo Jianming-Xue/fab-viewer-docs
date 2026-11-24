@@ -136,14 +136,14 @@
 
 ### 4.0 接口总表与全局约定
 
-**2 条端点均归属 `telemetry-hub`**（与 `05` 关键字展示同服务），服务内前缀 `/api/v1/srv_hang_monitor`，前端调用加 `telemetry-hub` 前缀。
+**2 条端点均归属 `telemetry-hub`**（与 `05` 关键字展示同服务）。下表路径是**后端注册路径**（均以 `/api` 开头，后端维持不变）；**前端调用时一律在前面加 `/telemetry-hub` 前缀**（如 `/telemetry-hub/api/v1/srv_hang_monitor/detail_info/page`），由网关转发时去掉。
 
 | # | 服务内路径 | 方法 | 用途 | 权限 | 细则 |
 |---|---|---|---|---|---|
 | 1 | `/api/v1/srv_hang_monitor/detail_info/page` | `GET` | 明细分页（进页面 / Refresh） | 进入本菜单即可 | §4.1 |
 | 2 | `/api/v1/srv_hang_monitor/resolve` | **`POST`** | 解决提交 | 有「解决」`Resolve` 权限可操作，无则禁止 | §4.2 |
 
-> Environment 下拉另消费一个 **Misc 模块**的接口 **`GET /api/v1/sys_misc/env/list`**，**不属本功能前缀**；**本篇只消费、不复刻规格**（与 `05` 对 Misc 接口的消费口径一致），接口异常时下拉空、不阻断页面其他部分。
+> Environment 下拉另消费一个 **Misc 模块**的接口 **`GET /api/v1/sys_misc/env/list`** —— 同在 **telemetry-hub 服务下、前端调用同样加 `/telemetry-hub`**，只是路由前缀不属本功能（`/api/v1/sys_misc`）；**本篇只消费、不复刻规格**（与 `05` 对 Misc 接口的消费口径一致），接口异常时下拉空、不阻断页面其他部分。
 
 **全局约定**（引用既有后端设计，本篇不另立）
 

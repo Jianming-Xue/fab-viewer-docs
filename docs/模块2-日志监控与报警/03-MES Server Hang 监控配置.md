@@ -160,9 +160,9 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 ## 4. 接口
 
-服务内前缀 `/api/v1/srv_hang_monitor`；前端调用加网关前缀 `telemetry-hub`；响应外壳沿用整体库。本篇为全量不分页接口，不使用分页结构。
+下表路径是**后端注册路径**（均以 `/api` 开头，后端维持不变）；**前端调用时一律在前面加 `/telemetry-hub` 前缀**（如 `/telemetry-hub/api/v1/srv_hang_monitor/cfg/list`），由网关转发时去掉。响应外壳沿用整体库。本篇为全量不分页接口，不使用分页结构。
 
-> Misc 的 `env/list` / `priority/list` **归属 Misc 模块**（`/api/v1/sys_misc`），本功能只消费；规格见 `01` §2.1 / §3.3 / §4.1-6，本篇不重复。
+> 全部接口都在 **telemetry-hub 服务下**、前端调用都加 `/telemetry-hub`；Misc 的 `env/list` / `priority/list` 也在此服务下（只是路由前缀为 `/api/v1/sys_misc`、不属本功能前缀），本功能只消费；规格见 `01` §2.1 / §3.3 / §4.1-6，本篇不重复。
 
 ### 4.1 接口清单
 

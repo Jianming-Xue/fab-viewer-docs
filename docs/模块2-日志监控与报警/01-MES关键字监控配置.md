@@ -242,9 +242,9 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 ### 4.1 接口清单
 
-服务内前缀 `/api/v1/log_monitor`（第 1 ~ 5、7 条），前端调用加网关前缀 `telemetry-hub`；响应外壳与分页结构沿用整体库。
+下表路径是**后端注册路径**（均以 `/api` 开头，后端维持不变）；**前端调用时一律在前面加 `/telemetry-hub` 前缀**（如 `/telemetry-hub/api/v1/log_monitor/cfg/page`），由网关转发时去掉。响应外壳与分页结构沿用整体库。
 
-> 第 6 条 `priority/list` **不属本功能前缀** —— 它归 **Misc 模块**（`/api/v1/sys_misc`），只读 Misc 表；**接口规格写在本篇**（§4.1-6）。
+> 全部接口（含第 6 条 Misc）都在 **telemetry-hub 服务下**，前端调用都加 `/telemetry-hub`；只是**路由前缀不同** —— 第 6 条 `priority/list` 归 **Misc 模块**（`/api/v1/sys_misc`），不属本功能前缀 `/api/v1/log_monitor`，只读 Misc 表；**接口规格写在本篇**（§4.1-6）。
 
 | # | 接口 | Method | 用途 | 权限 |
 |---|---|---|---|---|
