@@ -41,7 +41,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 关注 Rule Name | `FollowRuleNames` | ≤4000 | 是 | JSON 数组，**Rule 级**白名单 —— 配了则**只有**命中名单内的 Rule Name 才告警 |
 | 排除 Rule Name | `ExcludeRuleNames` | ≤4000 | 是 | JSON 数组，**Rule 级**黑名单 |
 | 报警等级 | `Priority` | ≤20 | 否 | `P1` ~ `P4`；**值域来自 Misc `system.global.priority`**（后端读 Misc 校验，前端走 `/api/v1/sys_misc/priority/list` 取候选，见 §4.1-6） |
-| 启用状态 | `Enabled` | — | 否 | 布尔；`true` 生效、`false` 停用；**新建默认 `true`**；只由列表开关改（`state` 接口），不进 Ro |
+| 启用状态 | `Enabled` | NUMBER(1) | 否 | 布尔：`1`（true）生效、非 `1` 停用；**新建默认 `1`（true）**；只由列表开关改（`state` 接口），不进 Ro |
 | 通知配置 | `AlarmCfgId` | ≤50 | 否 | 关联 `FvAlarmCfg.ID` |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值、`UpdatedAt` 无条件刷新 |
 
@@ -60,9 +60,8 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 主键 | `ID` | ≤50 | 否 | 底层赋值；仅被表一按 `AlarmCfgId` 内部关联，不出参 |
 | 收件人 | `MailToUsers` | ≤4000 | 是 | JSON 数组，收件人邮箱；**为空 ⇒ 邮件不发** |
 | 抄送 | `MailCCUsers` | ≤4000 | 是 | JSON 数组，抄送邮箱；CC 不顶替收件人 |
-| 飞书群 | `FeishuWebhooks` | ≤4000 | 是 | JSON 数组，群机器人地址（**可多个群**，逐群各发一条） |
-| 飞书 @ 人 | `FeishuAtUsers` | ≤4000 | 是 | JSON 数组，要 @ 的人的 **open_id**（人在该群才生效） |
-| 通知间隔 | `NotifyInterval` | ≤10 | 否 | **整数、单位分钟**，取值 `1 ~ 99999`，默认 **5** |
+| 飞书群与 @ 人 | `FeishuGroups` | ≤4000 | 是 | JSON map（Key Value）：**key = 群机器人 webhook 地址**（字符串），**value = 该群要 @ 的人的 open_id** —— 一个人写 string、多个人写 string 数组（人在该群才生效）；可空 |
+| 通知间隔 | `NotifyInterval` | ≤10 | 否 | **整数、单位分钟**，取值 `2 ~ 99999`（**必须 > 1**），默认 **5** |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值、`UpdatedAt` 无条件刷新 |
 
 **无业务唯一索引** —— 只按 `ID` 被表一 1:1 引用，不单独检索。
@@ -78,10 +77,11 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 **飞书通道口径（方案 A · 群自定义机器人）**
 
-- 只走 **webhook**：一个地址对应一个群；**一份配置可填多个群地址**，逐个群各发一条同样的汇总消息（同一群内是一条）。
-- **不支持私聊单个用户**（群自定义机器人无用户身份，官方明确不能调 `im/v1/messages`）；@ 人靠 `open_id`，该人**必须在这个群里**，否则 @ 不生效（消息照发）。
+- 只走 **webhook**：`FeishuGroups` 的一个 key 就是一个群机器人地址（一个地址对应一个群），**一份配置可填多个 key**，逐个 key 各发一条汇总消息、各自 @ 该 key 下的人（同一群内是一条）。
+- 每个 key 的 value 是**该群要 @ 的人的 open_id**：一个人写 string、多个人写 string 数组；@ 的人**必须在这个群里**才生效（消息照发）。
+- **不支持私聊单个用户**（群自定义机器人无用户身份，官方明确不能调 `im/v1/messages`）。
 - 多群发送**互不影响**：某个群失败重试一次，仍失败只记日志、不阻断其他群；全失败才按发送失败上报。
-- 底层 app 凭证 / 群配置已就绪，本表只管「发到哪些群、@ 谁」。
+- 底层 app 凭证 / 群配置已就绪，本表只管「发到哪些群、每个群 @ 谁」。
 
 **通知配置的生命周期（随规则走）**
 
@@ -191,7 +191,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 **底部（Tab 2）**：`Previous`（位于 `取消` **之前**）+ `取消` + `确认`（占据 Tab 1 里 `Next` 的位置）。
 
 - `Previous`：回 Tab 1（`Keyword 配置`），**保留已填值、不重复校验**；回到 Tab 1 后底部按钮组**恢复为 `取消` + `Next`**（`Previous` / `确认` 不再出现）。`取消`：关弹框，有改动时二次确认丢弃。
-- `确认`：校验本页（**通知间隔 1~99999**、**邮箱格式逐个校验**、webhook 格式，校验规则由组件自带）后，与开关 / 删除一样**先弹 Warning 提示框**（确认 / 取消）—— 确认才提交（**新增走 `POST`、修改走 `PUT`**）、取消关闭不动；成功后关弹框，新增刷新回第 1 页、修改原地替换该行。
+- `确认`：校验本页（**通知间隔 2~99999（必须 >1）**、**邮箱格式逐个校验**、**`feishuGroups` 的 webhook 与 open_id 格式**，校验规则由组件自带）后，与开关 / 删除一样**先弹 Warning 提示框**（确认 / 取消）—— 确认才提交（**新增走 `POST`、修改走 `PUT`**）、取消关闭不动；成功后关弹框，新增刷新回第 1 页、修改原地替换该行。
 - 保存成功后 **toast 不再提示「不会立即生效」** —— 运行时每轮重读配置，删改与启停都**下一轮生效**（口径见 `02` §6.2）。
 
 > 两条交叉校验**前端先做一遍**（在 Tab 1 即时红字，不等 Next），后端再兜一次，两者同源（§4.3「写接口的交叉校验」）。
@@ -211,7 +211,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 字段 | 控件 | 校验 |
 |---|---|---|
-| 通知间隔（分） | 输入框 | **必填**；仅整型数字，**`1 ~ 99999`**；默认 **5**；超出范围 / 非整数 ⇒ 就地红字 |
+| 通知间隔（分） | 输入框 | **必填**；仅整型数字，**`2 ~ 99999`（必须 > 1）**；默认 **5**；≤1 / 超上限 / 非整数 ⇒ 就地红字 |
 
 **② ── 邮件通知 ──**
 
@@ -224,15 +224,16 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 字段 | 控件 | 校验 |
 |---|---|---|
-| 飞书群 | **多行文本域，一行一个地址**（webhook 太长，用多字符串输入控件不好粘贴） | 可空；每条须匹配群机器人地址格式 `https://open.feishu.cn/open-apis/bot/v2/hook/…`，不合规 ⇒ 阻断提交 |
-| @ 人 | 多字符串输入控件 | 可空；`ou_` 开头的 open_id，可多个 |
+| 飞书群与 @ 人 | **Key Value 组件**：key 填群 webhook，value 填该群要 @ 的人的 open_id | 可空；key 须匹配群机器人地址格式 `https://open.feishu.cn/open-apis/bot/v2/hook/…`，value 须是 `ou_` 开头的 open_id（一个值 string、多个值 string 数组）；不合规 ⇒ 阻断提交 |
+
+> 组件里**一行一个群**：左边 key 是 webhook 地址，右边 value 是这群要 @ 的人 —— 只有一个 open_id 时按字符串填，多个按数组填。key 唯一（同一 webhook 不重复），不同群各占一行。
 
 **组件级约定**：
 
-> **除「通知间隔」外全部可空** —— 邮件两栏都空、飞书两栏都空也允许保存（等于这条配置只落库、不发通知）。
-> 飞书群字段下方常驻灰字提示：「**@ 的人必须在对应群里**，否则 @ 不生效（消息照发）」。
-> 校验全部**内聚在组件里**（必填、范围、邮箱格式、webhook 格式），消费方只负责取值 / 回填，不重复写校验。**前端已实现**，消费方基于 `AlarmCfgEditor` 完成字段校验与取值。
-> **回填按组件定义回写**：`notifyInterval` 回写到**通知间隔输入框**；`mailToUsers` / `mailCCUsers` 回写到**各自对应的字符串集合组件**；飞书内容（`feishuWebhooks` / `feishuAtUsers`）按 **Key Value 组件**的定义回写。
+> **除「通知间隔」外全部可空** —— 邮件两栏都空、飞书 Key Value 组件留空也允许保存（等于这条配置只落库、不发通知）。
+> 飞书 Key Value 组件下方常驻灰字提示：「**@ 的人必须在对应群里**，否则 @ 不生效（消息照发）」。
+> 校验全部**内聚在组件里**（必填、范围、邮箱格式、webhook / open_id 格式），消费方只负责取值 / 回填，不重复写校验。**前端已实现**，消费方基于 `AlarmCfgEditor` 完成字段校验与取值。
+> **回填按组件定义回写**：`notifyInterval` 回写到**通知间隔输入框**；`mailToUsers` / `mailCCUsers` 回写到**各自对应的字符串集合组件**；飞书内容 **`feishuGroups`**（JSON map：webhook → open_id）按 **Key Value 组件**的定义回写 —— key 回写 webhook、value 回写该群要 @ 的人（单个 string / 多个 string 数组）。
 > 组件的值模型即 `AlarmCfgRo` / `AlarmCfgDto`（§4.2），两个消费方同构 —— 落同一张 `FvAlarmCfg`，无独立通知接口。
 
 ---
@@ -287,9 +288,9 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 2. `priority` 必须存在于 Misc `system.global.priority`；
 3. `item + environment` 唯一（仅 `POST` 校验 —— `PUT` 不可改这两项，天然不冲突）；
 4. 三个 JSON 数组**序列化后**各 ≤4000 字符；
-5. `notifyInterval` 为整数且落在 **`1 ~ 99999`**；
+5. `notifyInterval` 为整数且落在 **`2 ~ 99999`**（必须 > 1）；
 6. 两条交叉校验：排除词不得是 `keyword` 子串（含相等）、关注名单与排除名单不得有交集（详见 §4.3「写接口的交叉校验」）；
-7. 通知格式：`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式、`feishuWebhooks` **逐个**校验机器人地址格式，任一不合规 ⇒ `ParameterInvalid`（这三项均可为空，空则跳过校验）。
+7. 通知格式：`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式；`feishuGroups` 的 **key 逐个**校验群机器人地址格式、**value** 校验 open_id（`ou_` 开头，单个 string 或 string 数组逐项校验），任一不合规 ⇒ `ParameterInvalid`（三项均可为空，空则跳过校验）。
 
 ### 4.2 出入参对象
 
@@ -316,9 +317,8 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 |---|---|---|---|
 | `mailToUsers` | `List<string>` | 否 | 邮箱格式，序列化 ≤4000 |
 | `mailCCUsers` | `List<string>` | 否 | 同上 |
-| `feishuWebhooks` | `List<string>` | 否 | 群机器人地址，序列化 ≤4000 |
-| `feishuAtUsers` | `List<string>` | 否 | `open_id` 列表，序列化 ≤4000 |
-| `notifyInterval` | int | 是 | **1 ~ 99999**，默认 5 |
+| `feishuGroups` | `Map<string, string \| string[]>`（JSON object） | 否 | **key = 群 webhook 地址，value = 该群要 @ 的人的 open_id**（一个值 string、多个值 string 数组）；序列化 ≤4000 |
+| `notifyInterval` | int | 是 | **2 ~ 99999**（必须 > 1），默认 5 |
 
 **`LogMonitorCfgDto`（出参，字段与 `LogMonitorCfgRo` 同形，另加 `enabled` 与两个展示字段）**
 
@@ -359,8 +359,10 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
     "alarmCfg": {
       "mailToUsers": ["ops@fab.com", "dba@fab.com"],
       "mailCCUsers": ["lead@fab.com"],
-      "feishuWebhooks": ["https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"],
-      "feishuAtUsers": ["ou_5d3c…"],
+      "feishuGroups": {
+        "https://open.feishu.cn/open-apis/bot/v2/hook/xxxx": "ou_5d3c…",
+        "https://open.feishu.cn/open-apis/bot/v2/hook/yyyy": ["ou_7a1b…", "ou_9c2d…"]
+      },
       "notifyInterval": 5
     }
   }
@@ -404,7 +406,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 步骤 | 动作 |
 |---|---|
-| ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30、`keyword` ≤30、`description` ≤255、`notifyInterval`（整数 **1~99999**，缺省补 **5**）、**邮箱 / webhook 逐个格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
+| ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30、`keyword` ≤30、`description` ≤255、`notifyInterval`（整数 **2~99999**，必须 > 1，缺省补 **5**）、**邮箱 / `feishuGroups` 的 key（webhook）与 value（open_id）格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
 | ② | **值域校验（调 `shared-business-lib` 库 utility 的公共方法）**：环境候选调 **`FetchEnvFromSystemMisc()`**、等级候选调 **`FetchPriorityFromSystemMisc()`**，两者**均输入为空、输出为字符串数组 `string[]`**；**不直连 Misc 表、不复刻解析逻辑**；不在值域（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
 | ③ | **存在性校验**：按 `item + environment` 校验对象是否已存在（**不加锁**）—— 已存在 ⇒ **不允许创建**（`LogMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突**转同一业务码**（防并发穿透） |
 | ④ | 事务：**先建通知对象**——生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建监控对象**——生成规则 `ID` → INSERT `FvLogMonitorCfg`（带该 `ALARM_CFG_ID`）→ 提交 |
@@ -471,7 +473,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `code` | 触发 | 前端表现 |
 |---|---|---|
 | `RequireParameterMissing` | 必填项缺失 / 空白 | 定位到字段的红字提示 |
-| `ParameterInvalid` | 长度超限、`notifyInterval` 非整数或超出 `1~99999`、邮箱 / webhook 格式不合规、JSON 序列化超长 | 定位到字段的红字提示 |
+| `ParameterInvalid` | 长度超限、`notifyInterval` 非整数或不在 `2~99999`（≤1 同样拒）、邮箱 / `feishuGroups` 的 webhook 或 open_id 格式不合规、JSON 序列化超长 | 定位到字段的红字提示 |
 | `LogMonitorCfgExists` | `item + environment` 已存在（创建时） | 提示「同环境下该规则名已存在」 |
 | `LogMonitorCfgNotFound` | `detail` 查不到；`PUT` / `DELETE` / `state` 时该 `item + environment` 未创建 | 提示后刷新列表 |
 | `EnvironmentNotAllowed` / `PriorityNotAllowed` | 值不在 Misc 值域内（含 Misc 未配） | 提示去 System Misc 先配候选值 |

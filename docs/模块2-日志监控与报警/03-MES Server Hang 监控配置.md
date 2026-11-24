@@ -48,7 +48,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | 最大 delay | `MaxDelay` | NUMBER(5) | 否 | 最大 delay（秒），**`1 ~ 65535`** |
 | 最大耗时 | `MaxRuleCost` | NUMBER(5) | 否 | 最大写日志耗时（秒），**`1 ~ 65535`** |
 | 报警等级 | `Priority` | ≤20 | 否 | `P1` ~ `P4`；**值域来自 Misc `system.global.priority`**（后端读 Misc 校验，前端走 `/api/v1/sys_misc/priority/list` 取候选，见 §4.1「后端校验」第 3 条） |
-| 启用状态 | `Enabled` | — | 否 | 布尔；`true` 生效、`false` 停用；**新建默认 `true`**；只由列表开关改（`state` 接口，§3.2 / §4.1-5），不进 Ro |
+| 启用状态 | `Enabled` | NUMBER(1) | 否 | 布尔：`1`（true）生效、非 `1` 停用；**新建默认 `1`（true）**；只由列表开关改（`state` 接口，§3.2 / §4.1-5），不进 Ro |
 | 通知配置 | `AlarmCfgId` | ≤50 | 否 | 关联 `FvAlarmCfg.ID` |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值、`UpdatedAt` 无条件刷新 |
 
@@ -152,7 +152,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | **查看** | 点操作列 `查看`（进入本菜单即可） | **只回显**该行的值，其余控件**保持禁用**（含 `确认`，防止误提交）；仅可点 `取消` 退出 |
 
 - `取消`：清空全部控件值 → 恢复**初始态**（全部禁用），不产生任何提交。
-- `确认`：先校验（必填 4 项 + 两阈值范围 + 通知间隔 + 邮箱 / webhook 格式，规则同 §4.1 的校验清单），通过后与开关 / 删除一样**先弹 Warning 提示框**（确认 / 取消）—— 确认才提交（**新增走 `POST`、修改走 `PUT`**）、取消关闭不动；成功后重新拉 `list` 回显到列表，并回到初始态。按钮权限与入口一致：新增态受「新增」`Create` 管控、修改态受「修改」`Update` 管控（分别对应 `POST` / `PUT`）。
+- `确认`：先校验（必填 4 项 + 两阈值范围 + 通知间隔 + 邮箱 / `feishuGroups` 的 webhook 与 open_id 格式，规则同 §4.1 的校验清单），通过后与开关 / 删除一样**先弹 Warning 提示框**（确认 / 取消）—— 确认才提交（**新增走 `POST`、修改走 `PUT`**）、取消关闭不动；成功后重新拉 `list` 回显到列表，并回到初始态。按钮权限与入口一致：新增态受「新增」`Create` 管控、修改态受「修改」`Update` 管控（分别对应 `POST` / `PUT`）。
 - 校验不过时就地红字提示，不弹全局错误；保存成功后 toast **不再提示「不会立即生效」**（运行时下一轮生效）。
 - 两条交叉校验（关注 / 排除名单交集、排除词是 keyword 子串）是**关键字监控特有**的，本功能无 keyword，不适用；Alarm 区仅校验格式与必填。
 
@@ -197,7 +197,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 3. `environment` ∈ Misc `mes.global.environments`、`priority` ∈ Misc `system.global.priority` —— 调 `shared-business-lib` 库 utility 的 **`FetchEnvFromSystemMisc()`** / **`FetchPriorityFromSystemMisc()`**，**均输入为空、输出 `string[]`**；**不直连 Misc 表、不复刻解析逻辑**（对齐功能 1）；
 4. `POST`：`environment` **不能已存在**（一环境一行）；
 5. `PUT` / `DELETE` / `state`：`environment` **必须已存在**；
-6. 通知配置：`notifyInterval` 为整数且 **`1 ~ 99999`**，`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式、`feishuWebhooks` **逐个**校验机器人地址格式，任一不合规 ⇒ `ParameterInvalid`（三项名单均可为空，空则跳过校验）。
+6. 通知配置：`notifyInterval` 为整数且 **`2 ~ 99999`（必须 > 1）**，`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式，`feishuGroups` 的 **key 逐个**校验群机器人地址格式、**value** 校验 open_id（`ou_` 开头，单个 string 或 string 数组逐项校验），任一不合规 ⇒ `ParameterInvalid`（三项名单均可为空，空则跳过校验）。
 
 ### 4.2 出入参对象
 
@@ -216,7 +216,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 **`AlarmCfgDto` / `AlarmCfgRo`（嵌套出参 / 入参，同形）**
 
-字段 `mailToUsers` / `mailCCUsers` / `feishuWebhooks` / `feishuAtUsers` / `notifyInterval`，定义与校验见 `01` §4.2，本篇不重复。
+字段 `mailToUsers` / `mailCCUsers` / **`feishuGroups`**（JSON map：key = 群 webhook、value = 该群要 @ 的人的 open_id，单个 string 或多个 string 数组，序列化 ≤4000）/ `notifyInterval`，定义与校验见 `01` §4.2，本篇不重复。
 
 **`ServerHangMonitorCfgDto`（出参，`list` / `POST` / `PUT` / `state` 同形）**
 
@@ -248,8 +248,10 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
     "alarmCfg": {
       "mailToUsers": ["ops@fab.com", "dba@fab.com"],
       "mailCCUsers": ["lead@fab.com"],
-      "feishuWebhooks": ["https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"],
-      "feishuAtUsers": ["ou_5d3c…"],
+      "feishuGroups": {
+        "https://open.feishu.cn/open-apis/bot/v2/hook/xxxx": "ou_5d3c…",
+        "https://open.feishu.cn/open-apis/bot/v2/hook/yyyy": ["ou_7a1b…", "ou_9c2d…"]
+      },
       "notifyInterval": 5
     }
   }
@@ -263,7 +265,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 1. 响应外壳：`code` 成功恒 `OK`、失败为 PascalCase 业务码，`success` 输出 `0` / `1`，`errMsg` 成功为空串。
 2. `ID` 与四个审计字段**全部由底层赋值**，不进任何 Ro；`updatedAt` / `updatedBy` 每次写操作无条件刷新。
 3. 字符串长度一律**按字符**校验（先校验、再落库，避免 `VARCHAR2` 字节语义抛 `ORA-12899`）；`trim` 后为空视同未传。
-4. 两个整数阈值先按整数解析再判 `1 ~ 65535`；`notifyInterval` 同理判 `1 ~ 99999`；非整数 ⇒ `ParameterInvalid`。
+4. 两个整数阈值先按整数解析再判 `1 ~ 65535`；`notifyInterval` 同理判 `2 ~ 99999`（必须 > 1）；非整数 ⇒ `ParameterInvalid`。
 5. 事务边界：一条写接口 = 一个事务（`POST` / `PUT` / `DELETE` 带通知表，`state` 只动主表）；`AlarmCfg` 的 ID 在同一事务内生成。
 6. **存在性与锁**：`POST` 需**校验对象是否已存在**（不加锁）；`PUT` / `DELETE` / `state` 需**校验对象存在并对 `environment` 加锁**（查到即持锁，同键写操作串行）。**不指定具体公共方法名**，实现层按此语义选型。
 7. **启停的生效路径**：`list` 全量返回、`Enabled` 只是行上的一个状态；运行时告警服务**每轮重读配置，只取 `Enabled = true` 的行**，停用环境不进本轮环境集合、不参与两条判据（见 `04` §7.3）。不缓存、不热加载，删改与启停都**下一轮生效**。
@@ -282,7 +284,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 | 步骤 | 动作 |
 |---|---|
-| ① | **必填校验（4 项）**：`environment` / `maxDelay` / `maxRuleCost` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验两阈值（`1~65535`）、`notifyInterval`（`1~99999`，缺省补 **5**）、邮箱 / webhook 逐个格式校验（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid` |
+| ① | **必填校验（4 项）**：`environment` / `maxDelay` / `maxRuleCost` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验两阈值（`1~65535`）、`notifyInterval`（`2~99999`，必须 > 1，缺省补 **5**）、邮箱 / `feishuGroups` 的 key（webhook）与 value（open_id）格式校验（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid` |
 | ② | **值域校验（调 `shared-business-lib` 库 utility 的公共方法）**：环境候选调 `FetchEnvFromSystemMisc()`、等级候选调 `FetchPriorityFromSystemMisc()`，均输入为空、输出 `string[]`；**不直连 Misc 表、不复刻解析逻辑**；不在值域（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
 | ③ | **存在性校验**：按 `environment` 校验对象是否已存在（**不加锁**）—— 已存在 ⇒ 不允许创建（`SrvHangMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突转同一业务码（防并发穿透） |
 | ④ | 事务：**先建通知对象** —— 生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建配置对象** —— 生成本表 `ID` → INSERT `FvSrvHangMonitorCfg`（带该 `ALARM_CFG_ID`），**`ENABLED` 取默认 `true`** → 提交 |
@@ -322,7 +324,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | `code` | 触发 | 前端表现 |
 |---|---|---|
 | `RequireParameterMissing` | 必填项缺失 / 空白（含 `state` 的 `environment` / `enabled` 缺失） | 定位到字段的红字提示 / 开关回弹 |
-| `ParameterInvalid` | 两阈值非整数或超 `1~65535`、`enabled` 非布尔、`notifyInterval` 超 `1~99999`、邮箱 / webhook 格式不合规 | 定位到字段的红字提示 |
+| `ParameterInvalid` | 两阈值非整数或超 `1~65535`、`enabled` 非布尔、`notifyInterval` 非整数或不在 `2~99999`（≤1 同样拒）、邮箱 / `feishuGroups` 的 webhook 或 open_id 格式不合规 | 定位到字段的红字提示 |
 | `SrvHangMonitorCfgExists` | `environment` 已存在（创建时） | 提示「该环境已配置」 |
 | `SrvHangMonitorCfgNotFound` | `PUT` / `DELETE` / `state` 时该 `environment` 未创建 | 提示后刷新列表 |
 | `EnvironmentNotAllowed` / `PriorityNotAllowed` | 值不在 Misc 值域内（含 Misc 未配） | 提示去 System Misc 先配候选值 |

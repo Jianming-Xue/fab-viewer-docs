@@ -433,7 +433,7 @@ GET /mes-log-line-2026.08/_search
 | 11 | `resolvedTime` | Oracle `ResolvedTime` | 前端据此派生 `resolved`（§2.4） |
 | 12 | `resolvedUser` | Oracle `ResolvedUser` | 处置人 |
 | 13 | `resolvedComment` | Oracle `ResolvedComment` | 处置说明，More Info 弹框回显（§2.5） |
-| 14 | `alarmed` | Oracle `Alarmed` | `Y` → `true`、`N` → `false` |
+| 14 | `alarmed` | Oracle `Alarmed`（`NUMBER(1)`，布尔） | `1` → `true`、非 `1` → `false` |
 | 15 | `issueId` | Oracle `LineId`（用竖线拼 `Item`） | 与结果索引 `_id` 同值；行主键与解决提交标识 |
 
 > Oracle 出 **10 个**（1、2、4、9~15），OS 出 **5 个**（3、5、6、7、8）。`ID` / 审计列**不出参**；`ResolvedComment` 本次起随明细出参（§2.3 / §4.4）。

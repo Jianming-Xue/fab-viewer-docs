@@ -309,7 +309,7 @@ GET /mes-log-line-2026.11/_search
 | 10 | `ruleMessage` | OS 行 `LOG_BODY`（经块 `START_LINE_ID`） | 块首行原文 |
 | 11 | `issueTime` | Oracle `IssueTime` | 同时是选结果月索引的依据 |
 | 12 | `reportTime` | Oracle `ReportTime` | 排序键 |
-| 13 | `alarmed` | Oracle `Alarmed` | `Y` → `true`、`N` → `false` |
+| 13 | `alarmed` | Oracle `Alarmed`（`NUMBER(1)`，布尔） | `1` → `true`、非 `1` → `false` |
 | 14 | `resolvedUser` | Oracle `ResolvedUser` | 处置人 |
 | 15 | `resolvedTime` | Oracle `ResolvedTime` | 前端据此派生 `resolved`（§2.4） |
 | 16 | `resolvedComment` | Oracle `ResolvedComment` | 处置说明，More Info 弹框回显（§2.5） |

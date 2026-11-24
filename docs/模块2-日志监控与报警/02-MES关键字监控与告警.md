@@ -41,7 +41,7 @@
 | 处置时刻 | `ResolvedTime` | TIMESTAMP(3) | 是 | 处置时写；是否为空派生「已解决」 |
 | 处置人 | `ResolvedUser` | ≤64 | 是 | 处置人 |
 | 处置备注 | `ResolvedComment` | ≤512 | 是 | 处置备注 |
-| 是否已通知 | `Alarmed` | CHAR(1) | 否 | 默认 `N`；通知发出后回写 `Y`（通知侧写，见 `10`） |
+| 是否已通知 | `Alarmed` | NUMBER(1) | 否 | 布尔、**由底层控制**：`1`（true）= 已发通知，非 `1` = 未发；通知发出后底层回写（见 `10`） |
 | 最后通知时刻 | `LastAlarmTime` | TIMESTAMP(3) | 是 | 通知发出的时间，非生成时间（通知侧回写） |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值 |
 
