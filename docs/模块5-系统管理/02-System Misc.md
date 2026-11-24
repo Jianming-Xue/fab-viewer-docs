@@ -1,63 +1,135 @@
-# 系统级配置 · System Misc
+# 系统杂项配置 · System Misc · 配置文档
 
-| 项 | 内容 |
-|---|---|
-| 模块 | 模块 5 · 系统管理 · **系统级配置**（System Misc） |
-| 使用者 | IT 运维（配置维护）；全部功能页面的下拉候选（间接消费） |
-| 状态 | **定稿**（2026-11-09 修订：PUT 收窄为**只改 value / defaultValue**，入参对象改 `ChangeSystemMiscValueRo`；编辑入口加**编辑权限点**；Boolean 落库转**大写 `TRUE` / `FALSE`**；长度一律按**字符**校验；卡片按 `item` 升序（SQL `order by item`）；候选接口收进 `sys_misc` 前缀；左列表**保留「全部」为第一项**、`category` 可为空；布尔拨动**二次确认**；并发按 `item` **加锁串行**；Json 草稿保留、两 tab 共用一个 radio；文本值 hover 看全；有改动关弹框需确认） |
-| 来源 | `FvMisc` 表曾议后搁置（无消费方），System Misc 使其归位 |
+## 1. 功能定位
 
-> 本篇按 `01-Server Hang Reason Config` 的格式组织；表规范沿用全项目约定，界面令牌沿用 `05`。
+维护**全局使用的变量**（环境名、IP、Server Category 等）—— 一处配置、各处消费；配置项由初始化脚本 / 运维落库，页面只改 `value` / `defaultValue`、不增删。
 
 ---
 
-## 一、功能定位
+## 2. 配置表
 
-| 项 | 内容 |
-|---|---|
-| 功能名 | 中文 **系统级配置** ／ English **System Misc**（界面文案双语，走 `05` §4.6） |
-| 干什么 | 维护**全局使用的变量**（环境名列表、IP 列表等），一处配置、各处消费 |
-| 权限 | **功能权限 + 编辑权限两级**：无功能权限 ⇒ `05` §4.3 的无权限态（插画 + 说明），不请求数据、不暴露任何配置内容；有功能权限但**无编辑权限** ⇒ 页面只读浏览（卡片、Json 查看可用），**「可编辑」总开关不显示**（或置灰，§3.3）。编辑权限点由模块 6 角色权限下发 |
-| 形态 | 配置页（**Body 左右布局**：左侧 Category List ＋ 右侧卡片列表 / 可编辑总开关 / 查看·编辑弹框）＋ Oracle 表 `FvMisc` |
-| 操作边界 | **只维护既有配置项**：页面**不提供新增、不提供删除**，只有**编辑** —— 配置项清单由初始化脚本 / 运维落库，页面不改清单，只改内容 |
-| 与 Reason Config 的差别 | 那边是**某一功能的专用配置**（Hang 判定）；这边是**全局变量的家** —— 候选值接口（`env/list`、`ipaddress/list` 等）的数据源（§六） |
+**入口**：**`system-config` 模块 → 一级菜单 `System Config` → 本页 `System Misc`**，与 `Server Hang Reason Config` 同属这一级菜单（本模块只有一级菜单，两者是本页）；权限＝**功能级（到本菜单）+ 一个编辑动作（`Update`）**，见 §3.1。
 
----
+**配置只有一张表**：**表 `FvMisc`**（§2.1）—— 全局变量的家：环境名 / IP / Server Category 等候选值接口的数据源（§4.4）。§2.2 讲该表 `value` / `defaultValue` 按 `valueType` 的校验规则。
 
-## 二、配置表 `FvMisc`
+> **只维护既有项、不增删**：配置项清单由初始化脚本 / 运维落库，页面与接口都不提供 `POST` / `DELETE`，只改 `value` / `defaultValue`（§4.1 / §4.3-2）。
 
-| 字段 | 长度 / 取值 | 说明 |
+表名与栏位均大驼峰、全项目统一不加引号（不加引号的标识符 Oracle 会转成大写，写 `ValueType` 与 `VALUETYPE` 是同一列）。表规范如下，长度 / 可空 / UK 见表内。
+
+**表统一规范**：
+
+- **主键 `ID`**：`VARCHAR2(≤50)`、非空，由框架底层赋值；**业务侧不引用、不出参**（行键即 `Item`，定位与修改全走它）。
+- **审计四字段** `CreatedAt` / `CreatedBy` / `UpdatedAt` / `UpdatedBy`：由底层统一控制 —— 赋值、`UpdatedAt` / `UpdatedBy` 的刷新与可空性均由框架托管，业务侧不进任何 SQL。
+- 列名大驼峰、不加引号（Oracle 自动转大写）；**业务时间列**统一 `TIMESTAMP(3)`（毫秒）；字符串长度按**字符**校验（避免 `VARCHAR2` 字节语义抛 `ORA-12899`）。
+
+### 2.1 表 `FvMisc`
+
+| 字段 | 列名 | 长度 | 可空 | 说明 |
+|---|---|---|---|---|
+| 主键 | `ID` | ≤50 | 否 | 底层赋值、业务不引用、不出参（行键即 `Item`） |
+| 配置项名 | `Item` | ≤255 | 否 | **唯一索引**；接口层与页面均以它定位（§4） |
+| 分类 | `Category` | ≤255 | 否 | **必填**；字符不限（非空即可）；下拉候选 = 本表 `distinct(category)`（自举，不另立清单） |
+| 描述 | `Description` | ≤255 | 是 | 纯文本，不限字符格式；页面左下角小字单行展示（**页面与接口均无修改入口**，只能初始化脚本 / 运维改库） |
+| 值类型 | `ValueType` | ≤20 | 否 | **必填、无默认值**（提交缺失即报错）；枚举 `Boolean` / `Text` / `Integer` / `Float` / `Json`，决定 `value` 与 `defaultValue` 的校验规则（§2.2） |
+| 配置值 | `Value` | ≤4000 | 是 | 按 `valueType` 校验；**一律可空**（Boolean 也允许空，空时以 `defaultValue` 为准） |
+| 默认值 | `DefaultValue` | ≤4000 | 是 | 规则与 value 一致；差别：**Boolean 型 `defaultValue` 不可空**；Json 空值落 `[]` |
+| 创建审计 | `CreatedAt` / `CreatedBy` | — | 见上 | 底层统一赋值、创建时自动 |
+| 更新审计 | `UpdatedAt` / `UpdatedBy` | — | 见上 | 底层统一赋值、保存时刷新 |
+
+**业务唯一索引**：`Item`。
+
+**无 `Enabled` 字段** —— 配置项的存在与否就是开关，不设停用态（§2.1 与旧议形态差异）。
+
+与旧议形态的差异：① 新增 `valueType`、`defaultValue`；② 审计补齐创建侧（`createdAt` / `createdBy`）；③ **取消 `enabled`**（配置项的存在与否就是开关，不设停用态）；④ **取消 Single / Multi 双模型**，Value 形态改由 `valueType` 决定（§2.2）。
+
+### 2.2 Value / Default Value 校验规则（按 `valueType`）
+
+`value` 与 `defaultValue` **同一套类型规则**；可空性上只有一处差别：**Boolean 型的 `defaultValue` 不可空**（`value` 一律允许空）。
+
+**两条全局口径**：
+
+- **长度一律按字符校验**（与其他页面的校验口径一致，不按字节）—— `item` ≤255 字符、`category` ≤255 字符、`description` ≤255 字符、`value` / `defaultValue` ≤4000 字符。
+- **落库形态**：`value` / `defaultValue` 底层均为文本列，各类型按字符串原样落库，唯 Boolean 例外 —— **落库前转大写 `TRUE` / `FALSE`**（如 `"TRUE"`）；Text / Integer / Float / Json 均按原文（或序列化原文）字符串落库，出参时按 `valueType` 还原为对应类型。
+
+| `valueType` | 规则 | `value` 可空 | `defaultValue` 可空 |
+|---|---|---|---|
+| **Boolean** | 仅 `true` / `false`；**落库转大写 `TRUE` / `FALSE`** | **是**（空 ⇒ 以 `defaultValue` 为准） | **否**（必须择一，不留空）；**页面不可改**，见下注 |
+| **Text** | 任意文本 | 是（**空存 `NULL`**，不存空串） | 是（同左） |
+| **Integer** | 整型；输入非整型**报错** | 是（空存 `NULL`） | 是（同左） |
+| **Float** | 浮点型；非数字**报错** | 是（空存 `NULL`） | 是（同左） |
+| **Json** | 只允许**三形态**（下详）；**空值统一落 `[]`**，不存 null | 是（空即 `[]`） | 是（空即 `[]`） |
+
+> **Boolean 的 `defaultValue` 页面不可编辑**：弹框的 `Default Value` tab 只读，页面也**没有其他设置默认值的入口**。库层仍要求它非空（`true` / `false`），需要调整时**由运维直接在数据库中改**。接口侧同理 —— 修改 Boolean 型配置时**不更新 `defaultValue`**（§4.3-2）。
+
+**Json 三形态**（顶层只能是其中之一）：
+
+| 形态 | 写法 | 示例 |
 |---|---|---|
-| `id` | — | 技术主键（全项目表规范） |
-| `item` | ≤ **255** | 配置项名 —— **唯一索引**；接口层与页面均以它定位（§五） |
-| `category` | ≤ **255** | 分类 —— **必填**；字符不限（非空即可）；下拉候选 = 本表 `distinct(category)`（自举，不另立清单） |
-| `description` | ≤ **255** | 描述 —— 纯文本，不限字符格式；可空；页面左下角小字单行展示（**页面与接口均无修改入口**，只能初始化脚本 / 运维改库） |
-| `valueType` | 枚举 | **必填、无默认值**（提交缺失即报错）；取值 `Boolean` / `Text` / `Integer` / `Float` / `Json`，决定 `value` 与 `defaultValue` 的校验规则（§四） |
-| `value` | ≤ **4000** | 配置值 —— 按 `valueType` 校验；**一律可空**（Boolean 也允许空，空时以 `defaultValue` 为准） |
-| `defaultValue` | ≤ **4000** | 默认值 —— 规则与 value 一致；差别：**Boolean 型 `defaultValue` 不可空**；Json 空值落 `[]` |
-| `createdAt` / `createdBy` | — | 审计，创建时自动 |
-| `updatedAt` / `updatedBy` | — | 审计，保存时自动 |
+| ① 字符串数组 | `List<string>` | `["PROD","PIRUN"]` |
+| ② 字符串键值表 | `Map<string, string>` | `{"PROD":"10.18.100.1"}` |
+| ③ 字符串键 + 字符串数组值 | `Map<string, List<string>>` | `{"PROD":["10.18.100.1","10.18.100.2"]}` |
 
-与旧议形态的差异：① 新增 `valueType`、`defaultValue`；② 审计补齐创建侧（`createdAt` / `createdBy`）；③ **取消 `enabled`**（配置项的存在与否就是开关，不设停用态）；④ **取消 Single / Multi 双模型**，Value 形态改由 `valueType` 决定（§四）。
+Json 约束：
+
+- Map 的 **key 一律 string**；value 为 **string** 或 **string 数组**，同一 Map 内两种写法可混用。
+- **不嵌更深结构**：无 Map 套 Map、无「Map 数组」（旧版多 Map 并列形态作废）。
+- **规模双卡**：**项数 ≤100**（顶层元素数；Map 按 key 数计）**且** 序列化原文 **长度 ≤4000 字符**，两条都要卡（后端一并校验）。
+- **空值规范**：Json 型 `value` / `defaultValue` 为空时不写 null —— 数据库**统一存 `[]`**（页面空编辑器提交即 `[]`，后端落库前归一化）。
+
+**控件映射**：
+
+| `valueType` | 编辑控件 |
+|---|---|
+| Boolean | **开关**（`true` 开 / `false` 关）；`value` 允许空，空态在卡片上按 `defaultValue` 的状态显示 |
+| Text | **输入框**：不卡字符类型，只卡长度 ≤4000 |
+| Integer | **输入框**：仅整型，非整型即时报错；长度 ≤4000 |
+| Float | **输入框**：仅浮点，非浮点即时报错；长度 ≤4000 |
+| Json | 编辑区形态由弹框级共用 radio 决定（`List` / `Map`，§3.6）；List = 列表（每行末尾删除图标）+ 左上角主题色新增图标；Map = 左 Key / 右 Value 两列（key 行带蓝色修改图标）。交互见 §3.6；提交时 Map 的 value ≤1 行折成 `string`。整体受 ≤100 项 / ≤4000 字符双卡 |
+
+**示例**：
+
+- `mes.global.environments` · `Json` · `["PROD","PIRUN"]`
+- `mes.global.ipaddresses` · `Json` · `{"PROD":["10.18.100.1","10.18.100.2"],"PIRUN":"10.18.200.1"}`
+- `mes.rule.results` · `Json` · `["PASS","CANCELRULE"]`
+- `max_retry_times` · `Integer` · `3`
+- `enable_trace` · `Boolean` · `true`
 
 ---
 
-## 三、页面逻辑（Body 左右布局）
+## 3. 配置页
 
-Body 分左右两栏：**左 = Category List**（分类切换，§3.2）；**右 = 卡片列表 + 「可编辑」总开关 + 查看 / 编辑弹框**（§3.3 ~ §3.5）。**不设搜索区、不设分页** —— 选中一个分类即取该分类下全部配置。
+Body 分左右两栏：**左 = Category List**（分类切换，§3.3）；**右 = 卡片列表 + 「可编辑」总开关 + 查看 / 编辑弹框**（§3.4 ~ §3.6）。**不设搜索区、不设分页** —— 选中一个分类即取该分类下全部配置。
 
-### 3.1 进页面加载顺序（强约束）
+### 3.1 菜单位置与权限
+
+| 项 | 内容 |
+|---|---|
+| 一级菜单 | **`System Config`**（中文界面同显示 `System Config`） |
+| 本页 | **`System Misc`**（中文界面显示「**系统杂项配置**」；与 `Server Hang Reason Config` 同属一级菜单 `System Config`，为其下两个本页之一） |
+| 挂载位置 | **`system-config`** 模块下 |
+| 权限方式 | **功能级（到本菜单）+ 一个编辑动作权限点**（`Update`），见下表 |
+
+**权限点**
+
+| # | 权限点 | 标识 | 限制行为 |
+|---|---|---|---|
+| 1 | **功能级（菜单）** | — | 一级菜单 `System Config` / 本页 `System Misc` 入口；**无权限 ⇒ `05` §4.3 无权限态**，不请求数据、不暴露配置内容 |
+| 2 | **「编辑」** | `Update` | 控制全部写操作（含「可编辑」总开关显隐、布尔拨动、卡片编辑）；有权限可改、无权限 ⇒ 只读浏览（卡片 / Json 查看可用，总开关不显示） |
+
+读类（分类列表 / 配置列表 / Json 查看）不单独设权限，进入本菜单即可查看。
+
+### 3.2 进页面加载顺序（强约束）
 
 | 步 | 动作 |
 |---|---|
-| 1 | 调 `GET telemetry-hub/api/v1/sys_misc/category/list` 取分类数组（已去重排序） |
+| 1 | 调 `GET /api/v1/sys_misc/category/list` 取分类数组（已去重排序） |
 | 2 | **默认选中「全部」**（左列表第一项，本地固定项，不来自接口） |
-| 3 | 带当前选中项调 `GET telemetry-hub/api/v1/sys_misc/list`：选中「全部」⇒ **不带 `category`**，取全表；选中具体分类 ⇒ 带 `category` 取该分类。一次取回**全部** Misc（不分页） |
+| 3 | 带当前选中项调 `GET /api/v1/sys_misc/list`：选中「全部」⇒ **不带 `category`**，取全表；选中具体分类 ⇒ 带 `category` 取该分类。一次取回**全部** Misc（不分页） |
 | 4 | 分类数组为空 ⇒ 左列表**只剩「全部」**，右栏按第 3 步查出全表（表也空则空态「暂无配置」） |
 
-> 顺序不能颠倒：**先分类、后列表**。选中项变化才触发第 3 步，切换分类时右栏整体替换（不留旧数据、不叠加）。
+> 顺序不能颠倒：**先分类、后列表**。选中项变化才触发第 3 步，切换分类时右栏整体替换（不留旧数据、不叠加）。上述路径均为后端注册路径，**前端调用时加 `/telemetry-hub` 前缀**（如 `/telemetry-hub/api/v1/sys_misc/list`，§4.1）。
 
-### 3.2 左侧 Category List
+### 3.3 左侧 Category List
 
 | 项 | 口径 |
 |---|---|
@@ -65,16 +137,16 @@ Body 分左右两栏：**左 = Category List**（分类切换，§3.2）；**右
 | 「全部」 | **恒显示，且为第一项**（本地固定项，非接口数据）；进页面**默认选中它** |
 | 选中「全部」 | 调 `list` 时**不带 `category`** ⇒ 返回全表（仍 `order by item`） |
 | 选中态 | 选中项**字号放大**（常规 `14px` → 选中 `16px` 加粗 + 主色 `#2F7D5A`），与其余项**明显区分**；未选中为 `14px` 常规、次级灰 |
-| 点击 | 切换分类 ⇒ 重新调 `list`（§3.1 第 3 步）；选中态样式随点击即时切换 |
+| 点击 | 切换分类 ⇒ 重新调 `list`（§3.2 第 3 步）；选中态样式随点击即时切换 |
 | 条数计数 | 不做 —— 只出分类名 |
-| 刷新时机 | 编辑只改 `value` / `defaultValue`（§5.2），**category 不可改** ⇒ 左列表无需因编辑而刷新；保存成功后仅右侧对应卡片按返回值替换 |
+| 刷新时机 | 编辑只改 `value` / `defaultValue`（§4.3-2），**category 不可改** ⇒ 左列表无需因编辑而刷新；保存成功后仅右侧对应卡片按返回值替换 |
 | 空表 | 分类候选为空 ⇒ 左列表只剩「全部」，右侧照常出全表（空则空态） |
 
-### 3.3 右侧卡片列表
+### 3.4 右侧卡片列表
 
 **容器**：卡片纵向排列，容器内滚动（**不分页**，一次渲染该分类全部项）。卡片沿用 `05` 令牌 —— 圆角基准 `10px`、内边距 `20px`（舒适档），卡片间 `12px`。
 
-**排序**：按 `item` **升序** —— 由 `list` 接口 SQL 的 `order by item` 保证（§5.1），前端按返回顺序直接渲染，不再排。
+**排序**：按 `item` **升序** —— 由 `list` 接口 SQL 的 `order by item` 保证（§4.3-1），前端按返回顺序直接渲染，不再排。
 
 **单张卡片的三区排版**：
 
@@ -90,7 +162,7 @@ Body 分左右两栏：**左 = Category List**（分类切换，§3.2）；**右
 |---|---|
 | **Boolean** | **开关**：`true` = 打开，`false` = 关闭。**显示值 = `value` 为空时取 `defaultValue`**（`defaultValue` 永不为空） |
 | **Text / Integer / Float** | **一行文本**，字号与颜色**与 item 一致**（`14px`、`colorText`）；超过 **20 字符**省略号截断，**hover 提示完整值** |
-| **Json** | **「…」三点按钮** —— 点击查看完整 JSON（只读弹框，§3.4） |
+| **Json** | **「…」三点按钮** —— 点击查看完整 JSON（只读弹框，§3.5） |
 
 `defaultValue` 的呈现：跟在 value 之后同区显示，`12px` 次级灰、前缀「默认」；截断规则同 value（同样 hover 看全）。
 
@@ -102,22 +174,22 @@ Body 分左右两栏：**左 = Category List**（分类切换，§3.2）；**右
 | 打开 | 非布尔类型（Text / Integer / Float / Json）value **最右侧显示编辑按钮**；布尔开关**可拨动** |
 
 - 布尔开关与编辑按钮**同受这一个总开关管控**，不设第二个入口。
-- 布尔开关拨动**需二次确认**：拨动后弹确认框（如「确认将 `mes.xxx` 改为 **开启**？」）—— 确认才走 `PUT`（只改 `value`，入参 `ChangeSystemMiscValueRo`，§5.2），成功后卡片按返回值刷新；**取消则开关回弹到原状态**，不发请求；`PUT` 失败同样回弹并提示。
-- **总开关不是权限闸门，是防误触**：真正的编辑权限判定在权限点 —— 无编辑权限的用户整个总开关都不出现（§一）。
+- 布尔开关拨动**需二次确认**：拨动后弹确认框（如「确认将 `mes.xxx` 改为 **开启**？」）—— 确认才走 `PUT`（只改 `value`，入参 `ChangeSystemMiscValueRo`，§4.3-2），成功后卡片按返回值刷新；**取消则开关回弹到原状态**，不发请求；`PUT` 失败同样回弹并提示。
+- **总开关不是权限闸门，是防误触**：真正的编辑权限判定在权限点 —— 无编辑权限的用户整个总开关都不出现（§1）。
 
-### 3.4 查看弹框（Json「…」触发）
+### 3.5 查看弹框（Json「…」触发）
 
 只读：展示该配置项完整 JSON（`value` 与 `defaultValue` 并列，等宽字体、可滚动），**不带编辑控件**，底部只有 `关闭`。
 
-### 3.5 编辑弹框（编辑按钮触发）
+### 3.6 编辑弹框（编辑按钮触发）
 
-**顶部字段（全部只读展示）** —— 编辑只涉及 value / defaultValue（§5.2），其余字段在页面上**一律不可改**：
+**顶部字段（全部只读展示）** —— 编辑只涉及 value / defaultValue（§4.3-2），其余字段在页面上**一律不可改**：
 
 | 字段 | 口径 |
 |---|---|
 | Item | **锁定**（定位键，不可改） |
-| Category | **只读展示**（接口不支持改，§5.2） |
-| Description | **只读展示**（接口不支持改，§5.2） |
+| Category | **只读展示**（接口不支持改，§4.3-2） |
+| Description | **只读展示**（接口不支持改，§4.3-2） |
 | Value Type | **锁定**（不可改）—— 类型是配置项的固有契约，要换类型只能另立新项 |
 
 > 要改 `category` / `description` 只能由运维直接在数据库中改 —— 页面与接口都没有入口。
@@ -141,7 +213,7 @@ Body 分左右两栏：**左 = Category List**（分类切换，§3.2）；**右
 | **Text** | **输入框**：不卡字符类型，只卡长度 ≤4000 |
 | **Integer** | **输入框**：仅整型，非整型即时报错；长度 ≤4000 |
 | **Float** | **输入框**：仅浮点，非浮点即时报错；长度 ≤4000 |
-| **Boolean** | **开关**。`Value` tab 可改、允许留空；**`Default Value` tab 只读** —— 页面不提供布尔默认值的编辑入口（要改由运维直接在库里改，§4 注） |
+| **Boolean** | **开关**。`Value` tab 可改、允许留空；**`Default Value` tab 只读** —— 页面不提供布尔默认值的编辑入口（要改由运维直接在库里改，§2.2 注） |
 | **Json** | 编辑区形态由 Tab 上方的共用 radio 决定（`List` / `Map`，§上）；两区交互见下 |
 
 **Json · List 编辑区**：
@@ -180,89 +252,56 @@ Body 分左右两栏：**左 = Category List**（分类切换，§3.2）；**右
 
 **显示长度**：`key`、`value`、List 元素一律**单行显示，超 30 字符省略号**截断；完整内容走 **hover 提示**。
 
-> **可编辑字段仅两个**：`value` / `defaultValue`。`item`（定位键）、`valueType`（类型契约）、`category`、`description` **一律不可改**（接口不支持，§5.2）。
+> **可编辑字段仅两个**：`value` / `defaultValue`。`item`（定位键）、`valueType`（类型契约）、`category`、`description` **一律不可改**（接口不支持，§4.3-2）。
 
-**保存后**：接口返回的 `SystemMiscDto` 直接替换该卡片；`category` 不可改，左列表无需刷新（§3.2）。
-
----
-
-## 四、Value / Default Value 校验规则（按 `valueType`）
-
-`value` 与 `defaultValue` **同一套类型规则**；可空性上只有一处差别：**Boolean 型的 `defaultValue` 不可空**（`value` 一律允许空）。
-
-**两条全局口径**：
-
-- **长度一律按字符校验**（与其他页面的校验口径一致，不按字节）—— `item` ≤255 字符、`category` ≤255 字符、`description` ≤255 字符、`value` / `defaultValue` ≤4000 字符。
-- **落库形态**：`value` / `defaultValue` 底层均为文本列，各类型按字符串原样落库，唯 Boolean 例外 —— **落库前转大写 `TRUE` / `FALSE`**（如 `"TRUE"`）；Text / Integer / Float / Json 均按原文（或序列化原文）字符串落库，出参时按 `valueType` 还原为对应类型。
-
-| `valueType` | 规则 | `value` 可空 | `defaultValue` 可空 |
-|---|---|---|---|
-| **Boolean** | 仅 `true` / `false`；**落库转大写 `TRUE` / `FALSE`** | **是**（空 ⇒ 以 `defaultValue` 为准） | **否**（必须择一，不留空）；**页面不可改**，见下注 |
-| **Text** | 任意文本 | 是（**空存 `NULL`**，不存空串） | 是（同左） |
-| **Integer** | 整型；输入非整型**报错** | 是（空存 `NULL`） | 是（同左） |
-| **Float** | 浮点型；非数字**报错** | 是（空存 `NULL`） | 是（同左） |
-| **Json** | 只允许**三形态**（下详）；**空值统一落 `[]`**，不存 null | 是（空即 `[]`） | 是（空即 `[]`） |
-
-> **Boolean 的 `defaultValue` 页面不可编辑**：弹框的 `Default Value` tab 只读，页面也**没有其他设置默认值的入口**。库层仍要求它非空（`true` / `false`），需要调整时**由运维直接在数据库中改**。接口侧同理 —— 修改 Boolean 型配置时**不更新 `defaultValue`**（§5.2 第 4 步）。
-
-**Json 三形态**（顶层只能是其中之一）：
-
-| 形态 | 写法 | 示例 |
-|---|---|---|
-| ① 字符串数组 | `List<string>` | `["PROD","PIRUN"]` |
-| ② 字符串键值表 | `Map<string, string>` | `{"PROD":"10.18.100.1"}` |
-| ③ 字符串键 + 字符串数组值 | `Map<string, List<string>>` | `{"PROD":["10.18.100.1","10.18.100.2"]}` |
-
-Json 约束：
-
-- Map 的 **key 一律 string**；value 为 **string** 或 **string 数组**，同一 Map 内两种写法可混用。
-- **不嵌更深结构**：无 Map 套 Map、无「Map 数组」（旧版多 Map 并列形态作废）。
-- **规模双卡**：**项数 ≤100**（顶层元素数；Map 按 key 数计）**且** 序列化原文 **长度 ≤4000 字符**，两条都要卡（后端一并校验）。
-- **空值规范**：Json 型 `value` / `defaultValue` 为空时不写 null —— 数据库**统一存 `[]`**（页面空编辑器提交即 `[]`，后端落库前归一化）。
-
-**控件映射**：
-
-| `valueType` | 编辑控件 |
-|---|---|
-| Boolean | **开关**（`true` 开 / `false` 关）；`value` 允许空，空态在卡片上按 `defaultValue` 的状态显示 |
-| Text | **输入框**：不卡字符类型，只卡长度 ≤4000 |
-| Integer | **输入框**：仅整型，非整型即时报错；长度 ≤4000 |
-| Float | **输入框**：仅浮点，非浮点即时报错；长度 ≤4000 |
-| Json | 编辑区形态由弹框级共用 radio 决定（`List` / `Map`，§3.5）；List = 列表（每行末尾删除图标）+ 左上角主题色新增图标；Map = 左 Key / 右 Value 两列（key 行带蓝色修改图标）。交互见 §3.5；提交时 Map 的 value ≤1 行折成 `string`。整体受 ≤100 项 / ≤4000 字符双卡 |
-
-**示例**：
-
-- `mes.global.environments` · `Json` · `["PROD","PIRUN"]`
-- `mes.global.ipaddresses` · `Json` · `{"PROD":["10.18.100.1","10.18.100.2"],"PIRUN":"10.18.200.1"}`
-- `mes.rule.results` · `Json` · `["PASS","CANCELRULE"]`
-- `max_retry_times` · `Integer` · `3`
-- `enable_trace` · `Boolean` · `true`
+**保存后**：接口返回的 `SystemMiscDto` 直接替换该卡片；`category` 不可改，左列表无需刷新（§3.3）。
 
 ---
 
-## 五、接口清单
+## 4. 接口
 
-**路径前缀**：服务内统一 `/api/v1/sys_misc`（**不再带 `log-viewer`**）；前端调用时由网关加服务前缀，实际为 `telemetry-hub/api/v1/sys_misc/...`。
+### 4.1 接口清单
+
+下表路径是**后端注册路径**（均以 `/api` 开头、统一在 `/api/v1/sys_misc` 前缀下，后端维持不变）；**前端调用时一律在前面加 `/telemetry-hub` 前缀**（如 `/telemetry-hub/api/v1/sys_misc/list`），由网关转发时去掉。全部接口都在 **telemetry-hub 服务下**。
 
 **响应外壳**：走**整体库**的全局响应包（`模块6/05-后端设计` §1.4）—— `code`（成功恒 `OK`）/ `success`（布尔，输出转 `0` / `1`）/ `errMsg` / `data` / `txId`。
 
-> **本功能不提供分页接口** —— 选中分类即取该分类下全部配置、选中「全部」即取全表（§3.1），`data` 为数组，不用整体库的 `Pageable`。
+> **本功能不提供分页接口** —— 选中分类即取该分类下全部配置、选中「全部」即取全表（§3.2），`data` 为数组，不用整体库的 `Pageable`。
+>
+> **不做 `POST`（新增）/ `DELETE`（删除）** —— 配置项清单由初始化脚本 / SQL 落库，页面与接口均无增删能力（§1）。
 
-| # | 接口（前端路径） | Method | 用途 |
+| # | 接口 | Method | 用途 |
 |---|---|---|---|
-| 1 | `telemetry-hub/api/v1/sys_misc/list` | `GET` | 按 `category` 取该分类下**全部** Misc |
-| 2 | `telemetry-hub/api/v1/sys_misc` | `PUT` | 修改（页面唯一写操作） |
-| 3 | `telemetry-hub/api/v1/sys_misc/category/list` | `GET` | Category List 候选（`distinct(category)` 去重排序） |
+| 1 | `/api/v1/sys_misc/list` | `GET` | 按 `category` 取该分类下**全部** Misc |
+| 2 | `/api/v1/sys_misc` | `PUT` | 修改（页面唯一写操作） |
+| 3 | `/api/v1/sys_misc/category/list` | `GET` | Category List 候选（`distinct(category)` 去重排序） |
 
-> **不做 `POST`（新增）/ `DELETE`（删除）** —— 配置项清单由初始化脚本 / SQL 落库，页面与接口均无增删能力（§一 操作边界）。
+### 4.2 出入参对象
 
-### 5.1 `list`（GET，URL 参数，**不分页**）
+**`ChangeSystemMiscValueRo`**（入参）：`item` / `value` / `defaultValue`（见 §4.3-2 表）。
+
+**`SystemMiscDto`**（出参）：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `item` | string | 配置项名（唯一键） |
+| `category` | string | 分类 |
+| `description` | string | 描述，可空 |
+| `valueType` | string | `Boolean` / `Text` / `Integer` / `Float` / `Json` |
+| `value` | any | 按 `valueType` 还原：Boolean ⇒ bool、Text ⇒ string、Integer ⇒ int、Float ⇒ number、Json ⇒ 数组 / 对象（底层均存字符串，Boolean 存大写 `TRUE` / `FALSE`，§2.2） |
+| `defaultValue` | any | 同上 |
+| `createdAt` / `createdBy` | string | 创建审计 |
+| `updatedAt` / `updatedBy` | string | 更新审计 |
+
+### 4.3 实现逻辑（逐接口）
+
+**1 · `list`（GET，URL 参数，不分页）**
 
 | 参数 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `category` | string | 否 | **等值**过滤；**空 = 不过滤，返回全表**（左列表选「全部」时不带，§3.1 / §3.2） |
+| `category` | string | 否 | **等值**过滤；**空 = 不过滤，返回全表**（左列表选「全部」时不带，§3.2 / §3.3） |
 
-出参 `data` = **`SystemMiscDto` 数组**（选中分类 ⇒ 该分类全量；「全部」⇒ 全表全量；无分页包装；空 ⇒ `[]`）。**SQL 必须带 `order by item` 升序**，前端按返回顺序直接渲染（§3.3 排序口径）。
+出参 `data` = **`SystemMiscDto` 数组**（选中分类 ⇒ 该分类全量；「全部」⇒ 全表全量；无分页包装；空 ⇒ `[]`）。**SQL 必须带 `order by item` 升序**，前端按返回顺序直接渲染（§3.4 排序口径）。
 
 ```json
 {
@@ -281,48 +320,31 @@ Json 约束：
 
 （`id` 不出参 —— 行键即 `item`，定位与修改全走它。）
 
-### 5.2 `PUT`（修改）
+**2 · `PUT`（修改）**
 
 入参对象 **`ChangeSystemMiscValueRo`** —— **只改值，不带其他字段**（`category` / `description` 均无修改入口，页面与接口都没有）：
 
 | 字段 | 类型 | 必填 | 约束 |
 |---|---|---|---|
 | `item` | string | 是 | 定位键（唯一索引），≤255 字符 —— 与库中不一致按「不存在」拒 |
-| `value` | any | 否 | 按库中 `valueType` 校验（§四），**可空**；Json 空 ⇒ 落 `[]` |
-| `defaultValue` | any | 否 | 同 `value`；**Boolean 型忽略此字段**（不落库，页面无入口，§四 注） |
+| `value` | any | 否 | 按库中 `valueType` 校验（§2.2），**可空**；Json 空 ⇒ 落 `[]` |
+| `defaultValue` | any | 否 | 同 `value`；**Boolean 型忽略此字段**（不落库，页面无入口，§2.2 注） |
 
 - **`category` / `description` / `valueType` 均不在 `ChangeSystemMiscValueRo` 中** —— 一律不可改；前端误传按未知字段忽略，不入库。
-- **`PUT` 是整表单式提交**：`value` / `defaultValue` 两个字段**都传当前值**（弹框里没改的 tab 也传原值），不做「只改传了哪个字段」的局部合并；布尔开关拨动只传 `item` + `value`（Boolean 无 defaultValue 入参，§四 注）。
-- 出参 `data` = **`SystemMiscDto`**（单条，字段见 §5.3），页面直接替换该卡片（§3.3）。
+- **`PUT` 是整表单式提交**：`value` / `defaultValue` 两个字段**都传当前值**（弹框里没改的 tab 也传原值），不做「只改传了哪个字段」的局部合并；布尔开关拨动只传 `item` + `value`（Boolean 无 defaultValue 入参，§2.2 注）。
+- 出参 `data` = **`SystemMiscDto`**（单条，字段见 §4.2），页面直接替换该卡片（§3.4）。
 
 **修改逻辑**
 
 1. **先对 `item` 加锁** —— 由底层统一加锁机制按 `item` 粒度串行化（同一配置项同时只允许一笔修改在途），随后按 `item` 查库；不存在 ⇒ 拒（页面只编辑既有项）。
-2. 取库中 `valueType`，按 §四 校验 `value`（可空）。`defaultValue` **仅非 Boolean 时**参与校验（Boolean 库中值恒非空、入参不认）。
+2. 取库中 `valueType`，按 §2.2 校验 `value`（可空）。`defaultValue` **仅非 Boolean 时**参与校验（Boolean 库中值恒非空、入参不认）。
 3. Boolean 型 `value` 落库前转大写 `TRUE` / `FALSE`；Json 型空值归一化为 `[]` 再落库。
-4. 只更新 `value` / `defaultValue`（Boolean 仅 `value`）+ `updatedAt` / `updatedBy`（底层审计，§一 注）；`item`、`valueType`、`category`、`description`、`createdAt` / `createdBy` 不动。
+4. 只更新 `value` / `defaultValue`（Boolean 仅 `value`）+ `updatedAt` / `updatedBy`（底层审计，§1 注）；`item`、`valueType`、`category`、`description`、`createdAt` / `createdBy` 不动。
 5. 提交事务并释放锁，返回更新后的 `SystemMiscDto`。
 
 > **并发口径**：并发同一 `item` 的两笔修改**排队执行**（后到者等前一笔释放锁后再读库），因此不会出现「后保存静默覆盖前一笔」；不额外用 `updatedAt` 做乐观锁比对。
 
-### 5.3 对象定义
-
-**`ChangeSystemMiscValueRo`**（入参）：`item` / `value` / `defaultValue`（见 §5.2 表）。
-
-**`SystemMiscDto`**（出参）：
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `item` | string | 配置项名（唯一键） |
-| `category` | string | 分类 |
-| `description` | string | 描述，可空 |
-| `valueType` | string | `Boolean` / `Text` / `Integer` / `Float` / `Json` |
-| `value` | any | 按 `valueType` 还原：Boolean ⇒ bool、Text ⇒ string、Integer ⇒ int、Float ⇒ number、Json ⇒ 数组 / 对象（底层均存字符串，Boolean 存大写 `TRUE` / `FALSE`，§四） |
-| `defaultValue` | any | 同上 |
-| `createdAt` / `createdBy` | string | 创建审计 |
-| `updatedAt` / `updatedBy` | string | 更新审计 |
-
-### 5.4 `category/list`（GET）
+**3 · `category/list`（GET）**
 
 无入参；出参 `data` = **按 `category` 去重并排序后的 string 数组**（空表 ⇒ 空数组）：
 
@@ -330,18 +352,15 @@ Json 约束：
 { "code": "OK", "success": 1, "errMsg": "", "data": ["global", "hang"], "txId": "3f9c1b7e2a4d" }
 ```
 
-不分页（distinct 值有限）。页面左侧直接按返回顺序渲染，**不额外补「全部」**（§3.2）。
+不分页（distinct 值有限）。页面左侧直接按返回顺序渲染，**不额外补「全部」**（§3.3）。
 
-**后端复验**：直调接口绕过页面控件时，后端按 §四 同一套规则校验 `value`（可空）与 `defaultValue`（Integer 整型 / Float 浮点 / Json 三形态 + 项数 ≤100 + 序列化原文 ≤4000 字符；Boolean 不校验也不改 `defaultValue`），不符即拒 —— 防把坏结构写进全局配置。长度一律按字符校验（§四 全局口径）。
+> **后端复验**：直调接口绕过页面控件时，后端按 §2.2 同一套规则校验 `value`（可空）与 `defaultValue`（Integer 整型 / Float 浮点 / Json 三形态 + 项数 ≤100 + 序列化原文 ≤4000 字符；Boolean 不校验也不改 `defaultValue`），不符即拒 —— 防把坏结构写进全局配置。长度一律按字符校验（§2.2 全局口径）。
 
+### 4.4 候选值接口（**候选值都从 Misc 出**）
 
----
+模块 1/00 的跨模块依赖「环境名 / Host IP / Server Category 的候选值来自配置」——落点即本功能。六个 `/list` 候选接口的数据源全部为 Misc，**路径统一收在 `sys_misc` 前缀下**，`item` 用**业务命名空间前缀**命名，`valueType` 一律 `Json`。下表同为后端注册路径，**前端调用时加 `/telemetry-hub` 前缀**，如 `/telemetry-hub/api/v1/sys_misc/env/list`。
 
-## 六、与候选值接口的关系（**候选值都从 Misc 出**）
-
-模块 1/00 的跨模块依赖「环境名 / Host IP / Server Category 的候选值来自配置」——落点即本功能。六个 `/list` 候选接口的数据源全部为 Misc，**路径统一收在 `sys_misc` 前缀下**，`item` 用**业务命名空间前缀**命名，`valueType` 一律 `Json`：
-
-| 候选接口（服务内路径） | 消费方 | Misc 的 `item` | 形态（§四） |
+| 候选接口（后端注册路径） | 消费方 | Misc 的 `item` | 形态（§2.2） |
 |---|---|---|---|
 | `GET /api/v1/sys_misc/env/list` | 01 / 02 / 03 的 Environment 下拉 | `mes.global.environments` | ① `List<string>` |
 | `GET /api/v1/sys_misc/ipaddress/list?environment=` | 01 / 03 的 Host IP 下拉（环境联动） | `mes.global.ipaddresses` | ③ `Map<string, List<string>>`（键 = 环境名；值也兼容 `Map<string, string>`） |
@@ -350,28 +369,26 @@ Json 约束：
 | `GET /api/v1/sys_misc/lock_object/list` | 01 列设置 Lock Object 候选 | `mes.rule.lockedobjects` | ① `List<string>` |
 | `GET /api/v1/sys_misc/call_sys/list` | 01 列设置 Call Sys 候选 | `mes.rule.calledsystems` | ① `List<string>` |
 
-> 前端调用时同样加网关前缀，如 `telemetry-hub/api/v1/sys_misc/env/list`。
-
 **出参**：六个接口一律 `data` = **`List<string>`**（去重 + 排序后），空则 `[]`。
 
-### 6.1 取数规则（六个接口共用）
+**取数规则（六个接口共用）**
 
-1. 先读 `value`，按 §6.2 判定形态并解析成字符串集合。
+1. 先读 `value`，按形态判定解析成字符串集合。
 2. 解析结果**为空**（value 为空 / 结构不认 / 按环境过滤后无值）⇒ **回落读 `defaultValue`**，解析方式与读 value **完全一致**。
 3. `defaultValue` 也取不到 ⇒ 输出**空数组** `[]`（不报错、不返回 null）。
 4. 输出前一律**去重 + 排序**。
 
-### 6.2 形态判定
+**形态判定**
 
 | `value` / `defaultValue` 的实际结构 | 取值方式 |
 |---|---|
 | **List**（字符串数组） | 取**全部**元素 |
 | **Map**（键值表，值可为 string 或 string 数组） | **按 `environment` 过滤**：入参非空 ⇒ 取该 key 的值；入参为空 ⇒ **全部 key 的 value 合并** |
-| 其他（标量 / 非 Json / 结构不合法） | 视为取不到值 ⇒ 走 §6.1 的回落或输出 `[]` |
+| 其他（标量 / 非 Json / 结构不合法） | 视为取不到值 ⇒ 走取数规则的回落或输出 `[]` |
 
 > 只有 `ipaddress/list` 带 `environment` 入参；其余五个即便 item 被配成 Map 形态，也因不传 environment 而退化为「全部 value 摊平」—— 规则统一，不特判。
 
-### 6.3 IP 接口的联动（`mes.global.ipaddresses`）
+**IP 接口的联动（`mes.global.ipaddresses`）**
 
 | 入参 `environment` | 取值 |
 |---|---|
@@ -385,10 +402,8 @@ Json 约束：
 
 ---
 
-## 七、待确认
+## 5. 待确认
 
-（无）—— 原 5 条已于 2026-11-09 全部拍板：① 左列表**保留「全部」且为第一项**（§3.1 / §3.2）；② 并发同一 `item` 由**底层加锁机制串行化**（§5.2）；③ 布尔拨动**需二次确认**（§3.3）；④ 总开关**不记忆**状态；⑤ **不做**虚拟滚动，容器常规滚动。
+（无）—— 原 5 条已于 2026-11-09 全部拍板：① 左列表**保留「全部」且为第一项**（§3.2 / §3.3）；② 并发同一 `item` 由**底层加锁机制串行化**（§4.3-2）；③ 布尔拨动**需二次确认**（§3.4）；④ 总开关**不记忆**状态；⑤ **不做**虚拟滚动，容器常规滚动。
 
 > 原型 `System-Misc-annotated-prototype.html` **本轮不同步** —— 先把需求口径定稿，原型统一后补。
-
----

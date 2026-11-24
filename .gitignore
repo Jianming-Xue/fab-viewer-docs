@@ -43,6 +43,7 @@
 # ── 模块 5：Server Hang Reason Config（已定稿） ──
 !/docs/模块5-系统管理/
 /docs/模块5-系统管理/*
+!/docs/模块5-系统管理/00-模块概览.md
 !/docs/模块5-系统管理/01-Server Hang Reason Config.md
 !/docs/模块5-系统管理/02-System Misc.md
 !/docs/模块1-日志检索与分析/prototype/MES-Rule实效分析-annotated-prototype.html
