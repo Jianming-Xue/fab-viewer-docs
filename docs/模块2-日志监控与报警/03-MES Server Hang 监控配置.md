@@ -48,13 +48,13 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | 最大 delay | `MaxDelay` | NUMBER(5) | 否 | 最大 delay（秒），**`1 ~ 65535`** |
 | 最大耗时 | `MaxRuleCost` | NUMBER(5) | 否 | 最大写日志耗时（秒），**`1 ~ 65535`** |
 | 报警等级 | `Priority` | ≤20 | 否 | `P1` ~ `P4`；**值域来自 Misc `system.global.priority`**（后端读 Misc 校验，前端走 `/api/v1/sys_misc/priority/list` 取候选，见 §4.1「后端校验」第 3 条） |
-| 启用状态 | `Enabled` | NUMBER(1) | 否 | 布尔：`1`（true）生效、非 `1` 停用；**新建默认 `1`（true）**；只由列表开关改（`state` 接口，§3.2 / §4.1-5），不进 Ro |
+| 启用状态 | `Enabled` | NUMBER(1) | 否 | 布尔：**`true`（库中 `1`）= 启用、非 `true` = 未启用**（`0` / `NULL` 等一律未启用，防止误用）；**新建默认 `true`**；只由列表开关改（`state` 接口，§3.2 / §4.1-5），不进 Ro |
 | 通知配置 | `AlarmCfgId` | ≤50 | 否 | 关联 `FvAlarmCfg.ID` |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值、`UpdatedAt` 无条件刷新 |
 
 **业务唯一索引**：`Environment`。
 
-- **`Enabled`**：只有 `true` 的配置生效，`false` 停用但配置保留；停用环境不参与两条判据 —— 运行时每轮重读配置时过滤（§4.3 共性 7 / `04` §7.3）。
+- **`Enabled`**：只有 `true` 的配置启用，非 `true` 未启用但配置保留；未启用环境不参与两条判据 —— 运行时每轮重读配置时过滤（§4.3 共性 7 / `04` §7.3）。
 
 ### 2.2 表二 · `FvAlarmCfg`（通知配置）
 
@@ -226,7 +226,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 | `maxDelay` | int | 最大 delay（秒） |
 | `maxRuleCost` | int | 最大耗时（秒） |
 | `priority` | string | `P1` ~ `P4` |
-| `enabled` | boolean | `true` 生效 / `false` 停用；列表开关取它 |
+| `enabled` | boolean | `true` = 启用、非 `true` = 未启用；列表开关取它 |
 | `alarmCfg` | `AlarmCfgDto` | 嵌套通知配置 |
 | `lastUpdatedTime` | string | 审计 `updatedAt` 有值取它，为空取 `createdAt` |
 | `lastUpdatedUser` | string | 审计 `updatedBy` 有值取它，为空取 `createdBy` |
@@ -268,7 +268,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 4. 两个整数阈值先按整数解析再判 `1 ~ 65535`；`notifyInterval` 同理判 `2 ~ 99999`（必须 > 1）；非整数 ⇒ `ParameterInvalid`。
 5. 事务边界：一条写接口 = 一个事务（`POST` / `PUT` / `DELETE` 带通知表，`state` 只动主表）；`AlarmCfg` 的 ID 在同一事务内生成。
 6. **存在性与锁**：`POST` 需**校验对象是否已存在**（不加锁）；`PUT` / `DELETE` / `state` 需**校验对象存在并对 `environment` 加锁**（查到即持锁，同键写操作串行）。**不指定具体公共方法名**，实现层按此语义选型。
-7. **启停的生效路径**：`list` 全量返回、`Enabled` 只是行上的一个状态；运行时告警服务**每轮重读配置，只取 `Enabled = true` 的行**，停用环境不进本轮环境集合、不参与两条判据（见 `04` §7.3）。不缓存、不热加载，删改与启停都**下一轮生效**。
+7. **启停的生效路径**：`list` 全量返回、`Enabled` 只是行上的一个状态；运行时告警服务**每轮重读配置，只取 `Enabled = true` 的行**，非 `true` 的未启用环境不进本轮环境集合、不参与两条判据（见 `04` §7.3）。不缓存、不热加载，删改与启停都**下一轮生效**。
 8. 权限：功能级到本菜单，进入菜单即可查（`list`）；写动作 `POST` 要「新增」`Create`、`PUT` / `state` 要「修改」`Update`、`DELETE` 要「删除」`Delete`，有权限可操作、无权限禁止。
 
 **1 · `list`**

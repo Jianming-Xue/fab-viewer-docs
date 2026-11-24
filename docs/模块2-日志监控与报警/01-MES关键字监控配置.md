@@ -41,13 +41,13 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 关注 Rule Name | `FollowRuleNames` | ≤4000 | 是 | JSON 数组，**Rule 级**白名单 —— 配了则**只有**命中名单内的 Rule Name 才告警 |
 | 排除 Rule Name | `ExcludeRuleNames` | ≤4000 | 是 | JSON 数组，**Rule 级**黑名单 |
 | 报警等级 | `Priority` | ≤20 | 否 | `P1` ~ `P4`；**值域来自 Misc `system.global.priority`**（后端读 Misc 校验，前端走 `/api/v1/sys_misc/priority/list` 取候选，见 §4.1-6） |
-| 启用状态 | `Enabled` | NUMBER(1) | 否 | 布尔：`1`（true）生效、非 `1` 停用；**新建默认 `1`（true）**；只由列表开关改（`state` 接口），不进 Ro |
+| 启用状态 | `Enabled` | NUMBER(1) | 否 | 布尔：**`true`（库中 `1`）= 启用、非 `true` = 未启用**（`0` / `NULL` 等一律未启用，防止误用）；**新建默认 `true`**；只由列表开关改（`state` 接口），不进 Ro |
 | 通知配置 | `AlarmCfgId` | ≤50 | 否 | 关联 `FvAlarmCfg.ID` |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值、`UpdatedAt` 无条件刷新 |
 
 **业务唯一索引**：`Item + Environment`。
 
-- **新增 `Enabled`**：只有 `true` 的规则生效，`false` 停用但配置保留；启停走列表开关（§3.2 / §4.1-7 `state` 接口）。
+- **新增 `Enabled`**：只有 `true` 的规则启用，非 `true` 未启用但配置保留；启停走列表开关（§3.2 / §4.1-7 `state` 接口）。
 - 三个 JSON 数组字段的**长度按字符**校验（≤4000），元素个数不单独卡上限；空/未配置存 `NULL`。
 - 改表后**不缓存、不热加载**：运行时每轮重读这张表，新增 / 修改 / 删除 / 启停都**下一轮生效**（`02` §6.2）。
 
@@ -332,7 +332,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `followRuleNames` | `List<string>` | 空 ⇒ `[]` |
 | `excludeRuleNames` | `List<string>` | 空 ⇒ `[]` |
 | `priority` | string | `P1` ~ `P4` |
-| `enabled` | boolean | `true` 生效 / `false` 停用 |
+| `enabled` | boolean | `true` = 启用、非 `true` = 未启用 |
 | `alarmCfg` | `AlarmCfgDto` | 嵌套通知配置 |
 | `lastUpdatedTime` | string | 审计 `updatedAt` 有值取它，为空取 `createdAt` |
 | `lastUpdatedUser` | string | 审计 `updatedBy` 有值取它，为空取 `createdBy` |
