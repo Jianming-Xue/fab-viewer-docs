@@ -84,7 +84,7 @@
 | Rule 过滤 | 两条判据各自的 Exclude Rule Name List（启动读），各进各的 DSL；**空名单不加该条件** |
 | 产出 | 命中 → A / B 各按自己的 `_id` 写 Oracle + OS，一条 issue 一个 `issueType`，同一块可各一条 |
 | 互斥 | `FvTurn` 独立行 `Name = SRVHANGMON`，`SELECT … FOR UPDATE SKIP LOCKED`（§6） |
-| 应用形态 | 同一应用多定时器项目；与关键字监控是两个独立报警服务 |
+| 应用形态 | 统一部署在应用 **`monitor-alarm`**（同一进程多定时器项目）；与关键字监控仍是两个独立报警服务，各自一把 `FvTurn` 行锁；通知定时器（`ALARMNOTIFY`，见 `10`）也在该应用内、与两者各自节奏、互不阻塞 |
 
 ### 4.2 必须守住
 
