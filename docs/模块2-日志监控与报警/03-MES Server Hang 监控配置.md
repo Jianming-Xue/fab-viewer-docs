@@ -1,5 +1,7 @@
 # MES Server Hang 监控 · 配置文档
 
+> **v1.1.0 更改（2026-11-25）**：`alarmCfg.notifyInterval` 由「未传默认 5」改为**必填、未传报错**（后端不再补默认值），与 `01` 同步、文档对齐已落地的实现。涉及章节：§4.1「后端校验」第 6 条、§4.3 `POST` ①、错误码清单。
+
 ## 1. 功能定位
 
 MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `Server Hang`；一次 Rule 写日志时长超过 **Max Rule Cost** 秒 ⇒ 报 `Endless Rule`。本功能**只管配置侧** —— 「一个环境下，两个阈值各配多少、报出来的报警算几级、发给谁、启不启用」；判定式、扫描与报警落库、通知在运行时文档展开，不在本篇。
@@ -194,7 +196,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 3. `environment` ∈ Misc `mes.global.environments`、`priority` ∈ Misc `system.global.priority` —— 复用 `env/list` / `priority/list` 的后端取值方法拿候选校验（与前端下拉同一套取值逻辑、同服务内直接调方法不走 HTTP，对齐功能 1）；
 4. `POST`：`environment` **不能已存在**（一环境一行）；
 5. `PUT` / `DELETE` / `state`：`environment` **必须已存在**；
-6. 通知配置：`notifyInterval` 为整数且 **`2 ~ 99999`（必须 > 1）**，`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式，`feishuGroups` 的 **key 逐个**校验群机器人地址格式、**value** 校验 open_id（`ou_` 开头，单个 string 或 string 数组逐项校验），任一不合规 ⇒ `ParameterInvalid`（三项名单均可为空，空则跳过校验）。
+6. 通知配置：`notifyInterval` **必填**（未传 ⇒ `RequireParameterMissing`，后端不补默认值），且为整数并落在 **`2 ~ 99999`（必须 > 1）**，`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式，`feishuGroups` 的 **key 逐个**校验群机器人地址格式、**value** 校验 open_id（`ou_` 开头，单个 string 或 string 数组逐项校验），任一不合规 ⇒ `ParameterInvalid`（三项名单均可为空，空则跳过校验）。
 
 ### 4.2 出入参对象
 
@@ -281,7 +283,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 | 步骤 | 动作 |
 |---|---|
-| ① | **必填校验（4 项）**：`environment` / `maxDelay` / `maxRuleCost` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验两阈值（`1~65535`）、`notifyInterval`（`2~99999`，必须 > 1，缺省补 **5**）、邮箱 / `feishuGroups` 的 key（webhook）与 value（open_id）格式校验（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid` |
+| ① | **必填校验（4 项）**：`environment` / `maxDelay` / `maxRuleCost` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验两阈值（`1~65535`）、`notifyInterval`（**必填**，未传 ⇒ `RequireParameterMissing`；`2~99999`，必须 > 1）、邮箱 / `feishuGroups` 的 key（webhook）与 value（open_id）格式校验（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid` |
 | ② | **值域校验（复用 `/list` 方法）**：环境候选取 `env/list`、等级候选取 `priority/list` 的后端取值方法（同服务内直接调方法、不走 HTTP；分别读 Misc `mes.global.environments` / `system.global.priority`）；不在候选内（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
 | ③ | **存在性校验**：按 `environment` 校验对象是否已存在（**不加锁**）—— 已存在 ⇒ 不允许创建（`SrvHangMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突转同一业务码（防并发穿透） |
 | ④ | 事务：**先建通知对象** —— 生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建配置对象** —— 生成本表 `ID` → INSERT `FvSrvHangMonitorCfg`（带该 `ALARM_CFG_ID`），**`ENABLED` 取默认 `true`** → 提交 |
@@ -320,7 +322,7 @@ MES 服务 Hang 靠日志块判定：块停写超过 **Max Delay** 秒 ⇒ 报 `
 
 | `code` | 触发 | 前端表现 |
 |---|---|---|
-| `RequireParameterMissing` | 必填项缺失 / 空白（含 `state` 的 `environment` / `enabled` 缺失） | 定位到字段的红字提示 / 开关回弹 |
+| `RequireParameterMissing` | 必填项缺失 / 空白（含 `state` 的 `environment` / `enabled` 缺失、`alarmCfg.notifyInterval` 未传） | 定位到字段的红字提示 / 开关回弹 |
 | `ParameterInvalid` | 两阈值非整数或超 `1~65535`、`enabled` 非布尔、`notifyInterval` 非整数或不在 `2~99999`（≤1 同样拒）、邮箱 / `feishuGroups` 的 webhook 或 open_id 格式不合规 | 定位到字段的红字提示 |
 | `SrvHangMonitorCfgExists` | `environment` 已存在（创建时） | 提示「该环境已配置」 |
 | `SrvHangMonitorCfgNotFound` | `PUT` / `DELETE` / `state` 时该 `environment` 未创建 | 提示后刷新列表 |

@@ -1,5 +1,7 @@
 # MES 关键字监控 · 配置文档
 
+> **v1.1.0 更改（2026-11-25）**：`alarmCfg.notifyInterval` 由「未传默认 5」改为**必填、未传报错**（后端不再补默认值），文档对齐已落地的实现。涉及章节：§2.2 表二、§4.1「后端校验」第 5 条、§4.2 `AlarmCfgRo`、§4.3 `POST` ①、错误码清单。
+
 ## 1. 功能定位
 
 MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Oracle 报错。这类错误散在海量日志里，靠人翻看不现实。本功能**定时扫描日志**，命中预设关键字就生成 Alarm 并通知到人（扫描与判定逻辑见运行时文档，不在本篇展开）。
@@ -58,7 +60,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | 收件人 | `MailToUsers` | ≤4000 | 是 | JSON 数组，收件人邮箱；**为空 ⇒ 邮件不发** |
 | 抄送 | `MailCCUsers` | ≤4000 | 是 | JSON 数组，抄送邮箱；CC 不顶替收件人 |
 | 飞书群与 @ 人 | `FeishuGroups` | ≤4000 | 是 | JSON map（Key Value）：**key = 群机器人 webhook 地址**（字符串），**value = 该群要 @ 的人的 open_id** —— 一个人写 string、多个人写 string 数组（人在该群才生效）；可空 |
-| 通知间隔 | `NotifyInterval` | ≤10 | 否 | **整数、单位分钟**，取值 `2 ~ 99999`（**必须 > 1**），默认 **5** |
+| 通知间隔 | `NotifyInterval` | ≤10 | 否 | **整数、单位分钟**，取值 `2 ~ 99999`（**必须 > 1**）；**必填**，未传即拒，后端不补默认值 |
 | 审计四字段 | `CreatedAt`/`CreatedBy`/`UpdatedAt`/`UpdatedBy` | — | 见上 | 底层统一赋值、`UpdatedAt` 无条件刷新 |
 
 **无业务唯一索引** —— 只按 `ID` 被表一 1:1 引用，不单独检索。
@@ -285,7 +287,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 2. `priority` 必须存在于 Misc `system.global.priority`；
 3. `item + environment` 唯一（仅 `POST` 校验 —— `PUT` 不可改这两项，天然不冲突）；
 4. 三个 JSON 数组**序列化后**各 ≤4000 字符；
-5. `notifyInterval` 为整数且落在 **`2 ~ 99999`**（必须 > 1）；
+5. `notifyInterval` **必填**（未传 ⇒ `RequireParameterMissing`，后端不补默认值），且为整数并落在 **`2 ~ 99999`**（必须 > 1）；
 6. 两条交叉校验：排除词不得是 `keyword` 子串（含相等）、关注名单与排除名单不得有交集（详见 §4.3「写接口的交叉校验」）；
 7. 通知格式：`mailToUsers` / `mailCCUsers` **逐个**校验邮箱格式；`feishuGroups` 的 **key 逐个**校验群机器人地址格式、**value** 校验 open_id（`ou_` 开头，单个 string 或 string 数组逐项校验），任一不合规 ⇒ `ParameterInvalid`（三项均可为空，空则跳过校验）。
 
@@ -315,7 +317,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 | `mailToUsers` | `List<string>` | 否 | 邮箱格式，序列化 ≤4000 |
 | `mailCCUsers` | `List<string>` | 否 | 同上 |
 | `feishuGroups` | `Map<string, string \| string[]>`（JSON object） | 否 | **key = 群 webhook 地址，value = 该群要 @ 的人的 open_id**（一个值 string、多个值 string 数组）；序列化 ≤4000 |
-| `notifyInterval` | int | 是 | **2 ~ 99999**（必须 > 1），默认 5 |
+| `notifyInterval` | int | 是 | **必填**：未传（缺失 / `null`）⇒ `RequireParameterMissing`，后端不补默认值；传了须为 **2 ~ 99999**（必须 > 1） |
 
 **`LogMonitorCfgDto`（出参，字段与 `LogMonitorCfgRo` 同形，另加 `enabled` 与两个展示字段）**
 
@@ -403,7 +405,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | 步骤 | 动作 |
 |---|---|
-| ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30、`keyword` ≤30、`description` ≤255、`notifyInterval`（整数 **2~99999**，必须 > 1，缺省补 **5**）、**邮箱 / `feishuGroups` 的 key（webhook）与 value（open_id）格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
+| ① | **必填校验（4 项）**：`environment` / `item` / `keyword` / `priority` 任一为空或空白 ⇒ `RequireParameterMissing`；顺带校验 `item` ≤30、`keyword` ≤30、`description` ≤255、`notifyInterval`（**必填**，未传 ⇒ `RequireParameterMissing`；整数 **2~99999**，必须 > 1）、**邮箱 / `feishuGroups` 的 key（webhook）与 value（open_id）格式校验**（可空，空则跳过），超限或不合规 ⇒ `ParameterInvalid`；**三名单交叉校验见本节末**「写接口的交叉校验」 |
 | ② | **值域校验（复用 `/list` 方法）**：环境候选取 `env/list`、等级候选取 `priority/list` 的后端取值方法（同服务内直接调方法、不走 HTTP；二者均出 `string[]`，分别读 Misc `mes.global.environments` / `system.global.priority`）；提交值不在候选内（含未配、集合为空）⇒ `EnvironmentNotAllowed` / `PriorityNotAllowed` |
 | ③ | **存在性校验**：按 `item + environment` 校验对象是否已存在（**不加锁**）—— 已存在 ⇒ **不允许创建**（`LogMonitorCfgExists`）；库层唯一索引兜底，捕获约束冲突**转同一业务码**（防并发穿透） |
 | ④ | 事务：**先建通知对象**——生成 `AlarmCfg.ID` → INSERT `FvAlarmCfg` → 拿到 `ALARM_CFG_ID`；**再建监控对象**——生成规则 `ID` → INSERT `FvLogMonitorCfg`（带该 `ALARM_CFG_ID`）→ 提交 |
@@ -469,7 +471,7 @@ MES 运行时会产生各种错误 —— 比如日志里出现 `ORA-` 就是 Or
 
 | `code` | 触发 | 前端表现 |
 |---|---|---|
-| `RequireParameterMissing` | 必填项缺失 / 空白 | 定位到字段的红字提示 |
+| `RequireParameterMissing` | 必填项缺失 / 空白（含 `notifyInterval` 未传） | 定位到字段的红字提示 |
 | `ParameterInvalid` | 长度超限、`notifyInterval` 非整数或不在 `2~99999`（≤1 同样拒）、邮箱 / `feishuGroups` 的 webhook 或 open_id 格式不合规、JSON 序列化超长 | 定位到字段的红字提示 |
 | `LogMonitorCfgExists` | `item + environment` 已存在（创建时） | 提示「同环境下该规则名已存在」 |
 | `LogMonitorCfgNotFound` | `detail` 查不到；`PUT` / `DELETE` / `state` 时该 `item + environment` 未创建 | 提示后刷新列表 |
